@@ -28,17 +28,17 @@ export const metadata: Metadata = {
     "clinic no-show solution",
     "gap recovery software",
   ],
-  metadataBase: new URL("https://gaplet.com"),
+  metadataBase: new URL("https://gaplets.com"),
   openGraph: {
     title: "Gaplet",
     description:
       "Recover revenue from cancellations and no-shows. Gaplet automatically fills last-minute appointment slots using your existing waitlist.",
-    url: "https://gaplet.com",
+    url: "https://gaplets.com",
     siteName: "Gaplet",
     type: "website",
     images: [
       {
-        url: "https://gaplet.com/og-image.jpg",
+        url: "og-gaplet.jpg",
         width: 1200,
         height: 630,
         alt: "Gaplet Open Graph Image",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     title: "Gaplet",
     description:
       "Never let a last-minute cancellation go to waste — use Gaplet to automatically fill empty appointments.",
-    images: ["https://gaplet.com/og-image.jpg"],
+    images: ["/og-gaplet.jpg"],
   },
 };
 
