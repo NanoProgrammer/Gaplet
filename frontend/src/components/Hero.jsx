@@ -8,10 +8,10 @@ export default function Hero() {
     <section className="relative isolate overflow-hidden min-h-screen bg-white flex flex-col items-center justify-center px-4 sm:px-8 ">
       <div className="absolute top-[-40px] left-[-60px] w-[300px] h-[300px] bg-emerald-400 opacity-30 rounded-full blur-[120px] z-[-1]" />
 
-      <div className="absolute bottom-[-120px] right-[-120px] w-[350px] h-[350px] bg-sky-400 opacity-30 rounded-full blur-[120px] z-[-1]" />
+      <div className="absolute top-90 right-[-120px] w-[350px] h-[350px] bg-sky-400 opacity-30 rounded-full blur-[120px] z-[-1.1]" />
 
-      <div className="absolute top-[30px] right-[-20px] w-[250px] h-[250px] bg-orange-800 opacity-20 rounded-full blur-[60px] z-[-1]" />
-      <div className="absolute bottom-[-80px] left-[10px] w-[300px] h-[310px] bg-violet-400 opacity-25 rounded-full blur-[40px] z-[-1]" />
+      <div className="absolute top-[20px] right-[-20px] w-[250px] h-[250px] bg-orange-800 opacity-20 rounded-full blur-[60px] z-[-1]" />
+      <div className="absolute top-80 left-[10px] w-[340px] h-[320px] bg-violet-400 opacity-25 rounded-full blur-[40px] z-[-1.1]" />
       {/* Contenido principal */}
       <div className="lg:mr-84 z-10 flex flex-col lg:flex-row items-start justify-start gap-82 lg:gap-0">
         {/* text and buttons */}
@@ -119,6 +119,8 @@ export default function Hero() {
           </div>
         </div>
       </div>
+     
+
     </section>
   );
 }
