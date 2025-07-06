@@ -1,7 +1,8 @@
-"use client";
+
 import React from "react";
 import GlowButton from "./Button";
 import TV from "./tv";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -25,8 +26,12 @@ export default function Hero() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">
+            <Link href={"/signup"}>
             <GlowButton variant="primary">Start now</GlowButton>
+            </Link>
+            <Link href="#Demo">
             <GlowButton variant="secondary">Demo ▼</GlowButton>
+            </Link>
           </div>
         </div>
         {/* diagram */}

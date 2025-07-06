@@ -19,7 +19,7 @@ export default function CallSection() {
   ));
 
   return (
-    <div className="max-w-7xl mx-auto z-10">
+    <div className="max-w-7xl mx-auto z-10 mb-32">
       <section className="relative w-full min-h-screen flex flex-col items-center justify-center bg-white px-6 py-20 text-center overflow-hidden">
         <div className="absolute bottom-108 right-[-130px] w-[350px] h-[350px] lg:bg-sky-400 opacity-30 rounded-full blur-[120px] z-[-1.1]" />
 
@@ -44,18 +44,19 @@ export default function CallSection() {
           {blocks}
         </div>
 
-        <div className="text-xl text-[var(--danger)] font-semibold mb-2 relative ">
+        <div className="text-xl text-[var(--danger)] font-semibold mb-2 relative " >
           💸 $900 lost this month due to cancellations alone
         </div>
 
         <div className="flex flex-col md:flex-row items-center text-center gap-3 mt-6 max-w-[640px] relative ">
           <p className="text-[var(--muted-foreground)] text-base md:text-lg">
             At a dental clinic, losing just 4 appointments a month can mean over{" "}
-            <span className="text-[var(--primary)] font-bold">$1,000</span> in unrecovered revenue. 
+            <span className="text-[var(--primary)] font-bold" >$1,000</span> in unrecovered revenue. 
             In salons, wellness centers, or therapy practices, the impact adds up silently—until it hits your bottom line.
           </p>
         </div>
       </section>
+      <div id='HowItWorks'></div>
     </div>
   );
 }

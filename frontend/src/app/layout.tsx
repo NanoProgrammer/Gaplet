@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 
 // SEO realista y coherente con la propuesta de Gaplet
 export const metadata: Metadata = {
-  title: "Gaplet | Smart Waitlist Management for Clinics and Service Providers",
+  title: "Gaplets | Smart Waitlist Management for Clinics and Service Providers",
   description:
-    "Gaplet fills last-minute cancellations by automatically notifying eligible clients from your existing schedule — recover revenue and never leave a spot empty.",
+    "Gaplets fills last-minute cancellations by automatically notifying eligible clients from your existing schedule — recover revenue and never leave a spot empty.",
   keywords: [
     "waitlist management",
     "calendar automation",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "og-gaplet.jpg",
+        url: "og_gaplet.png",
         width: 1200,
         height: 630,
         alt: "Gaplet Open Graph Image",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     title: "Gaplet",
     description:
       "Never let a last-minute cancellation go to waste — use Gaplet to automatically fill empty appointments.",
-    images: ["/og-gaplet.jpg"],
+    images: ["/og_gaplet.png"],
   },
 };
 

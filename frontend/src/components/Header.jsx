@@ -36,17 +36,17 @@ export default function Header() {
         {/* DESKTOP NAV */}
         <nav className="hidden md:flex items-center gap-8">
           <ul className="flex gap-6 text-sm font-medium">
-            <li><Link href="#Features" className="hover:underline hover:text-[var(--primary-hover)]">Features</Link></li>
+            <li><Link href="#SetUp" className="hover:underline hover:text-[var(--primary-hover)]">SetUp</Link></li>
             <li><Link href="#Pricing" className="hover:underline hover:text-[var(--primary-hover)]">Pricing</Link></li>
-            <li><Link href="#Integration" className="hover:underline hover:text-[var(--primary-hover)]">Integration</Link></li>
+            <li><Link href="#HowItWorks" className="hover:underline hover:text-[var(--primary-hover)]">How it works</Link></li>
             <li><Link href="#FAQ" className="hover:underline hover:text-[var(--primary-hover)]">FAQ</Link></li>
           </ul>
         </nav>
 
         {/* DESKTOP BUTTONS */}
         <div className="hidden md:flex items-center gap-4">
-          <Link href="/sign-up"><Button className="rounded-md">Sign up</Button></Link>
-          <Link href="/sign-in"><Button variant="outline" className="rounded-md">Sign in</Button></Link>
+          <Link href="/signup"><Button className="rounded-md">Sign up</Button></Link>
+          <Link href="/signin"><Button variant="outline" className="rounded-md">Sign in</Button></Link>
         </div>
 
         {/* MOBILE TOGGLE */}
