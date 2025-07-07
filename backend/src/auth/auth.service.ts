@@ -153,13 +153,14 @@ async findOrCreateGoogleUser(profile: { email: string; firstName: string; lastNa
     // Ya existe, lo usamos tal como está
     return user;
   }
+  const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
 
   // Si no existe, lo creamos con password nula (ya hiciste password opcional)
   return this.prisma.user.create({
     data: {
       email: profile.email,
       name: `${profile.firstName} ${profile.lastName}`,
-      password: "DEFAULT_PASSWORD", // mejor que usar 'GOOGLE_AUTH_USER'
+      password: hash, 
     },
   });
 }

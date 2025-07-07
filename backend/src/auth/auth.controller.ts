@@ -62,6 +62,8 @@ async googleCallback(@Req() req, @Res() res: Response) {
 
     const tokens = await this.authService.generateTokens(user.id, user.email);
 
+    const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+
     const html = `
       <script>
         window.opener.postMessage(
@@ -70,7 +72,7 @@ async googleCallback(@Req() req, @Res() res: Response) {
             refreshToken: '${tokens.refreshToken}',
             user: ${JSON.stringify(user)}
           },
-          '*'
+          '${FRONTEND_ORIGIN}'
         );
         window.close();
       </script>
