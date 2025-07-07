@@ -1,8 +1,9 @@
+// ✅ app/layout.tsx
+import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
 
-// Importación de fuentes con variables
+// ✅ Fuentes con CSS variables
 const geistSans = Geist({
   subsets: ["latin"],
   variable: "--font-geist-sans",
@@ -15,50 +16,52 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-// SEO realista y coherente con la propuesta de Gaplet
+// ✅ Metadata global
 export const metadata: Metadata = {
-  title: "Gaplets | Smart Waitlist Management for Clinics and Service Providers",
+  title: "Gaplets | Last-Minute Appointment App for Clinics and Salons",
   description:
-    "Gaplets fills last-minute cancellations by automatically notifying eligible clients from your existing schedule — recover revenue and never leave a spot empty.",
+    "Gaplets helps you fill last-minute cancellations automatically. Notify eligible clients from your waitlist and recover lost revenue — all in one smart scheduling app.",
   keywords: [
-    "waitlist management",
-    "calendar automation",
+    "last minute appointment app",
     "fill last minute cancellations",
-    "appointment notifications",
+    "waitlist automation software",
+    "smart scheduling for clinics",
+    "appointment recovery platform",
+    "calendar integration",
     "clinic no-show solution",
-    "gap recovery software",
   ],
   metadataBase: new URL("https://gaplets.com"),
   openGraph: {
-    title: "Gaplet",
+    title: "Gaplets | Fill Last-Minute Appointments with Automation",
     description:
-      "Recover revenue from cancellations and no-shows. Gaplet automatically fills last-minute appointment slots using your existing waitlist.",
+      "Stop losing revenue on no-shows. Gaplets fills last-minute cancellations using your own waitlist — fully automated.",
     url: "https://gaplets.com",
-    siteName: "Gaplet",
+    siteName: "Gaplets",
     type: "website",
     images: [
       {
-        url: "og_gaplet.png",
+        url: "/og_gaplet.png",
         width: 1200,
         height: 630,
-        alt: "Gaplet Open Graph Image",
+        alt: "Gaplets waitlist automation app",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gaplet",
+    title: "Gaplets | Recover Lost Appointments Automatically",
     description:
-      "Never let a last-minute cancellation go to waste — use Gaplet to automatically fill empty appointments.",
+      "Smart software to fill appointment gaps. Use Gaplets to notify waitlisted clients when last-minute slots open up.",
     images: ["/og_gaplet.png"],
   },
 };
 
+// ✅ Este es el layout real
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="antialiased font-sans bg-white text-black">

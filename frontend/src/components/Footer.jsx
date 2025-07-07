@@ -21,7 +21,7 @@ export default function Footer() {
           <ul className="space-y-1">
             <li><Link href="/about" className="hover:underline">About us</Link></li>
             <li><Link href="/blog" className="hover:underline">Blog</Link></li>
-            <li><Link href="/about/#Contact" className="hover:underline">Contact</Link></li>
+            <li><Link href="/about/#contact" className="hover:underline">Contact</Link></li>
           </ul>
         </div>
 
@@ -39,7 +39,8 @@ export default function Footer() {
           <h4 className="font-semibold text-foreground mb-3">Support</h4>
           <ul className="space-y-1">
             <li>
-              <a href="mailto:support@gaplets.com" className="hover:underline">
+              <a href="https://mail.google.com/mail/?view=cm&fs=1&to=support@gaplets.com"   target="_blank"
+  rel="noopener noreferrer" className="hover:underline">
                 support@gaplets.com
               </a>
             </li>
