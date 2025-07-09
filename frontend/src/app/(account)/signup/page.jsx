@@ -1,21 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import {  useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, Mail, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
-
+import { useRouter } from 'next/navigation';
 export default function SignUpPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  // Removed invalid useEffect with await; handle API calls in handleSubmit instead.
+
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(form);
-  };
+    try { 
+    const res = await fetch('http://localhost:4000/auth/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(form),
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.message || 'Signup failed')
+    } else {
+      // Opcional: redirigir o mostrar mensaje de éxito
+      console.log('Signup success')
+      router.push('/signin')
+    }
+  } catch (err) {
+    setError(err.message || 'Unexpected error')
+  }
+}
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-transparent px-6 py-20 overflow-hidden">
@@ -37,7 +61,7 @@ export default function SignUpPage() {
             <p className="text-sm text-gray-600 mt-1">Automate. Notify. Fill the gap.</p>
           </div>
         </div>
-
+        {error && <p className="text-red-400 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Full Name */}
           <div>

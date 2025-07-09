@@ -1,21 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Lock, Mail } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { m, motion } from 'framer-motion';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 export default function SignInPage() {
   const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+ const handleGoogleSignIn = () => {
+  const googleAuthURL = 'http://localhost:4000/auth/google';
 
-  const handleSubmit = (e) => {
+  const popup = window.open(
+    googleAuthURL,
+    '_blank',
+    'width=500,height=600'
+  );
+
+  window.addEventListener(
+    'message',
+    (event) => {
+      // ⚠️ Asegúrate de que el origin es válido
+      if (
+        event.origin !== 'http://localhost:4000' &&
+        event.origin !== process.env.NEXT_PUBLIC_API_URL
+      ) return;
+
+      const { accessToken, refreshToken, user } = event.data;
+
+      if (accessToken && refreshToken && user) {
+        console.log('Google login successful');
+        console.log('Access Token:', accessToken);
+        console.log('Refresh Token:', refreshToken);
+        console.log('User:', user);
+        // Aquí podrías pasar la data a un context, cookie, o simplemente navegar
+      } else {
+        console.warn('Google login failed or missing data');
+      }
+    },
+    { once: true }
+  );
+};
+
+  const handleSubmit =  async(e) => {
     e.preventDefault();
-    console.log('Sign in:', form);
+    try { 
+    const res = await fetch('http://localhost:4000/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.password
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.message || 'SignIn failed')
+    } else {
+      // Opcional: redirigir o mostrar mensaje de éxito
+      const data = await res.json(); 
+
+      console.log('SignIn success')
+      router.push('/dashbord')
+    
+    }
+  } catch (err) {
+    setError(err.message || 'Unexpected error')
+  }
   };
 
   return (
@@ -45,6 +106,7 @@ export default function SignInPage() {
         <button
           type="button"
           className="w-full flex items-center justify-center gap-3 border border-gray-300 bg-white text-gray-800 rounded-md py-2 font-medium hover:bg-gray-50 transition shadow-sm"
+          onClick={handleGoogleSignIn}
         >
           <Image
             src="/google.avif"
@@ -64,6 +126,7 @@ export default function SignInPage() {
         </div>
 
         {/* Form */}
+        {error && <p className="text-red-400 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
           <div>
@@ -100,23 +163,34 @@ export default function SignInPage() {
           </div>
 
           {/* Submit */}
-          <button
-            type="submit"
-            className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
-          >
-            Sign In
-          </button>
+<button
+  type="submit"
+  className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
+>
+  Sign In
+</button>
 
-          {/* Link */}
-          <p className="text-sm text-center text-gray-600">
-            Don’t have an account?{' '}
-            <Link
-              href="/signup"
-              className="text-primary underline underline-offset-2 hover:text-primary/80"
-            >
-              Create one
-            </Link>
-          </p>
+{/* Forgot password */}
+<p className="text-sm text-center text-gray-600 mt-2">
+  Forgot your password?{' '}
+  <Link
+    href="/forgotPassword"
+    className="text-primary underline underline-offset-2 hover:text-primary/80"
+  >
+    Recover it here
+  </Link>
+</p>
+
+{/* Link to signup */}
+<p className="text-sm text-center text-gray-600 -mt-2">
+  Don’t have an account?{' '}
+  <Link
+    href="/signup"
+    className="text-primary underline underline-offset-2 hover:text-primary/80"
+  >
+    Create one
+  </Link>
+</p>
         </form>
       </motion.div>
     </div>
