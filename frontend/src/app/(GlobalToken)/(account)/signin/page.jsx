@@ -31,6 +31,7 @@ export default function SignInPage() {
     const allowedOrigins = [
       new URL(API_URL).origin,
       'http://localhost:4000',
+      'https://gaplet.vercel.app',   
     ];
 
     if (!allowedOrigins.includes(event.origin)) {
