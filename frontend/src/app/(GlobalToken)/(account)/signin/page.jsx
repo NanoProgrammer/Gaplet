@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, startTransition } from 'react';
 import Link from 'next/link';
 import { Lock, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -15,7 +15,6 @@ export default function SignInPage() {
   const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
   if (!API_URL) {
     throw new Error('❌ NEXT_PUBLIC_API_URL no está definida en tu archivo .env');
   }
@@ -25,30 +24,33 @@ export default function SignInPage() {
   };
 
   const handleGoogleSignIn = () => {
-  const googleAuthURL = `${API_URL}/auth/google`;
-  const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
+    const googleAuthURL = `${API_URL}/auth/google`;
+    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
-  const receiveMessage = (event) => {
-    // Asegúrate de aceptar SOLO a tu backend (puedes agregar https://api.tu-dominio.com)
-    if (event.origin !== API_URL && event.origin !== 'http://localhost:4000') return;
+    const receiveMessage = (event) => {
+      if (event.origin !== API_URL && event.origin !== 'http://localhost:4000') return;
 
-    const { accessToken, refreshToken, user } = event.data;
-    if (accessToken && refreshToken && user) {
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
+      const { accessToken, refreshToken, user } = event.data ?? {};
 
-      setUser({ accessToken, refreshToken });
-      popup?.close();                // Cierra la ventana
-      router.push('/dashboard');     // Redirige
-    } else {
-      console.warn('Google login failed or missing data');
-    }
+      if (accessToken && refreshToken && user) {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
 
-    window.removeEventListener('message', receiveMessage); // Limpieza
+        setUser({ accessToken, refreshToken });
+        popup?.close();
+
+        startTransition(() => {
+          router.replace('/dashboard');
+        });
+      } else {
+        console.warn('Google login failed or missing data');
+      }
+
+      window.removeEventListener('message', receiveMessage);
+    };
+
+    window.addEventListener('message', receiveMessage, { once: true });
   };
-
-  window.addEventListener('message', receiveMessage);
-};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,19 +75,27 @@ export default function SignInPage() {
         setError('Tokens not returned');
         return;
       }
+
       localStorage.setItem('accessToken', data.accessToken);
-localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
       setUser({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
 
       console.log('SignIn success');
-      router.push('/dashbord');
+      router.replace('/dashboard');
     } catch (err) {
       setError(err.message || 'Unexpected error');
     }
   };
+
+  // Redirigir automáticamente si ya hay sesión
+  useEffect(() => {
+    if (user?.accessToken) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-transparent px-6 py-20 overflow-hidden">
@@ -136,7 +146,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
         {/* Form */}
         {error && <p className="text-red-400 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email */}
           <div>
             <label className="text-sm font-medium text-gray-700">Email address</label>
             <div className="relative mt-1">
@@ -148,12 +157,12 @@ localStorage.setItem('refreshToken', data.refreshToken);
                 value={form.email}
                 onChange={handleChange}
                 required
+                autoComplete="email"
                 className="w-full pl-10 pr-4 py-2 rounded-md border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:outline-none transition"
               />
             </div>
           </div>
 
-          {/* Password */}
           <div>
             <label className="text-sm font-medium text-gray-700">Password</label>
             <div className="relative mt-1">
@@ -165,12 +174,12 @@ localStorage.setItem('refreshToken', data.refreshToken);
                 value={form.password}
                 onChange={handleChange}
                 required
+                autoComplete="current-password"
                 className="w-full pl-10 pr-4 py-2 rounded-md border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:outline-none transition"
               />
             </div>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
@@ -178,7 +187,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             Sign In
           </button>
 
-          {/* Forgot password */}
           <p className="text-sm text-center text-gray-600 mt-2">
             Forgot your password?{' '}
             <Link
@@ -189,7 +197,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             </Link>
           </p>
 
-          {/* Link to signup */}
           <p className="text-sm text-center text-gray-600 -mt-2">
             Don’t have an account?{' '}
             <Link
