@@ -15,6 +15,7 @@ export default function SignInPage() {
   const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const FRONTEND_ORIGIN = process.env.NEXT_PUBLIC_FRONTEND_ORIGIN || 'http://localhost:3000';
 
   if (!API_URL) {
     throw new Error('❌ NEXT_PUBLIC_API_URL no está definida en tu archivo .env');
@@ -29,30 +30,33 @@ export default function SignInPage() {
 
     const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
-    window.addEventListener(
-  'message',
-  (event) => {
-    if (
-      event.origin !== API_URL &&
-      event.origin !== 'http://localhost:4000'
-    )
+    if (!popup) {
+      console.error('❌ No se pudo abrir el popup de Google');
       return;
-
-    const { accessToken, refreshToken, user } = event.data;
-
-    if (accessToken && refreshToken && user) {
-      console.log('Google login successful');
-      setUser({ accessToken, refreshToken });
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      router.push('/dashboard'); // 🎯 REDIRECCIÓN DESPUÉS DEL LOGIN
-    } else {
-      console.warn('Google login failed or missing data');
     }
-  },
-  { once: true }
-);
 
+    const handleMessage = (event) => {
+      if (event.origin !== FRONTEND_ORIGIN) {
+        console.warn('❌ Origen no permitido:', event.origin);
+        return;
+      }
+
+      const { accessToken, refreshToken, user } = event.data;
+
+      if (accessToken && refreshToken && user) {
+        console.log('✅ Google login successful');
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        setUser({ accessToken, refreshToken });
+        router.push('/dashboard');
+      } else {
+        console.warn('❌ Google login falló o datos incompletos');
+      }
+
+      window.removeEventListener('message', handleMessage);
+    };
+
+    window.addEventListener('message', handleMessage, false);
   };
 
   const handleSubmit = async (e) => {
@@ -78,14 +82,15 @@ export default function SignInPage() {
         setError('Tokens not returned');
         return;
       }
+
       localStorage.setItem('accessToken', data.accessToken);
-localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
       setUser({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
 
-      console.log('SignIn success');
+      console.log('✅ SignIn success');
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Unexpected error');
@@ -100,7 +105,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
         transition={{ duration: 0.5 }}
         className="z-10 w-full max-w-md bg-white/90 border border-gray-200 backdrop-blur-xl p-10 rounded-3xl shadow-2xl"
       >
-        {/* Header */}
         <div className="flex flex-col items-center gap-4 mb-10">
           <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center shadow-md">
             <Lock size={24} />
@@ -141,7 +145,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
         {/* Form */}
         {error && <p className="text-red-400 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email */}
           <div>
             <label className="text-sm font-medium text-gray-700">Email address</label>
             <div className="relative mt-1">
@@ -158,7 +161,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             </div>
           </div>
 
-          {/* Password */}
           <div>
             <label className="text-sm font-medium text-gray-700">Password</label>
             <div className="relative mt-1">
@@ -175,7 +177,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             </div>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
@@ -183,7 +184,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             Sign In
           </button>
 
-          {/* Forgot password */}
           <p className="text-sm text-center text-gray-600 mt-2">
             Forgot your password?{' '}
             <Link
@@ -194,7 +194,6 @@ localStorage.setItem('refreshToken', data.refreshToken);
             </Link>
           </p>
 
-          {/* Link to signup */}
           <p className="text-sm text-center text-gray-600 -mt-2">
             Don’t have an account?{' '}
             <Link
