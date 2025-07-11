@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { blogPosts } from '@/data/blogPosts';
 import type { Metadata } from 'next';
 
-// ✅ Genera los metadatos para SEO
+// ✅ Metadatos dinámicos
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = blogPosts.find((p) => p.slug === params.slug);
   if (!post) return {};
@@ -35,21 +35,18 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-// ✅ Genera rutas estáticas en build time
+// ✅ Generación estática
 export function generateStaticParams() {
   return blogPosts.map((post) => ({ slug: post.slug }));
 }
 
-interface BlogPageProps {
-  params: {
-    slug: string;
-  };
+// ✅ Página principal
+interface BlogPostPageProps {
+  params: { slug: string };
 }
 
-export default function BlogPostPage(props: BlogPageProps) {
-  const { slug } = props.params;
-  const post = blogPosts.find((p) => p.slug === slug);
-
+export default function BlogPostPage({ params }: BlogPostPageProps) {
+  const post = blogPosts.find((p) => p.slug === params.slug);
   if (!post) return notFound();
 
   return (
@@ -60,7 +57,6 @@ export default function BlogPostPage(props: BlogPageProps) {
 
         {post.image && (
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border">
-            {/* ⚠️ Cambiar a <Image /> si quieres optimizar */}
             <img
               src={post.image}
               alt={post.alt || post.title}
