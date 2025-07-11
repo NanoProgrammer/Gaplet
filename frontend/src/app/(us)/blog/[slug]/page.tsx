@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { blogPosts } from '@/data/blogPosts';
-import type { Metadata, ResolvingMetadata } from 'next';
+import type { Metadata } from 'next';
 
 // ✅ Generación de metadatos
 export async function generateMetadata(
