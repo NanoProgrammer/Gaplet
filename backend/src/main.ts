@@ -6,24 +6,39 @@ import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // 🟢 Solo este endpoint acepta raw
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
-  if (process.env.NODE_ENV === 'development')
+
+  // 🔴 Este afecta TODO, así que debe ir después y con cuidado
+  // Evitamos que rompa el webhook
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/webhooks/stripe') {
+      next(); // dejar raw
+    } else {
+      bodyParser.json()(req, res, next); // parsear JSON solo si NO es webhook
+    }
+  });
+
+  // CORS
+  if (process.env.NODE_ENV === 'development') {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
-  if (process.env.NODE_ENV === 'production') {
+  } else {
     app.enableCors({
       origin: 'https://gaplet.vercel.app',
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
     });
   }
-  app.use(bodyParser.json());
 
+  // Pipes
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
     }),
   );
+
   await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap();
