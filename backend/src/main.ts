@@ -11,7 +11,7 @@ async function bootstrap() {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   if (process.env.NODE_ENV === 'production') {
     app.enableCors({
-      origin: 'https://simuxel.vercel.app',
+      origin: 'https://gaplet.vercel.app',
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
     });
