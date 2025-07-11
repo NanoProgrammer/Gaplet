@@ -1,11 +1,16 @@
-import { notFound } from 'next/navigation';
-import { blogPosts } from '@/data/blogPosts';
-import type { Metadata } from 'next';
+import { notFound } from 'next/navigation'
+import { blogPosts } from '@/data/blogPosts'
+import type { Metadata } from 'next'
+import Image from 'next/image'
 
-// ✅ Metadatos dinámicos
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const post = blogPosts.find((p) => p.slug === params.slug);
-  if (!post) return {};
+// ✅ Generación de metadata dinámica
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}): Promise<Metadata> {
+  const post = blogPosts.find((p) => p.slug === params.slug)
+  if (!post) return {}
 
   return {
     title: `${post.title} | Blog | Gaplets`,
@@ -32,22 +37,22 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       description: `Explore insights: ${post.title}`,
       images: post.image ? [post.image] : [],
     },
-  };
+  }
 }
 
-// ✅ Generación estática
+// ✅ Rutas estáticas
 export function generateStaticParams() {
-  return blogPosts.map((post) => ({ slug: post.slug }));
+  return blogPosts.map((post) => ({ slug: post.slug }))
 }
 
-// ✅ Página principal
-interface BlogPostPageProps {
-  params: { slug: string };
-}
-
-export default function BlogPostPage({ params }: BlogPostPageProps) {
-  const post = blogPosts.find((p) => p.slug === params.slug);
-  if (!post) return notFound();
+// ✅ Componente de página sin errores de tipo
+export default function BlogPostPage({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const post = blogPosts.find((p) => p.slug === params.slug)
+  if (!post) return notFound()
 
   return (
     <section className="px-6 py-24 max-w-3xl mx-auto space-y-10">
@@ -57,10 +62,12 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
 
         {post.image && (
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border">
-            <img
+            {/* ⚠️ Optimizando con next/image */}
+            <Image
               src={post.image}
               alt={post.alt || post.title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
           </div>
         )}
@@ -71,5 +78,5 @@ export default function BlogPostPage({ params }: BlogPostPageProps) {
         dangerouslySetInnerHTML={{ __html: post.content }}
       />
     </section>
-  );
+  )
 }
