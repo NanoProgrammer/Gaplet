@@ -1,14 +1,8 @@
 import { notFound } from 'next/navigation'
 import { blogPosts } from '@/data/blogPosts'
-import type { Metadata } from 'next'
 import Image from 'next/image'
 
-// ✅ Generación de metadata dinámica
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string }
-}): Promise<Metadata> {
+export async function generateMetadata({ params }) {
   const post = blogPosts.find((p) => p.slug === params.slug)
   if (!post) return {}
 
@@ -40,17 +34,11 @@ export async function generateMetadata({
   }
 }
 
-// ✅ Rutas estáticas
 export function generateStaticParams() {
   return blogPosts.map((post) => ({ slug: post.slug }))
 }
 
-// ✅ Componente de página sin errores de tipo
-export default function BlogPostPage({
-  params,
-}: {
-  params: { slug: string }
-}) {
+export default function BlogPostPage({ params }) {
   const post = blogPosts.find((p) => p.slug === params.slug)
   if (!post) return notFound()
 
@@ -62,7 +50,6 @@ export default function BlogPostPage({
 
         {post.image && (
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border">
-            {/* ⚠️ Optimizando con next/image */}
             <Image
               src={post.image}
               alt={post.alt || post.title}
