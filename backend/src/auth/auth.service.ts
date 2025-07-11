@@ -83,52 +83,66 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string) {
+  console.log('📩 [ResetPassword] Start for:', email);
+
+  try {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new NotFoundException('Email not registered');
+    if (!user) {
+      console.warn('⚠️ Email not found:', email);
+      throw new NotFoundException('Email not registered');
+    }
+
+    console.log('✅ User found:', user.id, user.email);
 
     const token = await this.jwt.signAsync(
       { sub: user.id },
       { expiresIn: '15m', secret: this.config.get('JWT_SECRET') },
     );
 
+    console.log('🔑 Token generated:', token);
+
     const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
+    console.log('🔗 Reset link:', resetLink);
+
+    const emailUser = this.config.get('EMAIL_USER');
+    const emailPass = this.config.get('EMAIL_PASS');
+
+    if (!emailUser || !emailPass) {
+      console.error('❌ EMAIL_USER or EMAIL_PASS missing in env');
+      throw new Error('Missing email credentials');
+    }
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: this.config.get('EMAIL_USER'),
-        pass: this.config.get('EMAIL_PASS'),
+        user: emailUser,
+        pass: emailPass,
       },
     });
 
-    await transporter.sendMail({
-      to: email,
-      from: this.config.get('EMAIL_USER'),
+    const mailOptions = {
+      to: user.email,
+      from: emailUser,
       subject: 'Simuxel Password Reset Request',
       html: `
-  <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 40px;">
-    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <h2 style="color: #333; text-align: center;">🔐 Reset Your Simuxel Password</h2>
-      <p style="color: #555;">Hi ${user.name || 'there'},</p>
-      <p style="color: #555;">We received a request to reset your Simuxel password. Click the button below to continue:</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetLink}" style="background-color: #007bff; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-          Reset Password
-        </a>
-      </div>
-      <p style="color: #777;">This link will expire in <strong>15 minutes</strong>.</p>
-      <p style="color: #999; font-size: 12px;">If you didn’t request this, you can safely ignore this email.</p>
-      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-      <p style="color: #bbb; font-size: 12px; text-align: center;">
-        &copy; ${new Date().getFullYear()} Simuxel. All rights reserved.
-      </p>
-    </div>
-  </div>
-  `,
-    });
+        <p>Hello ${user.name || 'there'},</p>
+        <p>Reset your password using this link:</p>
+        <p><a href="${resetLink}">${resetLink}</a></p>
+      `,
+    };
 
+    console.log('📨 Sending email...');
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log('✅ Email sent:', info.messageId);
     return { message: 'Password reset link sent to your email' };
+  } catch (error) {
+    console.error('❌ [ResetPassword] ERROR:', error);
+    throw new BadRequestException('Failed to send reset email');
   }
+}
+
 
   async resetPassword(token: string, newPassword: string) {
     try {
