@@ -7,9 +7,14 @@ import { JwtRefreshStrategy, JwtStrategy } from './auth/strategy';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
 
-
 @Module({
-  imports: [AuthModule, UserModule,ConfigModule.forRoot({isGlobal: true}),CheckoutModule, PaymentsModule],
+  imports: [
+    AuthModule,
+    UserModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    CheckoutModule,
+    PaymentsModule,
+  ],
   controllers: [],
   providers: [PrismaManagerService, JwtStrategy, JwtRefreshStrategy],
 })

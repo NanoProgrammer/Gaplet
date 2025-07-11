@@ -4,7 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaManagerService } from 'src/prisma-manager/prisma-manager.service';
 
 @Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
+export class JwtRefreshStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
   constructor(private prisma: PrismaManagerService) {
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'), // or from cookie

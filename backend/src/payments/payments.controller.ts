@@ -10,7 +10,7 @@ export class PaymentsController {
 
   constructor(
     private configService: ConfigService,
-    private userService: UserService
+    private userService: UserService,
   ) {
     this.stripe = new Stripe(configService.get('STRIPE_SECRET_KEY'));
   }
@@ -25,7 +25,7 @@ export class PaymentsController {
       event = this.stripe.webhooks.constructEvent(
         req.body,
         sig,
-        this.configService.get('STRIPE_WEBHOOK_SECRET')
+        this.configService.get('STRIPE_WEBHOOK_SECRET'),
       );
     } catch (err) {
       console.error('❌ Webhook signature invalid', err.message);

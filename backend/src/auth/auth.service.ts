@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException,BadRequestException  } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import * as nodemailer from 'nodemailer';
 import { PrismaManagerService } from 'src/prisma-manager/prisma-manager.service';
@@ -6,12 +11,15 @@ import * as argon from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
-
 @Injectable()
 export class AuthService {
- constructor(private prisma : PrismaManagerService, private jwt: JwtService, private config: ConfigService) {} 
+  constructor(
+    private prisma: PrismaManagerService,
+    private jwt: JwtService,
+    private config: ConfigService,
+  ) {}
   async register(createAuthDto: CreateAuthDto) {
-    const user  =await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: {
         email: createAuthDto.email,
       },
@@ -19,8 +27,10 @@ export class AuthService {
     if (user) {
       throw new ConflictException('User already exists');
     }
-    if(createAuthDto.password.length < 6) {
-      throw new ConflictException('Password must be at least 6 characters long');
+    if (createAuthDto.password.length < 6) {
+      throw new ConflictException(
+        'Password must be at least 6 characters long',
+      );
     }
     const hashedPassword = await argon.hash(createAuthDto.password);
     const newUser = await this.prisma.user.create({
@@ -31,7 +41,6 @@ export class AuthService {
     });
     newUser.password = undefined; // Remove password from the response
     return newUser;
-
   }
 
   async login(email: string, password: string) {
@@ -51,53 +60,52 @@ export class AuthService {
     }
 
     return this.generateTokens(user.id, user.email);
-    
   }
 
   async generateTokens(userId: string, email: string) {
-  const payload = { sub: userId, email };
+    const payload = { sub: userId, email };
 
-  const accessToken = await this.jwt.signAsync(payload, {
-    secret: this.config.get('JWT_ACCESS_SECRET'),
-    expiresIn: '15m',
-  });
+    const accessToken = await this.jwt.signAsync(payload, {
+      secret: this.config.get('JWT_ACCESS_SECRET'),
+      expiresIn: '15m',
+    });
 
-  const refreshToken = await this.jwt.signAsync(payload, {
-    secret: this.config.get('JWT_REFRESH_SECRET'),
-    expiresIn: '7d',
-  });
+    const refreshToken = await this.jwt.signAsync(payload, {
+      secret: this.config.get('JWT_REFRESH_SECRET'),
+      expiresIn: '7d',
+    });
 
-  // Optional: store hashed refreshToken in DB to validate later
-  return {
-    accessToken,
-    refreshToken,
-  };
-}
+    // Optional: store hashed refreshToken in DB to validate later
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
 
-    async requestPasswordReset(email: string) {
-  const user = await this.prisma.user.findUnique({ where: { email } });
-  if (!user) throw new NotFoundException('Email not registered');
+  async requestPasswordReset(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('Email not registered');
 
-  const token = await this.jwt.signAsync(
-    { sub: user.id },
-    { expiresIn: '15m', secret: this.config.get('JWT_SECRET') }
-  );
+    const token = await this.jwt.signAsync(
+      { sub: user.id },
+      { expiresIn: '15m', secret: this.config.get('JWT_SECRET') },
+    );
 
-  const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
+    const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: this.config.get('EMAIL_USER'),
-      pass: this.config.get('EMAIL_PASS'),
-    }
-  });
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: this.config.get('EMAIL_USER'),
+        pass: this.config.get('EMAIL_PASS'),
+      },
+    });
 
- await transporter.sendMail({
-  to: email,
-  from: this.config.get('EMAIL_USER'),
-  subject: 'Simuxel Password Reset Request',
-  html: `
+    await transporter.sendMail({
+      to: email,
+      from: this.config.get('EMAIL_USER'),
+      subject: 'Simuxel Password Reset Request',
+      html: `
   <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 40px;">
     <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <h2 style="color: #333; text-align: center;">🔐 Reset Your Simuxel Password</h2>
@@ -117,54 +125,57 @@ export class AuthService {
     </div>
   </div>
   `,
-});
-
-  return { message: 'Password reset link sent to your email' };
-}
-
-async resetPassword(token: string, newPassword: string) {
-  try {
-    // Decode JWT
-    const payload = await this.jwt.verifyAsync(token, {
-      secret: this.config.get('JWT_SECRET'),
     });
 
-    if (!payload?.sub) throw new BadRequestException('Invalid token');
+    return { message: 'Password reset link sent to your email' };
+  }
 
-    // Hash the new password
-    const hashedPassword = await argon.hash(newPassword);
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      // Decode JWT
+      const payload = await this.jwt.verifyAsync(token, {
+        secret: this.config.get('JWT_SECRET'),
+      });
 
-    // Update the user's password in the DB
-    await this.prisma.user.update({
-      where: { id: payload.sub },
-      data: { password: hashedPassword }
+      if (!payload?.sub) throw new BadRequestException('Invalid token');
+
+      // Hash the new password
+      const hashedPassword = await argon.hash(newPassword);
+
+      // Update the user's password in the DB
+      await this.prisma.user.update({
+        where: { id: payload.sub },
+        data: { password: hashedPassword },
+      });
+
+      return { message: 'Password reset successful' };
+    } catch (err) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+  }
+
+  async findOrCreateGoogleUser(profile: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: profile.email },
     });
 
-    return { message: 'Password reset successful' };
-  } catch (err) {
-    throw new BadRequestException('Invalid or expired token');
+    if (user) {
+      // Ya existe, lo usamos tal como está
+      return user;
+    }
+    const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
+
+    // Si no existe, lo creamos con password nula (ya hiciste password opcional)
+    return this.prisma.user.create({
+      data: {
+        email: profile.email,
+        name: `${profile.firstName} ${profile.lastName}`,
+        password: hash,
+      },
+    });
   }
 }
-
-async findOrCreateGoogleUser(profile: { email: string; firstName: string; lastName: string }) {
-  const user = await this.prisma.user.findUnique({ where: { email: profile.email } });
-
-  if (user) {
-    // Ya existe, lo usamos tal como está
-    return user;
-  }
-  const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
-
-  // Si no existe, lo creamos con password nula (ya hiciste password opcional)
-  return this.prisma.user.create({
-    data: {
-      email: profile.email,
-      name: `${profile.firstName} ${profile.lastName}`,
-      password: hash, 
-    },
-  });
-}
-
-
-}
-

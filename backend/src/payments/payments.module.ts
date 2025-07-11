@@ -5,8 +5,8 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
-    ConfigModule,     // Para usar process.env.STRIPE_SECRET_KEY y STRIPE_WEBHOOK_SECRET
-    UserModule        // Para poder usar UserService y updateUserRole
+    ConfigModule, // Para usar process.env.STRIPE_SECRET_KEY y STRIPE_WEBHOOK_SECRET
+    UserModule, // Para poder usar UserService y updateUserRole
   ],
   controllers: [PaymentsController],
 })

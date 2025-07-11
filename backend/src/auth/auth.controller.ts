@@ -1,11 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, HttpCode, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  UseGuards,
+  HttpCode,
+  Res,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
-import {ResetPasswordDto} from './dto/newpassword.dto'
+import { ResetPasswordDto } from './dto/newpassword.dto';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
- interface RequestWithUser extends Request {
+interface RequestWithUser extends Request {
   user: {
     id: string;
     email: string;
@@ -20,51 +32,54 @@ export class AuthController {
   register(@Body() createAuthDto: CreateAuthDto) {
     return this.authService.register(createAuthDto);
   }
-@HttpCode(200)
+  @HttpCode(200)
   @Post('login')
   login(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.login(createAuthDto.email, createAuthDto.password); 
+    return this.authService.login(createAuthDto.email, createAuthDto.password);
   }
 
   @Post('request-password-reset')
-requestReset(@Body('email') email: string) {
-  return this.authService.requestPasswordReset(email);
-}
+  requestReset(@Body('email') email: string) {
+    return this.authService.requestPasswordReset(email);
+  }
 
   @Post('reset-password')
-resetPassword(@Body() dto: ResetPasswordDto) {
-  return this.authService.resetPassword(dto.token, dto.newPassword);
-}
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
 
-@UseGuards(AuthGuard('jwt-refresh'))
-@Post('refresh')
+  @UseGuards(AuthGuard('jwt-refresh'))
+  @Post('refresh')
   async refresh(@Req() req: RequestWithUser) {
-  const { accessToken } = await this.authService.generateTokens(req.user.id, req.user.email);
-  return { accessToken };
-}
+    const { accessToken } = await this.authService.generateTokens(
+      req.user.id,
+      req.user.email,
+    );
+    return { accessToken };
+  }
 
-@Get('google')
-@UseGuards(AuthGuard('google'))
-googleAuth() {} 
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth() {}
 
-@Get('google/callback')
-@UseGuards(AuthGuard('google'))
-async googleCallback(@Req() req, @Res() res: Response) {
-  try {
-    const userData = req.user;
-    
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(@Req() req, @Res() res: Response) {
+    try {
+      const userData = req.user;
 
-    if (!userData || !userData.email) {
-      return res.status(400).send('Google login failed');
-    }
+      if (!userData || !userData.email) {
+        return res.status(400).send('Google login failed');
+      }
 
-    const user = await this.authService.findOrCreateGoogleUser(userData);
+      const user = await this.authService.findOrCreateGoogleUser(userData);
 
-    const tokens = await this.authService.generateTokens(user.id, user.email);
+      const tokens = await this.authService.generateTokens(user.id, user.email);
 
-    const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+      const FRONTEND_ORIGIN =
+        process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 
-    const html = `
+      const html = `
       <script>
         window.opener.postMessage(
           {
@@ -78,11 +93,12 @@ async googleCallback(@Req() req, @Res() res: Response) {
       </script>
     `;
 
-    return res.send(html);
-  } catch (error) {
-    console.error('Google callback error:', error);
-    return res.status(500).send('Internal Server Error during Google OAuth callback.');
+      return res.send(html);
+    } catch (error) {
+      console.error('Google callback error:', error);
+      return res
+        .status(500)
+        .send('Internal Server Error during Google OAuth callback.');
+    }
   }
-}
-
 }
