@@ -1,86 +1,88 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Lock, Mail } from 'lucide-react';
-import { motion } from 'framer-motion';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@/context/UserContext';
+import { useState } from 'react'
+import Link from 'next/link'
+import { Lock, Mail } from 'lucide-react'
+import { motion } from 'framer-motion'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@/context/UserContext'
 
 export default function SignInPage() {
-  const { setUser } = useUser();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const router = useRouter();
+  const { setUser } = useUser()
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
+  const router = useRouter()
 
-  const API_URL           = process.env.NEXT_PUBLIC_API_URL;                // ej. http://localhost:4000
-  const FRONTEND_ORIGIN   = process.env.NEXT_PUBLIC_FRONTEND_ORIGIN ||       // ej. http://localhost:3000
-                            'http://localhost:3000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
+  const FRONTEND_ORIGIN = process.env.NEXT_PUBLIC_FRONTEND_ORIGIN || 'http://localhost:3000'
 
   /* ---------- Google ---------- */
   const handleGoogleSignIn = () => {
-    const googleAuthURL = `${API_URL}/auth/google`;
-    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
-    if (!popup) return console.error('❌ No se pudo abrir el popup');
+    const googleAuthURL = `${API_URL}/auth/google`
+    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600')
+    if (!popup) return console.error('❌ No se pudo abrir el popup')
 
-    /* Listener UNA SOLA VEZ */
     const handleMessage = (event) => {
       if (event.origin !== FRONTEND_ORIGIN) {
-        console.warn('❌ Origin no permitido:', event.origin);
-        return;
+        console.warn('❌ Origen no permitido:', event.origin)
+        return
       }
 
-      console.log('📦  postMessage recibido:', event.data);
+      const { accessToken, refreshToken, user, source } = event.data || {}
 
-      const { accessToken, refreshToken, user } = event.data || {};
+      // ✅ Evita interferencias como react-devtools
+      if (source !== 'gaplets-auth') {
+        console.warn('❌ Mensaje no autorizado (source inválido)')
+        return
+      }
 
       if (accessToken && refreshToken && user) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        setUser({ accessToken, refreshToken });
-        router.push('/dashboard');
+        localStorage.setItem('accessToken', accessToken)
+        localStorage.setItem('refreshToken', refreshToken)
+        setUser({ accessToken, refreshToken })
+        router.push('/dashboard')
       } else {
-        console.warn('❌ Datos incompletos en postMessage');
+        console.warn('❌ Datos incompletos en postMessage')
       }
-      window.removeEventListener('message', handleMessage);
-    };
 
-    window.addEventListener('message', handleMessage, false);
-  };
+      window.removeEventListener('message', handleMessage)
+    }
+
+    window.addEventListener('message', handleMessage, false)
+  }
 
   /* ---------- Email/Password ---------- */
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault()
+    setError('')
 
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
-      });
+      })
 
       if (!res.ok) {
-        const { message } = await res.json();
-        return setError(message || 'Sign-in failed');
+        const { message } = await res.json()
+        return setError(message || 'Sign-in failed')
       }
 
-      const { accessToken, refreshToken } = await res.json();
+      const { accessToken, refreshToken } = await res.json()
       if (!accessToken || !refreshToken) {
-        return setError('Tokens not returned');
+        return setError('Tokens not returned')
       }
 
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser({ accessToken, refreshToken });
-      router.push('/dashboard');
+      localStorage.setItem('accessToken', accessToken)
+      localStorage.setItem('refreshToken', refreshToken)
+      setUser({ accessToken, refreshToken })
+      router.push('/dashboard')
     } catch (err) {
-      setError(err.message || 'Unexpected error');
+      setError(err.message || 'Unexpected error')
     }
-  };
+  }
 
-  /* ---------- UI (no modificado) ---------- */
   return (
     <div className="relative min-h-screen flex items-center justify-center px-6 py-20">
       <motion.div
@@ -89,7 +91,6 @@ export default function SignInPage() {
         transition={{ duration: 0.5 }}
         className="z-10 w-full max-w-md bg-white/90 border border-gray-200 p-10 rounded-3xl shadow-2xl"
       >
-        {/* --- encabezado --- */}
         <div className="flex flex-col items-center gap-4 mb-10">
           <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center shadow-md">
             <Lock size={24} />
@@ -106,7 +107,7 @@ export default function SignInPage() {
           Sign in with Google
         </button>
 
-        {/* divisor */}
+        {/* Divider */}
         <div className="my-6 flex items-center gap-4 text-sm text-gray-400">
           <div className="h-px bg-gray-300 w-full" />
           or
@@ -116,7 +117,6 @@ export default function SignInPage() {
         {/* Form */}
         {error && <p className="text-red-500 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* email */}
           <div>
             <label className="text-sm font-medium">Email</label>
             <div className="relative mt-1">
@@ -132,7 +132,6 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {/* password */}
           <div>
             <label className="text-sm font-medium">Password</label>
             <div className="relative mt-1">
@@ -148,7 +147,6 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {/* submit */}
           <button className="w-full py-2 bg-primary text-white rounded-md font-semibold">
             Sign In
           </button>
@@ -162,5 +160,5 @@ export default function SignInPage() {
         </form>
       </motion.div>
     </div>
-  );
+  )
 }
