@@ -2,7 +2,11 @@ import { notFound } from 'next/navigation';
 import { blogPosts } from '@/data/blogPosts';
 import type { Metadata } from 'next';
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}): Promise<Metadata> {
   const post = blogPosts.find((p) => p.slug === params.slug);
   if (!post) return {};
 
@@ -34,15 +38,17 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-type Props = {
-  params: { slug: string };
-};
-
 export function generateStaticParams() {
-  return blogPosts.map((post) => ({ slug: post.slug }));
+  return blogPosts.map((post) => ({
+    slug: post.slug,
+  }));
 }
 
-export default function BlogPostPage({ params }: Props) {
+export default function BlogPostPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
   const post = blogPosts.find((p) => p.slug === params.slug);
 
   if (!post) return notFound();
