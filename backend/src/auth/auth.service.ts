@@ -98,7 +98,7 @@ export class AuthService {
     // 2. Generar token
     const token = await this.jwt.signAsync(
       { sub: user.id },
-      { expiresIn: '15m', secret: this.config.get('JWT_SECRET') },
+      { expiresIn: '15m', secret: this.config.get('JWT_ACCESS_SECRET') },
     );
 
     const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
