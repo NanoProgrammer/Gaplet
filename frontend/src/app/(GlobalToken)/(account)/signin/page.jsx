@@ -30,28 +30,29 @@ export default function SignInPage() {
     const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
     window.addEventListener(
-      'message',
-      (event) => {
-        if (
-          event.origin !== API_URL &&
-          event.origin !== 'http://localhost:4000' // backup para desarrollo local
-        )
-          return;
+  'message',
+  (event) => {
+    if (
+      event.origin !== API_URL &&
+      event.origin !== 'http://localhost:4000'
+    )
+      return;
 
-        const { accessToken, refreshToken, user } = event.data;
+    const { accessToken, refreshToken, user } = event.data;
 
-        if (accessToken && refreshToken && user) {
-          console.log('Google login successful');
-          setUser({
-            accessToken,
-            refreshToken,
-          });
-        } else {
-          console.warn('Google login failed or missing data');
-        }
-      },
-      { once: true }
-    );
+    if (accessToken && refreshToken && user) {
+      console.log('Google login successful');
+      setUser({ accessToken, refreshToken });
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      router.push('/dashboard'); // 🎯 REDIRECCIÓN DESPUÉS DEL LOGIN
+    } else {
+      console.warn('Google login failed or missing data');
+    }
+  },
+  { once: true }
+);
+
   };
 
   const handleSubmit = async (e) => {
