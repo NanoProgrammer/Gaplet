@@ -174,7 +174,7 @@ export class AuthService {
     try {
       // Decode JWT
       const payload = await this.jwt.verifyAsync(token, {
-        secret: this.config.get('JWT_SECRET'),
+        secret: this.config.get('JWT_ACCESS_SECRET'),
       });
 
       if (!payload?.sub) throw new BadRequestException('Invalid token');
