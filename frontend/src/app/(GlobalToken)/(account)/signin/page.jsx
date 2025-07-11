@@ -33,7 +33,8 @@ export default function SignInPage() {
       'http://localhost:4000',
       'https://gaplet.vercel.app',   
     ];
-
+     console.log('[postMessage] full event.data:', event.data);
+  console.log('[postMessage] origin:', event.origin);
     if (!allowedOrigins.includes(event.origin)) {
       console.warn('Blocked postMessage from unexpected origin:', event.origin);
       return;
