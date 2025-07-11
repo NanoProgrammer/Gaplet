@@ -101,7 +101,7 @@ export class AuthService {
       { expiresIn: '15m', secret: this.config.get('JWT_ACCESS_SECRET') },
     );
 
-    const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
+    const resetLink = `https://gaplet.vercel.app/recover-password/${token}`;
     console.log('🔗 Reset link:', resetLink);
 
     // 3. Verificar credenciales de correo
@@ -127,7 +127,7 @@ export class AuthService {
     const mailOptions = {
       to: user.email,
       from: emailUser,
-      subject: 'Simuxel Password Reset Request',
+      subject: 'Gaplet Password Reset Request',
       html: `
         <div style="font-family: sans-serif; padding: 20px;">
           <h2>Hello ${userName},</h2>
