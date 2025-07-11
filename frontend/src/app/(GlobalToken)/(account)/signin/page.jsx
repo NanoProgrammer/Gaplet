@@ -24,33 +24,44 @@ export default function SignInPage() {
   };
 
   const handleGoogleSignIn = () => {
-    const googleAuthURL = `${API_URL}/auth/google`;
-    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
+  const googleAuthURL = `${API_URL}/auth/google`;
+  const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
-    const receiveMessage = (event) => {
-      if (event.origin !== API_URL && event.origin !== 'http://localhost:4000') return;
+  const receiveMessage = (event) => {
+    const allowedOrigins = [
+      new URL(API_URL).origin,
+      'http://localhost:4000',
+    ];
 
-      const { accessToken, refreshToken, user } = event.data ?? {};
+    if (!allowedOrigins.includes(event.origin)) {
+      console.warn('Blocked postMessage from unexpected origin:', event.origin);
+      return;
+    }
 
-      if (accessToken && refreshToken && user) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
+    const { accessToken, refreshToken, user } = event.data ?? {};
 
-        setUser({ accessToken, refreshToken });
+    if (accessToken && refreshToken && user) {
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      setUser({ accessToken, refreshToken });
+
+      // Esperar ligeramente antes de cerrar el popup
+      setTimeout(() => {
         popup?.close();
-
         startTransition(() => {
           router.replace('/dashboard');
         });
-      } else {
-        console.warn('Google login failed or missing data');
-      }
+      }, 100);
+    } else {
+      console.warn('Google login failed or missing data');
+    }
 
-      window.removeEventListener('message', receiveMessage);
-    };
-
-    window.addEventListener('message', receiveMessage, { once: true });
+    window.removeEventListener('message', receiveMessage);
   };
+
+  window.addEventListener('message', receiveMessage, { once: true });
+};
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
