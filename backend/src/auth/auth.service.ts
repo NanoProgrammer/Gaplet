@@ -82,10 +82,11 @@ export class AuthService {
     };
   }
 
-  async requestPasswordReset(email: string) {
+ async requestPasswordReset(email: string) {
   console.log('📩 [ResetPassword] Start for:', email);
 
   try {
+    // 1. Buscar usuario
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       console.warn('⚠️ Email not found:', email);
@@ -94,16 +95,16 @@ export class AuthService {
 
     console.log('✅ User found:', user.id, user.email);
 
+    // 2. Generar token
     const token = await this.jwt.signAsync(
       { sub: user.id },
       { expiresIn: '15m', secret: this.config.get('JWT_SECRET') },
     );
 
-    console.log('🔑 Token generated:', token);
-
     const resetLink = `https://simuxel.vercel.app/recover-password/${token}`;
     console.log('🔗 Reset link:', resetLink);
 
+    // 3. Verificar credenciales de correo
     const emailUser = this.config.get('EMAIL_USER');
     const emailPass = this.config.get('EMAIL_PASS');
 
@@ -112,6 +113,7 @@ export class AuthService {
       throw new Error('Missing email credentials');
     }
 
+    // 4. Crear transporter
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -120,28 +122,52 @@ export class AuthService {
       },
     });
 
+    // 5. Preparar correo
+    const userName = user.name?.replace(/[^a-zA-Z0-9 ]/g, '') || 'there';
     const mailOptions = {
       to: user.email,
       from: emailUser,
       subject: 'Simuxel Password Reset Request',
       html: `
-        <p>Hello ${user.name || 'there'},</p>
-        <p>Reset your password using this link:</p>
-        <p><a href="${resetLink}">${resetLink}</a></p>
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h2>Hello ${userName},</h2>
+          <p>You requested a password reset. Click the button below:</p>
+          <p><a href="${resetLink}" style="background:#007bff;color:white;padding:10px 15px;border-radius:5px;text-decoration:none;">Reset Password</a></p>
+          <p>If you didn't request this, you can ignore this email.</p>
+          <small>This link expires in 15 minutes.</small>
+        </div>
       `,
     };
 
-    console.log('📨 Sending email...');
+    console.log('📨 Sending email to:', user.email);
 
+    // 6. Enviar correo
     const info = await transporter.sendMail(mailOptions);
 
     console.log('✅ Email sent:', info.messageId);
     return { message: 'Password reset link sent to your email' };
+
   } catch (error) {
-    console.error('❌ [ResetPassword] ERROR:', error);
-    throw new BadRequestException('Failed to send reset email');
+    console.error('❌ [ResetPassword] ERROR:', {
+      message: error.message,
+      stack: error.stack,
+      full: error,
+    });
+
+    // Si es error de autenticación con Gmail
+    if (error?.code === 'EAUTH' || error?.responseCode === 535) {
+      throw new BadRequestException('Email login failed: check EMAIL_USER and EMAIL_PASS');
+    }
+
+    // Si es otro error SMTP
+    if (error?.responseCode) {
+      throw new BadRequestException(`Email send failed [${error.responseCode}]: ${error.message}`);
+    }
+
+    throw new BadRequestException(error.message || 'Unexpected error while sending reset email');
   }
 }
+
 
 
   async resetPassword(token: string, newPassword: string) {
