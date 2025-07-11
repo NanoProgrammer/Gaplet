@@ -85,7 +85,7 @@ localStorage.setItem('refreshToken', data.refreshToken);
       });
 
       console.log('SignIn success');
-      router.push('/dashbord');
+      router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Unexpected error');
     }
