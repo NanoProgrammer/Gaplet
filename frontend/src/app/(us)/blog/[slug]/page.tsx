@@ -2,10 +2,8 @@ import { notFound } from 'next/navigation';
 import { blogPosts } from '@/data/blogPosts';
 import type { Metadata } from 'next';
 
-// ✅ Generación de metadatos
-export async function generateMetadata(
-  { params }: { params: { slug: string } }
-): Promise<Metadata> {
+// ✅ Genera los metadatos para SEO
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = blogPosts.find((p) => p.slug === params.slug);
   if (!post) return {};
 
@@ -37,17 +35,20 @@ export async function generateMetadata(
   };
 }
 
-// ✅ Generación de rutas estáticas
+// ✅ Genera rutas estáticas en build time
 export function generateStaticParams() {
   return blogPosts.map((post) => ({ slug: post.slug }));
 }
 
-type Props = {
-  params: { slug: string };
-};
+interface BlogPageProps {
+  params: {
+    slug: string;
+  };
+}
 
-export default function BlogPostPage({ params }: Props) {
-  const post = blogPosts.find((p) => p.slug === params.slug);
+export default function BlogPostPage(props: BlogPageProps) {
+  const { slug } = props.params;
+  const post = blogPosts.find((p) => p.slug === slug);
 
   if (!post) return notFound();
 
@@ -56,9 +57,10 @@ export default function BlogPostPage({ params }: Props) {
       <header className="text-center space-y-4">
         <h1 className="text-4xl font-bold text-gray-900">{post.title}</h1>
         <p className="text-muted-foreground text-sm">{post.date}</p>
+
         {post.image && (
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border">
-            {/* ⚠️ Si quieres evitar el warning, cambia esto a <Image /> de next/image */}
+            {/* ⚠️ Cambiar a <Image /> si quieres optimizar */}
             <img
               src={post.image}
               alt={post.alt || post.title}
