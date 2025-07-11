@@ -77,7 +77,8 @@ export default function SignInPage() {
         setError('Tokens not returned');
         return;
       }
-
+      localStorage.setItem('accessToken', data.accessToken);
+localStorage.setItem('refreshToken', data.refreshToken);
       setUser({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
