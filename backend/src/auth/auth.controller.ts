@@ -29,7 +29,6 @@ export class AuthController {
   register(@Body() createAuthDto: CreateAuthDto) {
     return this.authService.register(createAuthDto);
   }
-
   @HttpCode(200)
   @Post('login')
   login(@Body() createAuthDto: CreateAuthDto) {
@@ -71,25 +70,25 @@ export class AuthController {
       }
 
       const user = await this.authService.findOrCreateGoogleUser(userData);
+
       const tokens = await this.authService.generateTokens(user.id, user.email);
 
       const FRONTEND_ORIGIN =
         process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 
       const html = `
-        <script>
-          window.opener.postMessage(
-            {
-              accessToken: '${tokens.accessToken}',
-              refreshToken: '${tokens.refreshToken}',
-              user: ${JSON.stringify(user)},
-              source: 'gaplets-auth'
-            },
-            '${FRONTEND_ORIGIN}'
-          );
-          window.close();
-        </script>
-      `;
+      <script>
+        window.opener.postMessage(
+          {
+            accessToken: '${tokens.accessToken}',
+            refreshToken: '${tokens.refreshToken}',
+            user: ${JSON.stringify(user)}
+          },
+          '${FRONTEND_ORIGIN}'
+        );
+        window.close();
+      </script>
+    `;
 
       return res.send(html);
     } catch (error) {
