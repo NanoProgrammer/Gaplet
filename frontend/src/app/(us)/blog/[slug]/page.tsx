@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { blogPosts } from '@/data/blogPosts';
 import type { Metadata, ResolvingMetadata } from 'next';
 
+// ✅ Generación de metadatos
 export async function generateMetadata(
   { params }: { params: { slug: string } },
   _parent: ResolvingMetadata
@@ -37,18 +38,18 @@ export async function generateMetadata(
   };
 }
 
+// ✅ Generación de rutas estáticas
 export function generateStaticParams() {
-  return blogPosts.map((post) => ({
-    slug: post.slug,
-  }));
+  return blogPosts.map((post) => ({ slug: post.slug }));
 }
 
-export default function BlogPostPage({
-  params,
-}: {
+type Props = {
   params: { slug: string };
-}) {
+};
+
+export default function BlogPostPage({ params }: Props) {
   const post = blogPosts.find((p) => p.slug === params.slug);
+
   if (!post) return notFound();
 
   return (
@@ -58,6 +59,7 @@ export default function BlogPostPage({
         <p className="text-muted-foreground text-sm">{post.date}</p>
         {post.image && (
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border">
+            {/* ⚠️ Si quieres evitar el warning, cambia esto a <Image /> de next/image */}
             <img
               src={post.image}
               alt={post.alt || post.title}
