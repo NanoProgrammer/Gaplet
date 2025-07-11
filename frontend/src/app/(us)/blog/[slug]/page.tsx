@@ -4,8 +4,7 @@ import type { Metadata, ResolvingMetadata } from 'next';
 
 // ✅ Generación de metadatos
 export async function generateMetadata(
-  { params }: { params: { slug: string } },
-  _parent: ResolvingMetadata
+  { params }: { params: { slug: string } }
 ): Promise<Metadata> {
   const post = blogPosts.find((p) => p.slug === params.slug);
   if (!post) return {};
