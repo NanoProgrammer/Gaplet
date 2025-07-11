@@ -25,34 +25,30 @@ export default function SignInPage() {
   };
 
   const handleGoogleSignIn = () => {
-    const googleAuthURL = `${API_URL}/auth/google`;
+  const googleAuthURL = `${API_URL}/auth/google`;
+  const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
-    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
+  const receiveMessage = (event) => {
+    // Asegúrate de aceptar SOLO a tu backend (puedes agregar https://api.tu-dominio.com)
+    if (event.origin !== API_URL && event.origin !== 'http://localhost:4000') return;
 
-    window.addEventListener(
-      'message',
-      (event) => {
-        if (
-          event.origin !== API_URL &&
-          event.origin !== 'http://localhost:4000' // backup para desarrollo local
-        )
-          return;
+    const { accessToken, refreshToken, user } = event.data;
+    if (accessToken && refreshToken && user) {
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
 
-        const { accessToken, refreshToken, user } = event.data;
+      setUser({ accessToken, refreshToken });
+      popup?.close();                // Cierra la ventana
+      router.push('/dashboard');     // Redirige
+    } else {
+      console.warn('Google login failed or missing data');
+    }
 
-        if (accessToken && refreshToken && user) {
-          console.log('Google login successful');
-          setUser({
-            accessToken,
-            refreshToken,
-          });
-        } else {
-          console.warn('Google login failed or missing data');
-        }
-      },
-      { once: true }
-    );
+    window.removeEventListener('message', receiveMessage); // Limpieza
   };
+
+  window.addEventListener('message', receiveMessage);
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
