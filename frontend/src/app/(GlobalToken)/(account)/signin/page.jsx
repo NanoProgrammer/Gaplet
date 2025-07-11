@@ -31,10 +31,9 @@ export default function SignInPage() {
     const allowedOrigins = [
       new URL(API_URL).origin,
       'http://localhost:4000',
-      'https://gaplet.vercel.app',   
+      'https://gaplet.vercel.app',
     ];
-     console.log('[postMessage] full event.data:', event.data);
-  console.log('[postMessage] origin:', event.origin);
+
     if (!allowedOrigins.includes(event.origin)) {
       console.warn('Blocked postMessage from unexpected origin:', event.origin);
       return;
@@ -42,28 +41,33 @@ export default function SignInPage() {
 
     const { accessToken, refreshToken, user } = event.data ?? {};
 
-    if (accessToken && refreshToken && user) {
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser({ accessToken, refreshToken });
-
-      // Esperar ligeramente antes de cerrar el popup
-      setTimeout(() => {
-        popup?.close();
-        startTransition(() => {
-          router.replace('/dashboard');
-        });
-      }, 100);
-    } else {
-      console.warn('Google login failed or missing data');
+    // Ignora mensajes de extensiones como React DevTools
+    if (
+      typeof accessToken !== 'string' ||
+      typeof refreshToken !== 'string' ||
+      typeof user !== 'object'
+    ) {
+      console.warn('[Google Login] Ignored invalid message:', event.data);
+      return;
     }
+
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    setUser({ accessToken, refreshToken });
+
+    // Cierra el popup tras una ligera espera
+    setTimeout(() => {
+      popup?.close();
+      startTransition(() => {
+        router.replace('/dashboard');
+      });
+    }, 100);
 
     window.removeEventListener('message', receiveMessage);
   };
 
-  window.addEventListener('message', receiveMessage, { once: true });
+  window.addEventListener('message', receiveMessage);
 };
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
