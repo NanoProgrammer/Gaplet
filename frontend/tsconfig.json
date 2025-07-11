@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/Hero.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/Hero.jsx", "src/context/UserContext.jsx", "src/app/(GlobalToken)/payment-success/page.jsx"],
   "exclude": ["node_modules"]
 }

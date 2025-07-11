@@ -6,8 +6,13 @@ import { Lock, Mail } from 'lucide-react';
 import { m, motion } from 'framer-motion';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@/context/UserContext';
+
+
+
 
 export default function SignInPage() {
+    const { user, setUser } = useUser();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const router = useRouter();
@@ -37,9 +42,12 @@ export default function SignInPage() {
 
       if (accessToken && refreshToken && user) {
         console.log('Google login successful');
-        console.log('Access Token:', accessToken);
-        console.log('Refresh Token:', refreshToken);
-        console.log('User:', user);
+        const data = { accessToken, refreshToken, user };
+        setUser({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+        });
+
         // Aquí podrías pasar la data a un context, cookie, o simplemente navegar
       } else {
         console.warn('Google login failed or missing data');
@@ -69,6 +77,11 @@ export default function SignInPage() {
     } else {
       // Opcional: redirigir o mostrar mensaje de éxito
       const data = await res.json(); 
+      if(!data.accessToken || !data.refreshToken) return setError('not the right names')
+      setUser({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
 
       console.log('SignIn success')
       router.push('/dashbord')

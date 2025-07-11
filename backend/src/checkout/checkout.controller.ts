@@ -51,8 +51,8 @@ export class CheckoutController {
         userId,
         priceId,
       },
-      success_url: `${this.configService.get('FRONTEND_URL')}/payment-success`,
-      cancel_url: `${this.configService.get('FRONTEND_URL')}/payment-cancel`,
+      success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
+      cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
     });
 
     return { url: session.url };
