@@ -1,20 +1,16 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useUser } from '@/context/UserContext'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useUser } from '@/context/UserContext';
 
 const plans = [
   {
     name: 'starter',
     price: '$19/mo',
     shadow: 'shadow-blue-400/30 hover:shadow-blue-400/50',
-    features: [
-      '20 auto-fills per month',
-      'Email notifications',
-      '2 hour response time',
-    ],
+    features: ['20 auto-fills per month', 'Email notifications', '2 hour response time'],
     buttonColor: 'bg-blue-600 hover:bg-blue-700',
     textColor: 'text-blue-500',
   },
@@ -46,44 +42,45 @@ const plans = [
     buttonColor: 'bg-amber-500 hover:bg-amber-600',
     textColor: 'text-amber-500',
   },
-]
+];
 
 export default function PricingPage() {
-  const router = useRouter()
-  const { user } = useUser()
+  const router = useRouter();
+  const { user } = useUser();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     if (!user?.accessToken) {
-      router.push('/signin')
+      router.push('/signin');
     }
-  }, [user, router])
+  }, [user, router]);
 
   const goToCheckout = async (plan) => {
-    console.log('👉 Plan enviado:', plan);
-    
+    if (!API_URL) {
+      console.error('NEXT_PUBLIC_API_URL not set in .env');
+      return;
+    }
+
     try {
-      const res = await fetch(`http://localhost:4000/checkout/create-session`, {
+      const res = await fetch(`${API_URL}/checkout/create-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.accessToken}`,
         },
         body: JSON.stringify({ plan }),
-      })
-      if (!res.ok) throw new Error('Failed to create session')
-      const { url } = await res.json()
-      router.push(url)
+      });
+      if (!res.ok) throw new Error('Failed to create session');
+      const { url } = await res.json();
+      router.push(url);
     } catch (error) {
-      console.error(error)
-      router.push('/signin')
+      console.error(error);
+      router.push('/signin');
     }
-  }
+  };
 
   return (
-    <section
-      id="Pricing"
-      className="min-h-screen scale-60 py-20 px-4 sm:px-6 md:scale-90 "
-    >
+    <section id="Pricing" className="min-h-screen scale-60 py-20 px-4 sm:px-6 md:scale-90">
       <div className="w-4xl mx-auto text-center bottom-120 relative right-60 md:bottom-20">
         <div className="grid grid-cols-1 sm:mx-0 sm:grid-cols-2 md:grid-cols-3 gap-8 justify-center">
           {plans.map((plan) => (
@@ -124,5 +121,5 @@ export default function PricingPage() {
         </div>
       </div>
     </section>
-  )
+  );
 }

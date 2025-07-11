@@ -3,93 +3,91 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Lock, Mail } from 'lucide-react';
-import { m, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/context/UserContext';
 
-
-
-
 export default function SignInPage() {
-    const { user, setUser } = useUser();
+  const { user, setUser } = useUser();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!API_URL) {
+    throw new Error('❌ NEXT_PUBLIC_API_URL no está definida en tu archivo .env');
+  }
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
- const handleGoogleSignIn = () => {
-  const googleAuthURL = 'http://localhost:4000/auth/google';
 
-  const popup = window.open(
-    googleAuthURL,
-    '_blank',
-    'width=500,height=600'
-  );
+  const handleGoogleSignIn = () => {
+    const googleAuthURL = `${API_URL}/auth/google`;
 
-  window.addEventListener(
-    'message',
-    (event) => {
-      // ⚠️ Asegúrate de que el origin es válido
-      if (
-        event.origin !== 'http://localhost:4000' &&
-        event.origin !== process.env.NEXT_PUBLIC_API_URL
-      ) return;
+    const popup = window.open(googleAuthURL, '_blank', 'width=500,height=600');
 
-      const { accessToken, refreshToken, user } = event.data;
+    window.addEventListener(
+      'message',
+      (event) => {
+        if (
+          event.origin !== API_URL &&
+          event.origin !== 'http://localhost:4000' // backup para desarrollo local
+        )
+          return;
 
-      if (accessToken && refreshToken && user) {
-        console.log('Google login successful');
-        const data = { accessToken, refreshToken, user };
-        setUser({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-        });
+        const { accessToken, refreshToken, user } = event.data;
 
-        // Aquí podrías pasar la data a un context, cookie, o simplemente navegar
-      } else {
-        console.warn('Google login failed or missing data');
-      }
-    },
-    { once: true }
-  );
-};
-
-  const handleSubmit =  async(e) => {
-    e.preventDefault();
-    try { 
-    const res = await fetch('http://localhost:4000/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+        if (accessToken && refreshToken && user) {
+          console.log('Google login successful');
+          setUser({
+            accessToken,
+            refreshToken,
+          });
+        } else {
+          console.warn('Google login failed or missing data');
+        }
       },
-      body: JSON.stringify({
-        email: form.email,
-        password: form.password
-      }),
-    })
+      { once: true }
+    );
+  };
 
-    if (!res.ok) {
-      const err = await res.json()
-      setError(err.message || 'SignIn failed')
-    } else {
-      // Opcional: redirigir o mostrar mensaje de éxito
-      const data = await res.json(); 
-      if(!data.accessToken || !data.refreshToken) return setError('not the right names')
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setError(err.message || 'SignIn failed');
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.accessToken || !data.refreshToken) {
+        setError('Tokens not returned');
+        return;
+      }
+
       setUser({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
       });
 
-      console.log('SignIn success')
-      router.push('/dashbord')
-    
+      console.log('SignIn success');
+      router.push('/dashbord');
+    } catch (err) {
+      setError(err.message || 'Unexpected error');
     }
-  } catch (err) {
-    setError(err.message || 'Unexpected error')
-  }
   };
 
   return (
@@ -176,34 +174,34 @@ export default function SignInPage() {
           </div>
 
           {/* Submit */}
-<button
-  type="submit"
-  className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
->
-  Sign In
-</button>
+          <button
+            type="submit"
+            className="w-full py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary/90 transition"
+          >
+            Sign In
+          </button>
 
-{/* Forgot password */}
-<p className="text-sm text-center text-gray-600 mt-2">
-  Forgot your password?{' '}
-  <Link
-    href="/forgotPassword"
-    className="text-primary underline underline-offset-2 hover:text-primary/80"
-  >
-    Recover it here
-  </Link>
-</p>
+          {/* Forgot password */}
+          <p className="text-sm text-center text-gray-600 mt-2">
+            Forgot your password?{' '}
+            <Link
+              href="/forgotPassword"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Recover it here
+            </Link>
+          </p>
 
-{/* Link to signup */}
-<p className="text-sm text-center text-gray-600 -mt-2">
-  Don’t have an account?{' '}
-  <Link
-    href="/signup"
-    className="text-primary underline underline-offset-2 hover:text-primary/80"
-  >
-    Create one
-  </Link>
-</p>
+          {/* Link to signup */}
+          <p className="text-sm text-center text-gray-600 -mt-2">
+            Don’t have an account?{' '}
+            <Link
+              href="/signup"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Create one
+            </Link>
+          </p>
         </form>
       </motion.div>
     </div>

@@ -14,12 +14,18 @@ export default function ResetPasswordPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!API_URL) {
+    throw new Error('❌ NEXT_PUBLIC_API_URL no está definida en el archivo .env');
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      const res = await fetch('http://localhost:4000/auth/reset-password', {
+      const res = await fetch(`${API_URL}/auth/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

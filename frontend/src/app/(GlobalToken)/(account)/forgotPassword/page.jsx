@@ -10,11 +10,18 @@ export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
     try {
-      const res = await fetch('http://localhost:4000/auth/request-password-reset', {
+      if (!API_URL) {
+        throw new Error('API URL not set in environment variables.');
+      }
+
+      const res = await fetch(`${API_URL}/auth/request-password-reset`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,7 +37,7 @@ export default function ForgotPasswordPage() {
 
       setSubmitted(true);
     } catch (err) {
-      setError('An unexpected error occurred.');
+      setError(err.message || 'An unexpected error occurred.');
     }
   };
 
