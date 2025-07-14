@@ -6,7 +6,7 @@ export default function TV() {
     const timeout = setTimeout(() => {
       document.getElementById('face')?.classList.add('opacity-0');
       document.getElementById('loading')?.classList.add('opacity-100');
-    }, 400); // más rápido si quieres transición corta
+    }, 100); // más rápido si quieres transición corta
 
     return () => clearTimeout(timeout);
   }, []);

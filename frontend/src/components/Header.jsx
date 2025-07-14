@@ -46,7 +46,7 @@ export default function Header() {
         {/* DESKTOP BUTTONS */}
         <div className="hidden md:flex items-center gap-4">
           <Link href="/signup"><Button className="rounded-md">Sign up</Button></Link>
-          <Link href="/signin"><Button variant="outline" className="rounded-md">Sign in</Button></Link>
+          <Link href="/dashboard"><Button variant="outline" className="rounded-md">Sign in</Button></Link>
         </div>
 
         {/* MOBILE TOGGLE */}
