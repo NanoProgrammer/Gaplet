@@ -13,12 +13,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User{
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String?
-  role     String   @default("USER")
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  name               String?
+  password           String?
+  role               String   @default("USER")
+
+  totalReplacements  Int      @default(0)          // Citas exitosamente llenadas
+  totalCancellations Int      @default(0)          // Cancelaciones detectadas
+  lastReplacementAt  DateTime?                     // Última cita recuperada
+  lastCancellationAt DateTime?                     // Última cancelación detectada
+
+  smsSent            Int      @default(0)          // Créditos usados en SMS
+  emailSent          Int      @default(0)          // Créditos usados en Email
+
+  connectedIntegration ConnectedIntegration?       // Relación 1:1 con integración
+  preferences          UserPreference?             // Relación 1:1 con config personalizada
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model ConnectedIntegration {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+
+  provider        String                            // calendly, square, etc.
+  accessToken     String
+  refreshToken    String?
+  expiresAt       DateTime?
+  scope           String?
+
+  externalUserId  String?                           // ID del usuario en la otra plataforma
+  externalOrgId   String?                           // ID de empresa en la otra plataforma
+  webhookId       String?                           // Para eliminar luego si se desconecta
+
+  connectedAt     DateTime @default(now())
+  disconnectedAt  DateTime?
+
+  // EventLog[]        // opcional futuro si decides guardar eventos pasados
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id])
+
+  matchAppointmentType Boolean  @default(true)      // Si debe emparejar mismo tipo de cita
+  notifyBeforeMinutes  Int?                         // Filtrar: solo si su cita futura está a más de X min
+  notifyAfterMinutes   Int?                         // Filtrar: solo si su última cita fue hace más de X min
+  maxNotificationsPerGap Int?                       // Por default: 10-20
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+
+
