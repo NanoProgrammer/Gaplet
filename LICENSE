@@ -1,10 +1,65 @@
-This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
-To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/4.0/
+NonCommercial Attribution License (NCAL) v1.3
 
-You are free to:
-- Share — copy and redistribute the material in any medium or format
-- Adapt — remix, transform, and build upon the material
+Copyright (c) 2025 Santiago González / Gaplets
 
-Under the following terms:
-- Attribution — You must give appropriate credit.
-- NonCommercial — You may not use the material for commercial purposes.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, and distribute the Software **exclusively for non-commercial purposes**, 
+under the following conditions:
+
+1. Non-Commercial Use Only  
+The Software may not be used, in whole or in part, for any commercial purpose.  
+Commercial purposes include, but are not limited to:  
+- Selling or licensing the Software or derivative works  
+- Using the Software to develop commercial products or services  
+- Including the Software in any offering, application, or platform that generates revenue  
+- Any use by or for the benefit of for-profit entities  
+**No exceptions will be granted for commercial licensing.**
+
+2. Attribution Required  
+You must give clear and visible credit to the original author.  
+Examples include:  
+- “Created by Santiago González / Gaplets” in README, About page, or UI  
+- Keeping this license notice in distributed copies
+
+3. No Commercial Redistribution or Sublicensing  
+You may not sublicense, sell, or redistribute the Software or derivative works for commercial gain.
+
+4. License Must Be Preserved  
+You must include this license in all full or partial copies, including modified versions.
+
+5. Prohibited Uses in Artificial Intelligence  
+The Software may not be used to train, fine-tune, or feed into any machine learning model, dataset, or artificial intelligence system, whether for commercial or non-commercial purposes.
+
+6. No Redistribution on Monetized Platforms  
+The Software may not be uploaded or shared on any platform or service that generates revenue directly or indirectly (e.g., YouTube, Udemy, Patreon, GitHub Sponsors), even if offered for free.
+
+7. No Obfuscation or Misrepresentation  
+You may not remove or obscure credits, copyright notices, or claim authorship of the original Software.
+
+8. Termination on Violation  
+If you violate any of these terms, your rights under this license terminate automatically.  
+You must immediately stop using the Software and destroy all copies.
+
+9. Prohibited Use in Blockchain and Cryptocurrency Projects  
+The Software may not be used in any project related to cryptocurrencies, NFTs, or blockchain technology.
+
+10. No Use by Governments or Military  
+The Software may not be used, directly or indirectly, by any government, military, or surveillance agency without explicit written permission (which will not be granted).
+
+11. No Linking with Proprietary Software  
+You may not combine, link, or integrate the Software with any proprietary, closed-source, or commercial software.
+
+12. Share-Alike Requirement  
+Any derivative works must be released under this same NonCommercial Attribution License (NCAL v1.3).  
+No other licenses are allowed for modified versions.
+
+13. Governing Law  
+This license shall be governed by, and interpreted under, the laws of the Province of Alberta, Canada.  
+Any disputes must be resolved in the courts of Alberta, Canada.
+
+14. Disclaimer of Warranty  
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,  
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,  
+AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DAMAGES OR OTHER LIABILITY  
+ARISING FROM THE USE OF THE SOFTWARE.
