@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtRefreshStrategy, JwtStrategy } from './auth/strategy';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PaymentsModule } from './payments/payments.module';
     ConfigModule.forRoot({ isGlobal: true }),
     CheckoutModule,
     PaymentsModule,
+    IntegrationsModule,
   ],
   controllers: [],
   providers: [PrismaManagerService, JwtStrategy, JwtRefreshStrategy],

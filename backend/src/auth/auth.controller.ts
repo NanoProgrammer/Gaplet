@@ -7,6 +7,8 @@ import {
   UseGuards,
   HttpCode,
   Res,
+  Param,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateAuthDto } from './dto/create-auth.dto';
@@ -98,4 +100,93 @@ export class AuthController {
         .send('Internal Server Error during Google OAuth callback.');
     }
   }
+  /*  🔹 1) REDIRECCIÓN OAUTH  ----------------------------------------- */
+@UseGuards(AuthGuard('jwt'))
+@Get('connect/:provider')
+async connectProvider(
+  @Param('provider') provider: 'calendly' | 'acuity' | 'square',
+  @Req() req: RequestWithUser,
+  @Res() res: Response,
+) {
+  const apiBase = process.env.API_BASE_URL;  // ej. https://api.gaplet.com
+  const redirect = encodeURIComponent(`${apiBase}/auth/callback/${provider}`);
+  const state = req.user.id;                // rastrear al usuario
+
+  switch (provider) {
+    case 'calendly': {
+      const scope =
+        'user.read organization.read event_types.read ' +
+        'scheduled_events.read scheduled_events.write ' +
+        'webhook_subscriptions.write';
+      const url = `https://auth.calendly.com/oauth/authorize` +
+        `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
+        `&response_type=code` +
+        `&redirect_uri=${redirect}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&state=${state}`;
+      return res.redirect(url);
+    }
+
+    case 'acuity': {
+      const scope =
+        'appointments_read appointments_write ' +
+        'client_read client_write ' +
+        'availability_read webhooks_write';
+      const url = `https://acuityscheduling.com/oauth2/authorize` +
+        `?client_id=${process.env.ACUITY_CLIENT_ID}` +
+        `&response_type=code` +
+        `&redirect_uri=${redirect}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&state=${state}`;
+      return res.redirect(url);
+    }
+
+    case 'square': {
+      const scope =
+        'APPOINTMENTS_READ APPOINTMENTS_WRITE ' +
+        'CUSTOMERS_READ CUSTOMERS_WRITE ' +
+        'MERCHANT_PROFILE_READ WEBHOOKS_WRITE';
+      const url = `https://connect.squareup.com/oauth2/authorize` +
+        `?client_id=${process.env.SQUARE_CLIENT_ID}` +
+        `&response_type=code` +
+        `&redirect_uri=${redirect}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&state=${state}` +
+        `&session=false`;
+      return res.redirect(url);
+    }
+
+    default:
+      return res.status(400).send('Unsupported provider');
+  }
+}
+
+
+/*  🔹 2) CALLBACK OAUTH  ------------------------------------------- */
+@Get('callback/:provider')
+async oauthCallback(
+  @Param('provider') provider: 'calendly' | 'acuity' | 'square',
+  @Query('code') code: string,
+  @Query('state') state: string,
+  @Res() res: Response,
+) {
+  try {
+    // 2a. Intercambia code → tokens y guarda en ConnectedIntegration
+    await this.authService.exchangeTokenAndSave(provider, code, state);
+
+    // 2b. Registra automáticamente el webhook de cancelación
+    await this.authService.ensureWebhook(provider, state);
+
+    // 2c. Redirige a tu front de éxito
+    return res.redirect(
+      `${process.env.FRONTEND_ORIGIN}/dashboard/integrations?provider=${provider}&status=success`,
+    );
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    return res
+      .status(500)
+      .send(`Error while connecting ${provider}: ` + err.message);
+  }
+}
+
 }
