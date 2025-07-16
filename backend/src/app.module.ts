@@ -6,7 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtRefreshStrategy, JwtStrategy } from './auth/strategy';
 import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
-import { IntegrationsModule } from './integrations/integrations.module';
+
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     ConfigModule.forRoot({ isGlobal: true }),
     CheckoutModule,
     PaymentsModule,
-    IntegrationsModule,
+    WebhooksModule,
   ],
   controllers: [],
   providers: [PrismaManagerService, JwtStrategy, JwtRefreshStrategy],
