@@ -19,8 +19,10 @@ export default function IntegrationsPage() {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
+  if (typeof window === 'undefined') return;
+
+  const accessToken = localStorage.getItem('accessToken');
+  const refreshToken = localStorage.getItem('refreshToken');
 
     if (!accessToken) {
       router.push('/signin');
