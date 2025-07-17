@@ -142,14 +142,7 @@ async connectProvider(
     }
 
     case 'acuity': {
-      const scope = [
-        'appointments_read',
-        'appointments_write',
-        'client_read',
-        'client_write',
-        'availability_read',
-        'webhooks_write',
-      ].join(' ');
+      const scope = 'api-v1';
       url = `https://acuityscheduling.com/oauth2/authorize` +
         `?client_id=${process.env.ACUITY_CLIENT_ID}` +
         `&response_type=code` +
