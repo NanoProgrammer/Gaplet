@@ -61,35 +61,79 @@ export default function SettingsPage() {
 
   const [user, setUser] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [accessToken, setAccessToken] = useState('');
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  const accessToken =  localStorage.getItem('accessToken');
 
   useEffect(() => {
-  const fetchData = async () => {
+  if (typeof window === 'undefined') return;
+
+  const access = localStorage.getItem('accessToken');
+  const refresh = localStorage.getItem('refreshToken');
+
+  if (!access) {
+    router.push('/signin');
+    return;
+  }
+
+  const tryFetchData = async (tokenToUse) => {
     try {
-      const prefRes = await fetchWithAuth('/auth/preference');
+      const prefRes = await fetch(`${apiBase}/auth/preference`, {
+        headers: { Authorization: `Bearer ${tokenToUse}` },
+      });
+
+      if (prefRes.status === 401 && refresh) {
+        const refreshRes = await fetch(`${apiBase}/auth/refresh`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${refresh}` },
+        });
+
+        if (!refreshRes.ok) throw new Error('Refresh token invalid or expired');
+
+        const newTokens = await refreshRes.json();
+        if (!newTokens.accessToken) throw new Error('No new access token');
+
+        localStorage.setItem('accessToken', newTokens.accessToken);
+        setAccessToken(newTokens.accessToken);
+
+        return await tryFetchData(newTokens.accessToken); // Retry with new token
+      }
+
+      if (!prefRes.ok) throw new Error('Unauthorized');
+
       const prefText = await prefRes.text();
       if (prefText) {
         const data = JSON.parse(prefText);
         setForm({
           matchAppointmentType: data.matchAppointmentType,
-          notifyBefore: { value: data.notifyBeforeMinutes / 1440 || '', unit: 1440 },
-          notifyAfter: { value: data.notifyAfterMinutes / 1440 || '', unit: 1440 },
+          notifyBefore: {
+            value: data.notifyBeforeMinutes / 1440 || '',
+            unit: 1440,
+          },
+          notifyAfter: {
+            value: data.notifyAfterMinutes / 1440 || '',
+            unit: 1440,
+          },
           maxNotificationsPerGap: data.maxNotificationsPerGap || '',
         });
       }
 
-      const userRes = await fetchWithAuth('/user/me');
+      const userRes = await fetch(`${apiBase}/user/me`, {
+        headers: { Authorization: `Bearer ${tokenToUse}` },
+      });
+
+      if (!userRes.ok) throw new Error('Failed to fetch user');
+
       const userData = await userRes.json();
       setUser(userData);
     } catch (err) {
-      console.error(err);
+      console.error('[Auth Fetch Error]', err);
       router.push('/signin');
     }
   };
 
-  fetchData();
+  setAccessToken(access); // save current access token
+  tryFetchData(access);   // start fetch flow
 }, []);
 
 
