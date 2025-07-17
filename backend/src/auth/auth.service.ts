@@ -10,6 +10,7 @@ import { PrismaManagerService } from 'src/prisma-manager/prisma-manager.service'
 import * as argon from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import {CreateUserPreferenceDto} from './dto/create-user-preference.dto'
 
 @Injectable()
 export class AuthService {
@@ -168,6 +169,14 @@ export class AuthService {
   }
 }
 
+
+async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
+  return this.prisma.userPreference.upsert({
+    where: { userId },
+    update: data,
+    create: { ...data, userId },
+  });
+}
 
 
   async resetPassword(token: string, newPassword: string) {
@@ -443,6 +452,12 @@ async validateAccessToken(token: string) {
   } catch (err) {
     throw new BadRequestException('Invalid or expired token');
   }
+}
+
+async getUserPreference(userId: string) {
+  return this.prisma.userPreference.findUnique({
+    where: { userId },
+  });
 }
 
 

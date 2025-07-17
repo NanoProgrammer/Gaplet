@@ -18,7 +18,6 @@ export class PaymentsController {
   @Post('stripe')
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
     const sig = req.headers['stripe-signature'] as string;
-
     let event: Stripe.Event;
 
     try {
@@ -32,13 +31,11 @@ export class PaymentsController {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // ✅ 1. Asignar rol cuando el checkout se completa
+    // ✅ 1. Asignar rol cuando se completa el pago
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-
       const userId = session.metadata?.userId;
       const priceId = session.metadata?.priceId;
-
       const role = this.mapPriceToRole(priceId);
 
       if (userId && role) {
@@ -47,7 +44,7 @@ export class PaymentsController {
       }
     }
 
-    // 🛑 2. Revocar rol si cancela la suscripción
+    // 🛑 2. Revocar rol cuando cancela
     if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as Stripe.Subscription;
       const userId = subscription.metadata?.userId;
@@ -61,7 +58,6 @@ export class PaymentsController {
     return res.status(200).send('Webhook handled');
   }
 
-  // 🎯 Mapea los priceId a roles de tu sistema
   private mapPriceToRole(priceId: string): string {
     const roles = {
       [this.configService.get('STRIPE_PRICE_ID_STARTER')]: 'STARTER',

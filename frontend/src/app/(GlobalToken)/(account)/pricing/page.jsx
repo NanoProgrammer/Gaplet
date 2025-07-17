@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useUser } from '@/context/UserContext';
 
 const plans = [
   {
@@ -46,27 +44,40 @@ const plans = [
 
 export default function PricingPage() {
   const router = useRouter();
-  const { user } = useUser();
+  const [accessToken, setAccessToken] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
-    if (!user?.accessToken) {
-      router.push('/signin');
-    }
-  }, [user, router]);
+    const token = localStorage.getItem('accessToken');
+    if (!token) return router.push('/signin');
+
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`${API_URL}/user/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Unauthorized');
+        const data = await res.json();
+
+        setAccessToken(token);
+        setUserRole(data.role || 'USER');
+      } catch (err) {
+        console.error('Error fetching user:', err);
+        router.push('/signin');
+      }
+    };
+
+    fetchUser();
+  }, [API_URL, router]);
 
   const goToCheckout = async (plan) => {
-    if (!API_URL) {
-      console.error('NEXT_PUBLIC_API_URL not set in .env');
-      return;
-    }
-
     try {
       const res = await fetch(`${API_URL}/checkout/create-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ plan }),
       });
@@ -77,6 +88,12 @@ export default function PricingPage() {
       console.error(error);
       router.push('/signin');
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    router.push('/signin');
   };
 
   return (
@@ -113,12 +130,30 @@ export default function PricingPage() {
                   onClick={() => goToCheckout(plan.name.toLowerCase())}
                   className={`w-full rounded-xl px-6 py-3 text-white font-medium transition-colors ${plan.buttonColor}`}
                 >
-                  Try 1 week free
+                  {userRole && ['STARTER', 'PRO', 'PREMIUM'].includes(userRole)
+                    ? 'Change Plan'
+                    : 'Try 1 week free'}
                 </button>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Mostrar logout solo si es rol USER */}
+        {userRole === 'USER' && (
+          <div className="mt-10 text-center">
+            <p className="text-sm text-gray-600">
+              You’re logged in with a basic account.{' '}
+              <button
+                onClick={handleLogout}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Sign out
+              </button>{' '}
+              to switch accounts.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

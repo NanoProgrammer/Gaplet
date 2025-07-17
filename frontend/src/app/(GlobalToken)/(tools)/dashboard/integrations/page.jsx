@@ -54,7 +54,7 @@ export default function IntegrationsPage() {
 
           const newTokens = await refreshRes.json();
           localStorage.setItem('accessToken', newTokens.accessToken);
-          localStorage.setItem('refreshToken', newTokens.refreshToken);
+    
           await fetchUserInfo(newTokens.accessToken);
         } else {
           throw new Error('Unexpected error');
@@ -122,13 +122,16 @@ export default function IntegrationsPage() {
         <div className="flex items-start gap-4 bg-yellow-100 text-yellow-800 rounded-xl px-6 py-4 border-l-4 border-yellow-500 shadow-sm mb-10">
           <AlertTriangle className="w-5 h-5 mt-1" />
           <div>
-            <p className="font-semibold text-sm">
-              We cannot create or edit your bookings directly on external platforms.
-            </p>
-            <p className="text-sm">
-              Please monitor all changes from your <strong>Main Dashboard</strong> after using any integration.
-            </p>
-          </div>
+  <p className="font-semibold text-sm">
+    Due to platform limitations, we cannot create or modify bookings directly on <strong>Calendly</strong>. 
+    (This restriction does not apply to Square or Acuity.)
+  </p>
+  <p className="text-sm mt-1">
+    After connecting any calendar integration, please track all booking activity from your 
+    <strong> Main Dashboard</strong>. Any changes made on the external platform will sync automatically.
+  </p>
+</div>
+
         </div>
 
         {loading ? (

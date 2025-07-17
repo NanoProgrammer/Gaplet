@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import {CreateUserPreferenceDto} from './dto/create-user-preference.dto'
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { ResetPasswordDto } from './dto/newpassword.dto';
 import { Request, Response } from 'express';
@@ -32,6 +33,22 @@ export class AuthController {
   register(@Body() createAuthDto: CreateAuthDto) {
     return this.authService.register(createAuthDto);
   }
+
+    @UseGuards(AuthGuard('jwt'))
+@Get('preference')
+async getPreference(@Req() req: RequestWithUser) {
+  return this.authService.getUserPreference(req.user.id);
+}
+
+@UseGuards(AuthGuard('jwt'))
+@Post('preference')
+async savePreference(
+  @Req() req: RequestWithUser,
+  @Body() body: CreateUserPreferenceDto,
+) {
+  return this.authService.saveUserPreference(req.user.id, body);
+}
+
 
   @HttpCode(200)
   @Post('login')
@@ -201,4 +218,6 @@ async connectProvider(
         .send(`Error while connecting ${provider}: ` + err.message);
     }
   }
+
+
 }
