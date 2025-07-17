@@ -4,25 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
-const handleCancelSubscription = async () => {
-  const confirmed = window.confirm('Are you sure you want to cancel your subscription?');
-  if (!confirmed) return;
-
-  try {
-    const res = await fetchWithAuth('/checkout/cancel-subscription', { method: 'POST' });
-    if (res.ok) {
-      alert('Subscription cancelled.');
-      window.location.reload();
-    } else {
-      const error = await res.json();
-      alert('Error: ' + error.message);
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Something went wrong.');
-  }
-};
-
 const fetchWithAuth = async (url, options = {}) => {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
   let accessToken = localStorage.getItem('accessToken');
@@ -82,7 +63,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false);
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
+  const accessToken =  localStorage.getItem('accessToken');
 
   useEffect(() => {
   const fetchData = async () => {
@@ -300,12 +281,13 @@ export default function SettingsPage() {
                 Upgrade Plan
               </button></a>
               
-              <button
-  onClick={handleCancelSubscription}
+              <a href="https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00" target="_blank">
+                <button
   className="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200 font-medium"
 >
   Cancel Subscription
 </button>
+              </a>
 
             </div>
           </motion.div>

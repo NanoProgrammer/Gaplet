@@ -54,12 +54,11 @@ export default function DashboardPage() {
       return res.json();
     })
     .then((user) => {
-      if (user.role === 'USER') {
-        router.replace('/pricing');
-      } else {
-        router.replace('/dashboard');
-      }
-    })
+  setUserInfo(user); // <- Aquí guardamos el nombre y todo lo demás
+  if (user.role === 'USER') {
+    router.replace('/pricing');
+  }
+})
     .catch(() => {
       localStorage.clear();
       router.replace('/signin');
@@ -69,7 +68,7 @@ export default function DashboardPage() {
 
   const checklistComplete = userInfo?.connectedIntegration && preferences;
 
-  const replacementLimit = userInfo?.role === 'PREMIUM' ? 100 : userInfo?.role === 'PRO' ? 50 : 20;
+  const replacementLimit = userInfo?.role === 'PREMIUM' ? 100 : userInfo?.role === 'PRO' ? 50 : userInfo?.role === 'STARTER' ? 25 : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
