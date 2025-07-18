@@ -145,13 +145,14 @@ async connectProvider(
   'webhook_subscriptions:write',
 ].join(' ');
 
-      url = `https://auth.calendly.com/oauth/authorize` +
-        `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
-        `&response_type=code` +
-        `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&state=${state}`;
-      break;
+      
+  url = `https://auth.calendly.com/oauth/authorize` +
+    `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
+    `&response_type=code` +
+    `&redirect_uri=${encodeURIComponent(redirect)}` + 
+    `&scope=${encodeURIComponent(scope)}` +           
+    `&state=${state}`;
+  break;
     }
 
     case 'acuity': {
