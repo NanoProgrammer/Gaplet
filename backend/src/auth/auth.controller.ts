@@ -137,12 +137,14 @@ async connectProvider(
   switch (provider) {
     case 'calendly': {
       // Scopes válidos según documentación v2
+
       const scope = [
-        'user:read',
-        'scheduled_events:read',
-        'scheduled_events:write',
-        'webhook_subscriptions:write',
-      ].join(' ');
+  'user:read',
+  'scheduled_events:read',
+  'webhook_subscriptions:read',
+  'webhook_subscriptions:write',
+].join(' ');
+
       url = `https://auth.calendly.com/oauth/authorize` +
         `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
         `&response_type=code` +

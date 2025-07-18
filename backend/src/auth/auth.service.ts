@@ -236,7 +236,7 @@ async exchangeTokenAndSave(
   code: string,
   userId: string,
 ) {
-  const api = process.env.API_BASE_URL; 
+  const api = process.env.API_BASE_URL;
   const redirect = `${api}/auth/callback/${provider}`;
   let tokenRes: any;
   let externalUserId: string | null = null;
@@ -257,7 +257,13 @@ async exchangeTokenAndSave(
         }),
       }).then(r => r.json());
 
-      // ✅ Extraer el organization y user ID
+      if (!tokenRes.access_token) {
+        console.error('CALENDLY TOKEN ERROR:', tokenRes);
+        throw new Error(
+          `Calendly token error: ${tokenRes.error || 'unknown'} - ${tokenRes.error_description || ''}`,
+        );
+      }
+
       const me = await fetch('https://api.calendly.com/users/me', {
         headers: {
           Authorization: `Bearer ${tokenRes.access_token}`,
@@ -278,14 +284,21 @@ async exchangeTokenAndSave(
         code,
         redirect_uri: redirect,
       });
+
       tokenRes = await fetch('https://acuityscheduling.com/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
       }).then(r => r.json());
 
-      // Acuity no ofrece una forma pública fácil de obtener el ID de usuario/empresa
-      // Dejar como null, o puedes agregar aquí un fetch extra si lo necesitas
+      if (!tokenRes.access_token) {
+        console.error('ACUITY TOKEN ERROR:', tokenRes);
+        throw new Error(
+          `Acuity token error: ${tokenRes.error || 'unknown'} - ${tokenRes.error_description || ''}`,
+        );
+      }
+
+      // No external user/org ID disponible en OAuth básico de Acuity
       break;
     }
 
@@ -299,18 +312,22 @@ async exchangeTokenAndSave(
           client_secret: process.env.SQUARE_CLIENT_SECRET,
           grant_type: 'authorization_code',
           code,
+          redirect_uri: redirect,
         }),
       }).then(r => r.json());
 
-      // ✅ Obtener ID del usuario (merchant)
-      const merchant = await fetch(
-        'https://connect.squareup.com/v2/merchants/me',
-        {
-          headers: {
-            Authorization: `Bearer ${tokenRes.access_token}`,
-          },
+      if (!tokenRes.access_token) {
+        console.error('SQUARE TOKEN ERROR:', tokenRes);
+        throw new Error(
+          `Square token error: ${tokenRes.error || 'unknown'} - ${tokenRes.message || ''}`,
+        );
+      }
+
+      const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
+        headers: {
+          Authorization: `Bearer ${tokenRes.access_token}`,
         },
-      ).then(r => r.json());
+      }).then(r => r.json());
 
       externalUserId = merchant.merchant?.id || null;
       break;
@@ -318,6 +335,7 @@ async exchangeTokenAndSave(
   }
 
   const { access_token, refresh_token, expires_in, expires_at, scope } = tokenRes;
+
   const expires = expires_in
     ? new Date(Date.now() + expires_in * 1000)
     : expires_at
@@ -349,6 +367,7 @@ async exchangeTokenAndSave(
 }
 
 
+
 /* ---------------------------------------------------------
    2)  ENSURE WEBHOOK  (one per provider)
 --------------------------------------------------------- */
@@ -359,19 +378,20 @@ async ensureWebhook(
   const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({
     where: { userId },
   });
-  if (integration.webhookId) return; // ya existe
+
+  if (integration.webhookId) return;
 
   const target = `${process.env.API_BASE_URL}/webhooks/${provider}`;
 
   switch (provider) {
     /* ------------ CALENDLY ------------ */
     case 'calendly': {
-      // Necesitamos el organization ID una sola vez
       const me = await fetch('https://api.calendly.com/users/me', {
         headers: { Authorization: `Bearer ${integration.accessToken}` },
       }).then(r => r.json());
 
       const orgId = me.resource.current_organization;
+
       const res = await fetch('https://api.calendly.com/webhook_subscriptions', {
         method: 'POST',
         headers: {
@@ -388,8 +408,9 @@ async ensureWebhook(
 
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
-        data: { webhookId: res.resource.id, externalOrgId: orgId },
+        data: { webhookId: res.resource?.id, externalOrgId: orgId },
       });
+
       break;
     }
 
@@ -406,38 +427,38 @@ async ensureWebhook(
 
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
-        data: { webhookId: res.id.toString() },
+        data: { webhookId: res.id?.toString() },
       });
+
       break;
     }
 
     /* ------------ SQUARE ------------ */
     case 'square': {
-      const res = await fetch(
-        'https://connect.squareup.com/v2/webhooks/subscriptions',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            idempotency_key: crypto.randomUUID(),
-            name: 'Gaplet–Canceled',
-            event_types: ['bookings.canceled', 'appointments.cancelled'],
-            notification_url: target,
-          }),
+      const res = await fetch('https://connect.squareup.com/v2/webhooks/subscriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json',
         },
-      ).then(r => r.json());
+        body: JSON.stringify({
+          idempotency_key: crypto.randomUUID(),
+          name: 'Gaplet–Canceled',
+          event_types: ['bookings.canceled', 'appointments.cancelled'],
+          notification_url: target,
+        }),
+      }).then(r => r.json());
 
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
         data: { webhookId: res.subscription?.id },
       });
+
       break;
     }
   }
 }
+
 async validateAccessToken(token: string) {
   try {
     const payload = await this.jwt.verifyAsync(token, {
