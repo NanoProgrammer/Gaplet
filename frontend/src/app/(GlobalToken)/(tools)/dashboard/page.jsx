@@ -25,12 +25,13 @@ export default function DashboardPage() {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!accessToken) return;
 
-  fetch(`${API_URL}/user/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-    .then(async (res) => {
+  const fetchUser = async () => {
+    try {
+      let res = await fetch(`${API_URL}/user/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
       if (res.status === 401 && refreshToken) {
-        // Intenta refrescar el token
         const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${refreshToken}` },
@@ -41,34 +42,48 @@ export default function DashboardPage() {
         const newTokens = await refreshRes.json();
         localStorage.setItem('accessToken', newTokens.accessToken);
 
-        // Intenta nuevamente con el nuevo access token
-        return fetch(`${API_URL}/user/me`, {
+        res = await fetch(`${API_URL}/user/me`, {
           headers: { Authorization: `Bearer ${newTokens.accessToken}` },
         });
       }
 
-      return res;
-    })
-    .then((res) => {
-      if (!res.ok) throw new Error();
-      return res.json();
-    })
-    .then((user) => {
-  setUserInfo(user); // <- Aquí guardamos el nombre y todo lo demás
-  if (user.role === 'USER') {
-    router.replace('/pricing');
-  }
-})
-    .catch(() => {
+      if (!res.ok) throw new Error('Failed to fetch user');
+
+      const user = await res.json();
+      setUserInfo(user);
+
+      if (user.role === 'USER') {
+        router.replace('/pricing');
+        return;
+      }
+
+      // ✅ Ahora sí, carga las preferencias
+      const prefsRes = await fetch(`${API_URL}/user/preferences`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (prefsRes.ok) {
+        const prefs = await prefsRes.json();
+        setPreferences(prefs);
+      } else {
+        setPreferences(null); // Por si no tiene preferencias aún
+      }
+
+    } catch (err) {
+      console.error('Error loading dashboard:', err);
       localStorage.clear();
       router.replace('/signin');
-    });
+    }
+  };
+
+  fetchUser();
 }, []);
+
 
 
   const checklistComplete = userInfo?.connectedIntegration && preferences;
 
-  const replacementLimit = userInfo?.role === 'PREMIUM' ? 100 : userInfo?.role === 'PRO' ? 50 : userInfo?.role === 'STARTER' ? 25 : 0;
+  const replacementLimit = userInfo?.role === 'PREMIUM' ? 100 : userInfo?.role === 'PRO' ? 50 : userInfo?.role === 'STARTER' ? 20 : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
