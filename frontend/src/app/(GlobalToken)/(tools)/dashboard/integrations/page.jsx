@@ -14,9 +14,32 @@ import {
 
 export default function IntegrationsPage() {
   const router = useRouter();
+  const [notification, setNotification] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+  useEffect(() => {
+  if (typeof window === 'undefined') return;
+
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status');
+  const provider = params.get('provider');
+
+  if (!status || !provider) return;
+
+  if (status === 'success') {
+    setNotification({ type: 'success', provider });
+  } else if (status === 'error') {
+    setNotification({ type: 'error', provider });
+  }
+
+  // Limpiar la URL
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState(null, '', cleanUrl);
+}, []);
+
 
   useEffect(() => {
   if (typeof window === 'undefined') return;
@@ -114,6 +137,20 @@ export default function IntegrationsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white px-6 py-10">
       <div className="max-w-5xl mx-auto">
+        {notification && (
+  <div
+    className={`rounded-lg p-4 mb-6 text-sm font-medium ${
+      notification.type === 'success'
+        ? 'bg-green-100 text-green-800 border border-green-300'
+        : 'bg-red-100 text-red-800 border border-red-300'
+    }`}
+  >
+    {notification.type === 'success'
+      ? `✅ ${notification.provider} connected successfully!`
+      : `❌ Failed to connect ${notification.provider}.`}
+  </div>
+)}
+
         <h1 className="text-4xl font-extrabold text-gray-800 mb-4 flex items-center gap-3">
           <PlugZap className="w-8 h-8 text-green-500 animate-pulse" /> Integrations
         </h1>
