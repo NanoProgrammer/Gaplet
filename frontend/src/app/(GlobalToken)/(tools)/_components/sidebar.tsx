@@ -4,8 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Settings, PlugZap, LogOut } from 'lucide-react';
 
+import { useUser } from '@/context/UserContext';
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { setUser } = useUser(); 
   const router = useRouter();
 
   const navItems = [
@@ -17,6 +20,7 @@ export default function Sidebar() {
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    setUser(null);
     router.push('/signin');
   };
 
