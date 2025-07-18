@@ -130,7 +130,8 @@ async connectProvider(
 ) {
   const userId = req.user.id;
   const apiBase = process.env.API_BASE_URL;
-  const redirect = encodeURIComponent(`${apiBase}/auth/callback/${provider}`);
+  const redirect = `${apiBase}/auth/callback/${provider}`;
+
   const state = userId;
   let url = '';
 
