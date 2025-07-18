@@ -138,17 +138,17 @@ async connectProvider(
 
   switch (provider) {
     case 'calendly': {
+      // ✅ Scopes válidos de Calendly según su documentación oficial
       const scope = [
-        'user.read',
         'organization.read',
-        'event_types.read',
-        'scheduled_events.read',
-        'scheduled_events.write',
-        'webhook_subscriptions.write',
-        'invitee.me.read',
-        'event_type_available_times.read',
-        'user_busy_times.read',
+        'user.read',
+        'event_type.read',
+        'scheduled_event.read',
+        'webhook_subscription.read',
+        'webhook_subscription.write',
+        'invitee.read'
       ].join(' ');
+
       url = `https://auth.calendly.com/oauth/authorize` +
         `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
         `&response_type=code` +
@@ -170,14 +170,18 @@ async connectProvider(
     }
 
     case 'square': {
+      // ✅ Scopes válidos para bookings y customers (2024)
       const scope = [
-        'APPOINTMENTS_READ',
-        'APPOINTMENTS_WRITE',
+        'BOOKINGS_READ',
+        'BOOKINGS_WRITE',
         'CUSTOMERS_READ',
         'CUSTOMERS_WRITE',
         'MERCHANT_PROFILE_READ',
-        'WEBHOOKS_WRITE',
+        'MERCHANT_PROFILE_READ',
+        'APPOINTMENTS_READ',
+        'APPOINTMENTS_WRITE'
       ].join(' ');
+
       url = `https://connect.squareup.com/oauth2/authorize` +
         `?client_id=${process.env.SQUARE_CLIENT_ID}` +
         `&response_type=code` +
@@ -194,7 +198,6 @@ async connectProvider(
 
   return res.json({ redirectUrl: url });
 }
-
 
 
 
