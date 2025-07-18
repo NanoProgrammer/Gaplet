@@ -137,23 +137,18 @@ async connectProvider(
 
   switch (provider) {
     case 'calendly': {
-      // Scopes válidos según documentación v2
-const scope = [
-  'user:read',
-  'organization:read',
-  'scheduled_events:read',
-  'webhook_subscriptions:read',
-  'webhook_subscriptions:write',
-].join(' ');
-
-      
-  url = `https://auth.calendly.com/oauth/authorize` +
+  const scope = ['user:read', 'scheduled_events:read'].join(' ');
+  const redirect = `${process.env.API_BASE_URL}/auth/callback/calendly`;
+  const url = `https://auth.calendly.com/oauth/authorize` +
     `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
     `&response_type=code` +
-    `&redirect_uri=${encodeURIComponent(redirect)}` + 
-    `&scope=${encodeURIComponent(scope)}` +           
+    `&redirect_uri=${encodeURIComponent(redirect)}` +
+    `&scope=${encodeURIComponent(scope)}` +
     `&state=${state}`;
-  break;
+
+  console.log('🧪 Calendly Test URL:', url);
+  return res.json({ redirectUrl: url });
+
     }
 
     case 'acuity': {
