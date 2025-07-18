@@ -1,4 +1,10 @@
-import { Controller, Post, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Req,
+  Res,
+  HttpCode,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
@@ -12,10 +18,11 @@ export class PaymentsController {
     private configService: ConfigService,
     private userService: UserService,
   ) {
-    this.stripe = new Stripe(configService.get('STRIPE_SECRET_KEY'));
+    this.stripe = new Stripe(this.configService.get('STRIPE_SECRET_KEY'));
   }
 
   @Post('stripe')
+  @HttpCode(200)
   async handleWebhook(@Req() req: Request, @Res() res: Response) {
     const sig = req.headers['stripe-signature'] as string;
     let event: Stripe.Event;
@@ -27,35 +34,45 @@ export class PaymentsController {
         this.configService.get('STRIPE_WEBHOOK_SECRET'),
       );
     } catch (err) {
-      console.error('❌ Webhook signature invalid', err.message);
+      console.error('❌ Webhook signature invalid:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // ✅ 1. Asignar rol cuando se completa el pago
+    console.log(`📩 Received Stripe event: ${event.type}`);
+
+    // ✅ 1. Rol al completar pago
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.userId;
-      const priceId = session.metadata?.priceId;
-      const role = this.mapPriceToRole(priceId);
+      const metadata = session.metadata || {};
+      const userId = metadata.userId;
+      const priceId = metadata.priceId;
 
-      if (userId && role) {
-        await this.userService.updateUserRole(userId, role);
-        console.log(`✅ Asignado rol ${role} a usuario ${userId}`);
+      if (!userId || !priceId) {
+        console.warn('⚠️ Missing metadata in checkout.session.completed');
+        return res.status(200).send('Missing metadata');
       }
+
+      const role = this.mapPriceToRole(priceId);
+      await this.userService.updateUserRole(userId, role);
+
+      console.log(`✅ Rol "${role}" asignado a usuario ${userId}`);
     }
 
-    // 🛑 2. Revocar rol cuando cancela
+    // 🛑 2. Revocar rol al cancelar suscripción
     if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as Stripe.Subscription;
       const userId = subscription.metadata?.userId;
 
-      if (userId) {
-        await this.userService.updateUserRole(userId, 'USER');
-        console.log(`⚠️ Rol revocado para usuario ${userId} (cancelación)`);
+      if (!userId) {
+        console.warn('⚠️ No userId in subscription metadata');
+        return res.status(200).send('Missing userId');
       }
+
+      await this.userService.updateUserRole(userId, 'USER');
+      console.log(`⚠️ Rol revocado (USER) para usuario ${userId}`);
     }
 
-    return res.status(200).send('Webhook handled');
+    return res.send('Webhook handled');
   }
 
   private mapPriceToRole(priceId: string): string {

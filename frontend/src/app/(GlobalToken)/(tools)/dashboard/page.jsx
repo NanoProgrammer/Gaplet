@@ -73,6 +73,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
       <header className="mb-10">
+        <p>{userInfo?.role}</p>
         <h1 className="text-3xl font-bold text-gray-800">
           Welcome back{userInfo?.name ? `, ${userInfo.name.split(' ')[0]} 👋` : ' 👋'}
         </h1>
