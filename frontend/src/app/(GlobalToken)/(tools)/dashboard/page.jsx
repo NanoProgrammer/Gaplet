@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/context/UserContext';
 import {
   RefreshCw,
   Slash,
   TrendingUp,
   CalendarDays,
   Mail,
-  Zap,
   Clock,
   MessageSquare,
 } from 'lucide-react';
@@ -20,70 +18,75 @@ export default function DashboardPage() {
   const [preferences, setPreferences] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
- useEffect(() => {
-  const accessToken = localStorage.getItem('accessToken');
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!accessToken) return;
+  useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
 
-  const fetchUser = async () => {
-    try {
-      let res = await fetch(`${API_URL}/user/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (res.status === 401 && refreshToken) {
-        const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${refreshToken}` },
-        });
-
-        if (!refreshRes.ok) throw new Error('Refresh failed');
-
-        const newTokens = await refreshRes.json();
-        localStorage.setItem('accessToken', newTokens.accessToken);
-
-        res = await fetch(`${API_URL}/user/me`, {
-          headers: { Authorization: `Bearer ${newTokens.accessToken}` },
-        });
-      }
-
-      if (!res.ok) throw new Error('Failed to fetch user');
-
-      const user = await res.json();
-      setUserInfo(user);
-
-      if (user.role === 'USER') {
-        router.replace('/pricing');
-        return;
-      }
-
-      // ✅ Ahora sí, carga las preferencias
-      const prefsRes = await fetch(`${API_URL}/user/preferences`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (prefsRes.ok) {
-        const prefs = await prefsRes.json();
-        setPreferences(prefs);
-      } else {
-        setPreferences(null); // Por si no tiene preferencias aún
-      }
-
-    } catch (err) {
-      console.error('Error loading dashboard:', err);
-      localStorage.clear();
+    if (!accessToken) {
       router.replace('/signin');
+      return;
     }
-  };
 
-  fetchUser();
-}, []);
+    const fetchData = async () => {
+      try {
+        let res = await fetch(`${API_URL}/user/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
+        if (res.status === 401 && refreshToken) {
+          const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${refreshToken}` },
+          });
 
+          if (!refreshRes.ok) throw new Error('Refresh failed');
 
-  const checklistComplete = userInfo?.connectedIntegration && preferences;
+          const newTokens = await refreshRes.json();
+          localStorage.setItem('accessToken', newTokens.accessToken);
 
-  const replacementLimit = userInfo?.role === 'PREMIUM' ? 100 : userInfo?.role === 'PRO' ? 50 : userInfo?.role === 'STARTER' ? 20 : 0;
+          res = await fetch(`${API_URL}/user/me`, {
+            headers: { Authorization: `Bearer ${newTokens.accessToken}` },
+          });
+        }
+
+        if (!res.ok) throw new Error('Failed to fetch user');
+        const user = await res.json();
+        setUserInfo(user);
+
+        if (user.role === 'USER') {
+          router.replace('/pricing');
+          return;
+        }
+
+        // 🟩 Usa el endpoint correcto para preferencias
+        const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (prefsRes.ok) {
+          const prefs = await prefsRes.json();
+          setPreferences(prefs);
+        } else {
+          setPreferences(null);
+        }
+      } catch (err) {
+        console.error('Error loading dashboard:', err);
+        localStorage.clear();
+        router.replace('/signin');
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const replacementLimit =
+    userInfo?.role === 'PREMIUM'
+      ? 100
+      : userInfo?.role === 'PRO'
+      ? 50
+      : userInfo?.role === 'STARTER'
+      ? 20
+      : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
@@ -98,50 +101,49 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {/* Activation Checklist */}
-      {userInfo && preferences && !checklistComplete && (
+      {/* ✅ Checklist siempre visible */}
+      {userInfo && (
         <section className="mb-12">
-  <h2 className="text-xl font-semibold text-gray-800 mb-4">
-    Your Activation Checklist
-  </h2>
-  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
-    <li className="flex items-start gap-3">
-      {!userInfo.connectedIntegration && (
-        <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-      )}
-      {userInfo.connectedIntegration ? (
-        <span className="text-sm text-gray-500 line-through">
-          Connect your client management system
-        </span>
-      ) : (
-        <a
-          href="/dashboard/integrations"
-          className="text-sm text-green-500 font-medium hover:underline transition"
-        >
-          Connect your client management system
-        </a>
-      )}
-    </li>
-    <li className="flex items-start gap-3">
-      {!preferences && (
-        <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-      )}
-      {preferences ? (
-        <span className="text-sm text-gray-500 line-through">
-          Configure notification rules
-        </span>
-      ) : (
-        <a
-          href="/dashboard/settings"
-          className="text-sm text-green-500 font-medium hover:underline transition"
-        >
-          Configure notification rules
-        </a>
-      )}
-    </li>
-  </ul>
-</section>
-
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Your Activation Checklist
+          </h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
+            <li className="flex items-start gap-3">
+              {!userInfo.connectedIntegration && (
+                <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              )}
+              {userInfo.connectedIntegration ? (
+                <span className="text-sm text-gray-500 line-through">
+                  Connect your client management system
+                </span>
+              ) : (
+                <a
+                  href="/dashboard/integrations"
+                  className="text-sm text-green-500 font-medium hover:underline transition"
+                >
+                  Connect your client management system
+                </a>
+              )}
+            </li>
+            <li className="flex items-start gap-3">
+              {!preferences && (
+                <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              )}
+              {preferences ? (
+                <span className="text-sm text-gray-500 line-through">
+                  Configure notification rules
+                </span>
+              ) : (
+                <a
+                  href="/dashboard/settings"
+                  className="text-sm text-green-500 font-medium hover:underline transition"
+                >
+                  Configure notification rules
+                </a>
+              )}
+            </li>
+          </ul>
+        </section>
       )}
 
       {/* Stats */}
