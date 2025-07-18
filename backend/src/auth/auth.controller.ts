@@ -137,7 +137,7 @@ async connectProvider(
 
   switch (provider) {
     case 'calendly': {
-  const scope = ['user:read', 'scheduled_events:read'].join(' ');
+  const scope = ['user:read'].join(' ');
   const redirect = `${process.env.API_BASE_URL}/auth/callback/calendly`;
   const url = `https://auth.calendly.com/oauth/authorize` +
     `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
@@ -146,10 +146,10 @@ async connectProvider(
     `&scope=${encodeURIComponent(scope)}` +
     `&state=${state}`;
 
-  console.log('🧪 Calendly Test URL:', url);
+  console.log('🔍 Calendly minimal URL:', url);
   return res.json({ redirectUrl: url });
+}
 
-    }
 
     case 'acuity': {
       const scope = 'api-v1';
