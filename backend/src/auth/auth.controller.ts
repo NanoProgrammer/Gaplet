@@ -135,53 +135,51 @@ async connectProvider(
   let url = '';
 
   switch (provider) {
-    case 'calendly':
-      const calendlyScope = [
-        "user:read",
-        "organization:read",
-        "event_types:read",
-        "scheduled_events:read",
-        "scheduled_events:write",
-        "webhook_subscriptions:write",
-        "invitee:read",
-        "event_type_available_times:read",
-        "user_busy_times:read"
-      ].join(" ");
+    case 'calendly': {
+      // Scopes válidos según documentación v2
+      const scope = [
+        'user:read',
+        'scheduled_events:read',
+        'scheduled_events:write',
+        'webhook_subscriptions:write',
+      ].join(' ');
       url = `https://auth.calendly.com/oauth/authorize` +
         `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(calendlyScope)}` +
+        `&scope=${encodeURIComponent(scope)}` +
         `&state=${state}`;
       break;
+    }
 
-    case 'acuity':
-      const acuityScope = "api-v1";
+    case 'acuity': {
+      const scope = 'api-v1';
       url = `https://acuityscheduling.com/oauth2/authorize` +
         `?client_id=${process.env.ACUITY_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(acuityScope)}` +
+        `&scope=${encodeURIComponent(scope)}` +
         `&state=${state}`;
       break;
+    }
 
-    case 'square':
-      const squareScope = [
-        "APPOINTMENTS_READ",
-        "APPOINTMENTS_WRITE",
-        "CUSTOMERS_READ",
-        "CUSTOMERS_WRITE",
-        "MERCHANT_PROFILE_READ",
-        "WEBHOOKS_WRITE"
-      ].join(" ");
+    case 'square': {
+      // Scopes válidos según referencia OAuth Square
+      const scope = [
+        'APPOINTMENTS_READ',
+        'APPOINTMENTS_WRITE',
+        'CUSTOMERS_READ',
+        'MERCHANT_PROFILE_READ',
+      ].join('+'); // Square usa '+' como separador
       url = `https://connect.squareup.com/oauth2/authorize` +
         `?client_id=${process.env.SQUARE_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(squareScope)}` +
+        `&scope=${scope}` +
         `&state=${state}` +
         `&session=false`;
       break;
+    }
 
     default:
       return res.status(400).send('Unsupported provider');
