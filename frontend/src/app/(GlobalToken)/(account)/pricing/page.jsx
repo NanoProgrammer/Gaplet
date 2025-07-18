@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@/context/UserContext';
 
 const plans = [
   {
@@ -46,6 +47,7 @@ export default function PricingPage() {
   const router = useRouter();
   const [accessToken, setAccessToken] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const { setUser } = useUser();
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function PricingPage() {
   };
 
   const handleLogout = () => {
+    setUser(null);
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     router.push('/signin');
