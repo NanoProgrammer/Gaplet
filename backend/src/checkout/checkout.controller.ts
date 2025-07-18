@@ -42,6 +42,21 @@ export class CheckoutController {
       throw new BadRequestException(`Invalid plan: ${plan}`);
     }
 
+    // Busca si ya hay un Stripe Customer con este email
+    const customers = await this.stripe.customers.list({
+      email,
+      limit: 10,
+    });
+
+    let stripeCustomer = customers.data.find(c => c.email === email);
+
+    if (!stripeCustomer) {
+      stripeCustomer = await this.stripe.customers.create({
+        email,
+        metadata: { userId },
+      });
+    }
+
     // Verifica si ya usó funciones premium
     const hasPremiumFeatures = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -57,9 +72,9 @@ export class CheckoutController {
       !hasPremiumFeatures?.preferences;
 
     const session = await this.stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       mode: 'subscription',
-      customer_email: email,
+      customer: stripeCustomer.id,
+      payment_method_types: ['card'],
       line_items: [
         {
           price: priceId,
