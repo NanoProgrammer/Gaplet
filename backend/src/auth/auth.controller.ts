@@ -129,68 +129,59 @@ async connectProvider(
   @Res() res: Response,
 ) {
   const userId = req.user.id;
-
   const apiBase = process.env.API_BASE_URL;
   const redirect = encodeURIComponent(`${apiBase}/auth/callback/${provider}`);
   const state = userId;
-
   let url = '';
 
   switch (provider) {
-    case 'calendly': {
-      // ✅ Scopes válidos de Calendly según su documentación oficial
-      const scope = [
-        'organization.read',
-        'user.read',
-        'event_type.read',
-        'scheduled_event.read',
-        'webhook_subscription.read',
-        'webhook_subscription.write',
-        'invitee.read'
-      ].join(' ');
-
+    case 'calendly':
+      const calendlyScope = [
+        "user:read",
+        "organization:read",
+        "event_types:read",
+        "scheduled_events:read",
+        "scheduled_events:write",
+        "webhook_subscriptions:write",
+        "invitee:read",
+        "event_type_available_times:read",
+        "user_busy_times:read"
+      ].join(" ");
       url = `https://auth.calendly.com/oauth/authorize` +
         `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
+        `&scope=${encodeURIComponent(calendlyScope)}` +
         `&state=${state}`;
       break;
-    }
 
-    case 'acuity': {
-      const scope = 'api-v1';
+    case 'acuity':
+      const acuityScope = "api-v1";
       url = `https://acuityscheduling.com/oauth2/authorize` +
         `?client_id=${process.env.ACUITY_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
+        `&scope=${encodeURIComponent(acuityScope)}` +
         `&state=${state}`;
       break;
-    }
 
-    case 'square': {
-      // ✅ Scopes válidos para bookings y customers (2024)
-      const scope = [
-        'BOOKINGS_READ',
-        'BOOKINGS_WRITE',
-        'CUSTOMERS_READ',
-        'CUSTOMERS_WRITE',
-        'MERCHANT_PROFILE_READ',
-        'MERCHANT_PROFILE_READ',
-        'APPOINTMENTS_READ',
-        'APPOINTMENTS_WRITE'
-      ].join(' ');
-
+    case 'square':
+      const squareScope = [
+        "APPOINTMENTS_READ",
+        "APPOINTMENTS_WRITE",
+        "CUSTOMERS_READ",
+        "CUSTOMERS_WRITE",
+        "MERCHANT_PROFILE_READ",
+        "WEBHOOKS_WRITE"
+      ].join(" ");
       url = `https://connect.squareup.com/oauth2/authorize` +
         `?client_id=${process.env.SQUARE_CLIENT_ID}` +
         `&response_type=code` +
         `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
+        `&scope=${encodeURIComponent(squareScope)}` +
         `&state=${state}` +
         `&session=false`;
       break;
-    }
 
     default:
       return res.status(400).send('Unsupported provider');
