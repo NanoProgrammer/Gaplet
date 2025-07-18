@@ -138,9 +138,9 @@ async connectProvider(
   switch (provider) {
     case 'calendly': {
       // Scopes válidos según documentación v2
-
-      const scope = [
+const scope = [
   'user:read',
+  'organization:read',
   'scheduled_events:read',
   'webhook_subscriptions:read',
   'webhook_subscriptions:write',
