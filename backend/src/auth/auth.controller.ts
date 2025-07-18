@@ -138,7 +138,7 @@ async connectProvider(
   switch (provider) {
     case 'calendly': {
   const scope = ['user:read', 'scheduled_events:read'].join(' ');
-  const redirect = `${process.env.API_BASE_URL}/auth/callback/calendly`;
+  const redirect = 'https://gaplet.onrender.com/auth/callback/calendly';
   const url = `https://auth.calendly.com/oauth/authorize` +
     `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
     `&response_type=code` +
