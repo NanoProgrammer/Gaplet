@@ -170,7 +170,7 @@ export default function SettingsPage() {
     if (!res.ok) throw new Error(data.message || 'Failed to cancel subscription');
 
     // ✅ Redirige al Customer Portal automáticamente
-    window.location.href = 'https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00';
+    router.push('/');
   } catch (err) {
     console.error('❌ Cancel error:', err.message);
     // Puedes mostrar un banner o toast si tienes uno implementado
