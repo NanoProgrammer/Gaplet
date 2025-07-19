@@ -90,9 +90,7 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
       },
     ],
     subscription_data: {
-      
       ...(trialEligible ? { trial_period_days: 7 } : {}),
-      proration_behavior: 'create_prorations',
       metadata: {
         userId,
       },
