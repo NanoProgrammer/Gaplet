@@ -153,6 +153,27 @@ export default function SettingsPage() {
     }));
   };
 
+  async function handleCancel(e) {
+    e.preventDefault(); // previene redirección inmediata al portal
+    try {
+      const res = await fetch('/checkout/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // si usas cookies con JWT
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error cancelling subscription');
+
+      alert('✅ Subscription will be cancelled at the end of the period.');
+      // luego de éxito puedes redirigir al portal si quieres
+      window.open('https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00', '_blank');
+    } catch (err) {
+      alert('❌ Failed to cancel subscription: ' + err.message);
+    }
+  }
   const handleSimpleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -325,13 +346,12 @@ export default function SettingsPage() {
                 Upgrade Plan
               </button></a>
               
-              <a href="https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00" target="_blank">
-                <button
-  className="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200 font-medium"
->
-  Cancel Subscription
-</button>
-              </a>
+              <button
+    onClick={handleCancel}
+    className="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200 font-medium"
+  >
+    Cancel Subscription
+  </button>
 
             </div>
           </motion.div>

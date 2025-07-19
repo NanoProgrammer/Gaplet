@@ -108,32 +108,42 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 
 
   @Post('cancel-subscription')
-  async cancelSubscription(@Req() req: Request) {
-    const user = req.user as any;
-    const userId = user.id;
+async cancelSubscription(@Req() req: Request) {
+  const user = req.user as any;
+  const userId = user.id;
+  const email = user.email;
 
-    const activeSubscriptions = await this.stripe.subscriptions.list({
-      status: 'active',
-      expand: ['data.customer'],
-      limit: 100,
-    });
+  // 1. Buscar cliente en Stripe
+  const customers = await this.stripe.customers.list({
+    email,
+    limit: 10,
+  });
 
-    const subscription = activeSubscriptions.data.find(
-      (s) => s.metadata?.userId === userId,
-    );
+  const stripeCustomer = customers.data.find(c => c.email === email);
 
-    if (!subscription) {
-      throw new BadRequestException(
-        'No active subscription found for this user.',
-      );
-    }
-
-    await this.stripe.subscriptions.update(subscription.id, {
-      cancel_at_period_end: true,
-    });
-
-    return {
-      message: 'Subscription will be cancelled at the end of the current period.',
-    };
+  if (!stripeCustomer) {
+    throw new BadRequestException('Stripe customer not found for this user.');
   }
+
+  // 2. Buscar suscripción activa asociada a este customer
+  const subscriptions = await this.stripe.subscriptions.list({
+    customer: stripeCustomer.id,
+    status: 'active',
+    limit: 5,
+  });
+
+  if (subscriptions.data.length === 0) {
+    throw new BadRequestException('No active subscription found for this user.');
+  }
+
+  // 3. Cancelar todas las suscripciones activas (normalmente solo una)
+  for (const sub of subscriptions.data) {
+    await this.stripe.subscriptions.cancel(sub.id);
+  }
+
+  return {
+    message: 'Active subscription(s) cancelled immediately.',
+  };
+}
+
 }
