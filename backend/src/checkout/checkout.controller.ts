@@ -25,78 +25,89 @@ export class CheckoutController {
   }
 
   @Post('create-session')
-  async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
-    const user = req.user as any;
-    const userId = user.id;
-    const email = user.email;
-    const currentRole = user.role;
+async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
+  const user = req.user as any;
+  const userId = user.id;
+  const email = user.email;
+  const currentRole = user.role;
 
-    const priceMap = {
-      starter: this.configService.get('STRIPE_PRICE_ID_STARTER'),
-      pro: this.configService.get('STRIPE_PRICE_ID_PRO'),
-      premium: this.configService.get('STRIPE_PRICE_ID_PREMIUM'),
-    };
+  const priceMap = {
+    starter: this.configService.get('STRIPE_PRICE_ID_STARTER'),
+    pro: this.configService.get('STRIPE_PRICE_ID_PRO'),
+    premium: this.configService.get('STRIPE_PRICE_ID_PREMIUM'),
+  };
 
-    const priceId = priceMap[plan.toLowerCase()];
-    if (!priceId) {
-      throw new BadRequestException(`Invalid plan: ${plan}`);
-    }
+  const priceId = priceMap[plan.toLowerCase()];
+  if (!priceId) {
+    throw new BadRequestException(`Invalid plan: ${plan}`);
+  }
 
-    // Busca si ya hay un Stripe Customer con este email
-    const customers = await this.stripe.customers.list({
+  // 1. Buscar (o crear) el cliente en Stripe
+  const customers = await this.stripe.customers.list({ email, limit: 10 });
+  let stripeCustomer = customers.data.find((c) => c.email === email);
+
+  if (!stripeCustomer) {
+    stripeCustomer = await this.stripe.customers.create({
       email,
-      limit: 10,
+      metadata: { userId },
     });
+  }
 
-    let stripeCustomer = customers.data.find(c => c.email === email);
+  // 2. Cancelar cualquier suscripción activa del cliente
+  const subscriptions = await this.stripe.subscriptions.list({
+    customer: stripeCustomer.id,
+    status: 'active',
+    limit: 5,
+  });
 
-    if (!stripeCustomer) {
-      stripeCustomer = await this.stripe.customers.create({
-        email,
-        metadata: { userId },
-      });
-    }
+  for (const sub of subscriptions.data) {
+    await this.stripe.subscriptions.cancel(sub.id); // ❌ Cancela inmediatamente
+  }
 
-    // Verifica si ya usó funciones premium
-    const hasPremiumFeatures = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        connectedIntegration: { select: { id: true } },
-        preferences: { select: { id: true } },
+  // 3. Verificar si el usuario es elegible para trial
+  const hasPremiumFeatures = await this.prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      connectedIntegration: { select: { id: true } },
+      preferences: { select: { id: true } },
+    },
+  });
+
+  const trialEligible =
+    currentRole === 'USER' &&
+    !hasPremiumFeatures?.connectedIntegration &&
+    !hasPremiumFeatures?.preferences;
+
+  // 4. Crear la sesión de pago
+  const session = await this.stripe.checkout.sessions.create({
+    mode: 'subscription',
+    customer: stripeCustomer.id,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
       },
-    });
-
-    const trialEligible =
-      currentRole === 'USER' &&
-      !hasPremiumFeatures?.connectedIntegration &&
-      !hasPremiumFeatures?.preferences;
-
-    const session = await this.stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: stripeCustomer.id,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      subscription_data: {
-        ...(trialEligible ? { trial_period_days: 7 } : {}),
-        metadata: {
-          userId,
-        },
-      },
+    ],
+    subscription_data: {
+      
+      ...(trialEligible ? { trial_period_days: 7 } : {}),
+      proration_behavior: 'create_prorations',
       metadata: {
         userId,
-        priceId,
       },
-      success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
-      cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
-    });
+    },
+    metadata: {
+      userId,
+      priceId,
+    },
+    success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
+    cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
+  });
 
-    return { url: session.url };
-  }
+  return { url: session.url };
+}
+
 
   @Post('cancel-subscription')
   async cancelSubscription(@Req() req: Request) {
