@@ -153,27 +153,30 @@ export default function SettingsPage() {
     }));
   };
 
-  async function handleCancel(e) {
-    e.preventDefault(); // previene redirección inmediata al portal
-    try {
-      const res = await fetch('/checkout/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // si usas cookies con JWT
-      });
+ async function handleCancel(e) {
+  e.preventDefault();
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error cancelling subscription');
+  try {
+    const res = await fetchWithAuth(`${apiBase}/checkout/cancel-subscription`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-      alert('✅ Subscription will be cancelled at the end of the period.');
-      // luego de éxito puedes redirigir al portal si quieres
-      window.open('https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00', '_blank');
-    } catch (err) {
-      alert('❌ Failed to cancel subscription: ' + err.message);
-    }
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
+
+    if (!res.ok) throw new Error(data.message || 'Failed to cancel subscription');
+
+    // ✅ Redirige al Customer Portal automáticamente
+    window.location.href = 'https://billing.stripe.com/p/login/test_cNibJ30pZ2Sc0Yv2SL67S00';
+  } catch (err) {
+    console.error('❌ Cancel error:', err.message);
+    // Puedes mostrar un banner o toast si tienes uno implementado
   }
+}
+
   const handleSimpleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
