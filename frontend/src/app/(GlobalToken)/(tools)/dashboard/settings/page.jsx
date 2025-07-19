@@ -157,7 +157,7 @@ export default function SettingsPage() {
   e.preventDefault();
 
   try {
-    const res = await fetchWithAuth(`https://gaplet.onrender.com/checkout/cancel-subscription`, {
+    const res = await fetchWithAuth(`/checkout/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
