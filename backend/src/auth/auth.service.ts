@@ -203,7 +203,7 @@ async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
     }
   }
 
-  async findOrCreateGoogleUser(profile: {
+async findOrCreateGoogleUser(profile: {
   email: string;
   firstName: string;
   lastName: string;
@@ -218,7 +218,9 @@ async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
     if (profile.refreshToken) {
       await this.prisma.user.update({
         where: { email: profile.email },
-        data: { googleRefreshToken: profile.refreshToken },
+        data: {
+          googleRefreshToken: profile.refreshToken,
+        } as any, // 👈 Solución al error TS2353
       });
     }
     return existingUser;
@@ -226,13 +228,18 @@ async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
 
   const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
 
+  const userData: any = {
+    email: profile.email,
+    name: `${profile.firstName} ${profile.lastName}`,
+    password: hash,
+  };
+
+  if (profile.refreshToken) {
+    userData.googleRefreshToken = profile.refreshToken;
+  }
+
   return this.prisma.user.create({
-    data: {
-      email: profile.email,
-      name: `${profile.firstName} ${profile.lastName}`,
-      password: hash,
-      googleRefreshToken: profile.refreshToken, // ← Guardar token al crear
-    },
+    data: userData,
   });
 }
 
