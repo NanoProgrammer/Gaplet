@@ -17,91 +17,78 @@ export default function DashboardPage() {
   const [userInfo, setUserInfo] = useState(null);
   const [preferences, setPreferences] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return null;
 
-  try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${refreshToken}`,
-      },
-    });
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    if (!data.accessToken) return null;
-
-    localStorage.setItem('accessToken', data.accessToken);
-    return data.accessToken;
-  } catch (err) {
-    console.error('Error refreshing token:', err);
-    return null;
-  }
-};
-
-  useEffect(() => {
-  const fetchData = async () => {
+  const refreshAccessToken = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
-    let accessToken = localStorage.getItem('accessToken');
-
-    if (!accessToken && refreshToken) {
-      accessToken = await refreshAccessToken();
-    }
-
-    // ⚠️ Espera a que accessToken esté realmente disponible
-    if (!accessToken) {
-      return router.replace('/signin');
-    }
+    if (!refreshToken) return null;
 
     try {
-  const res = await fetch(`${API_URL}/user/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${refreshToken}`,
+        },
+      });
 
-     const rawText = await res.text();
+      if (!res.ok) return null;
 
-  if (!res.ok) {
-    console.error('❌ /user/me responded with', res.status, rawText);
-    throw new Error('Failed to fetch user');
-  }
+      const data = await res.json();
+      if (!data.accessToken) return null;
 
-  let user;
-  try {
-    user = JSON.parse(text);
-  } catch (err) {
-    console.error('❌ JSON parse error:', text);
-    throw new Error('Invalid JSON from /user/me');
-  }
-
-  setUserInfo(user);
-
-  if (user.role === 'USER') {
-    return router.replace('/pricing');
-  }
-
-  const prefsRes = await fetch(`${API_URL}/auth/preference`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  setPreferences(prefsRes.ok ? await prefsRes.json() : null);
-
-
+      localStorage.setItem('accessToken', data.accessToken);
+      return data.accessToken;
     } catch (err) {
-      console.error('Error loading dashboard:', err);
-      localStorage.clear();
-      router.replace('/signin');
+      console.error('Error refreshing token:', err);
+      return null;
     }
   };
 
-  // ⚠️ Añadir pequeña espera para asegurar disponibilidad del token
-  const timer = setTimeout(fetchData, 50);
-  return () => clearTimeout(timer);
-}, []);
+  useEffect(() => {
+    const fetchData = async () => {
+      const refreshToken = localStorage.getItem('refreshToken');
+      let accessToken = localStorage.getItem('accessToken');
 
+      if (!accessToken && refreshToken) {
+        accessToken = await refreshAccessToken();
+      }
 
+      if (!accessToken) {
+        return router.replace('/signin');
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/user/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('❌ /user/me responded with', res.status, errorText);
+          throw new Error('Failed to fetch user');
+        }
+
+        const user = await res.json();
+        setUserInfo(user);
+
+        if (user.role === 'USER') {
+          return router.replace('/pricing');
+        }
+
+        const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        setPreferences(prefsRes.ok ? await prefsRes.json() : null);
+      } catch (err) {
+        console.error('Error loading dashboard:', err);
+        localStorage.clear();
+        router.replace('/signin');
+      }
+    };
+
+    const timer = setTimeout(fetchData, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const replacementLimit =
     userInfo?.role === 'PREMIUM'
@@ -125,7 +112,6 @@ const refreshAccessToken = async () => {
         </p>
       </header>
 
-      {/* ✅ Checklist siempre visible */}
       {userInfo && (
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -170,7 +156,6 @@ const refreshAccessToken = async () => {
         </section>
       )}
 
-      {/* Stats */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
         <StatCard label="Replacements" value={`${userInfo?.totalReplacements || 0}/${replacementLimit}`} icon={<RefreshCw className="w-6 h-6 text-blue-500" />} color="border-l-blue-500" />
         <StatCard label="Cancellations" value={userInfo?.totalCancellations || 0} icon={<Slash className="w-6 h-6 text-red-500" />} color="border-l-red-500" />
@@ -180,7 +165,6 @@ const refreshAccessToken = async () => {
         <StatCard label="Emails Sent" value={userInfo?.emailSent || 0} icon={<Mail className="w-6 h-6 text-indigo-500" />} color="border-l-indigo-500" />
       </div>
 
-      {/* Activity */}
       <section className="mt-12">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h2>
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4 transition hover:shadow-lg hover:scale-[1.01] duration-200">
