@@ -1,19 +1,14 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-} from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const UserContext = createContext({
   user: null,
-  setUser: () => {},
+  setUser: (user) => {}, // ✅ acepta un argumento
 });
 
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // ✅ sin <User | null>
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
