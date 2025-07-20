@@ -44,66 +44,55 @@ const refreshAccessToken = async () => {
 
   useEffect(() => {
   const fetchData = async () => {
-    let accessToken = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
+  let accessToken = localStorage.getItem('accessToken');
+  const refreshToken = localStorage.getItem('refreshToken');
 
-    if (!accessToken && refreshToken) {
-      // Token expirado o ausente: intenta refrescar
-      const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${refreshToken}` },
-      });
-
-      if (!refreshRes.ok) {
-        console.error('Failed to refresh access token');
-        localStorage.clear();
-        router.replace('/signin');
-        return;
-      }
-
-      const data = await refreshRes.json();
-      accessToken = data.accessToken;
-      localStorage.setItem('accessToken', accessToken);
-    }
-
+  if (!accessToken && refreshToken) {
+    accessToken = await refreshAccessToken();
     if (!accessToken) {
+      localStorage.clear();
       router.replace('/signin');
       return;
     }
+  }
 
-    try {
-      // Obtener datos del usuario
-      const res = await fetch(`${API_URL}/user/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+  if (!accessToken) {
+    router.replace('/signin');
+    return;
+  }
 
-      if (!res.ok) throw new Error('Failed to fetch user');
+  try {
+    const res = await fetch(`${API_URL}/user/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-      const user = await res.json();
-      setUserInfo(user);
+    if (!res.ok) throw new Error('Failed to fetch user');
 
-      if (user.role === 'USER') {
-        router.replace('/pricing');
-        return;
-      }
+    const user = await res.json();
+    setUserInfo(user);
 
-      // Obtener preferencias
-      const prefsRes = await fetch(`${API_URL}/auth/preference`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (prefsRes.ok) {
-        const prefs = await prefsRes.json();
-        setPreferences(prefs);
-      } else {
-        setPreferences(null);
-      }
-    } catch (err) {
-      console.error('Error loading dashboard:', err);
-      localStorage.clear();
-      router.replace('/signin');
+    if (user.role === 'USER') {
+      router.replace('/pricing');
+      return;
     }
-  };
+
+    const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (prefsRes.ok) {
+      const prefs = await prefsRes.json();
+      setPreferences(prefs);
+    } else {
+      setPreferences(null);
+    }
+  } catch (err) {
+    console.error('Error loading dashboard:', err);
+    localStorage.clear();
+    router.replace('/signin');
+  }
+};
+
 
   fetchData();
 }, []);
