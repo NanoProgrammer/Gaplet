@@ -5,7 +5,6 @@ import {
   useContext,
   useState,
   useEffect,
-  ReactNode,
 } from 'react';
 
 const UserContext = createContext({
@@ -14,7 +13,7 @@ const UserContext = createContext({
 });
 
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState(null); // ✅ sin <User | null>
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
