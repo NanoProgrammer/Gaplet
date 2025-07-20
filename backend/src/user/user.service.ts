@@ -16,4 +16,16 @@ export class UserService {
     delete updatedUser.password; // Remove password from the response
     return updatedUser;
   }
+
+  // user.service.ts
+async getMe(userId: string) {
+  return this.prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      connectedIntegration: true,
+      preferences: true,
+    },
+  });
+}
+
 }

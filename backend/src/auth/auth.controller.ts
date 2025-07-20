@@ -124,7 +124,7 @@ async savePreference(
 @UseGuards(AuthGuard('jwt'))
 @Get('connect/:provider')
 async connectProvider(
-  @Param('provider') provider: 'calendly' | 'acuity' | 'square',
+  @Param('provider') provider:   'acuity' | 'square',
   @Req() req: RequestWithUser,
   @Res() res: Response,
 ) {
@@ -136,25 +136,6 @@ async connectProvider(
   let url = '';
 
   switch (provider) {
-    case 'calendly': {
-  const scope = [
-  'user:read',
-  'organization:read',
-  'scheduled_events:read',
-  'webhook_subscriptions:read',
-  'webhook_subscriptions:write',
-].join(' ');
-  const redirect = 'https://gaplet.onrender.com/auth/callback/calendly';
-  const url = `https://auth.calendly.com/oauth/authorize` +
-    `?client_id=${process.env.CALENDLY_CLIENT_ID}` +
-    `&response_type=code` +
-    `&redirect_uri=${encodeURIComponent(redirect)}` +
-    `&scope=${encodeURIComponent(scope)}` +
-    `&state=${state}`;
-
-  console.log('🔍 Calendly minimal URL:', url);
-  return res.json({ redirectUrl: url });
-}
 
 
     case 'acuity': {

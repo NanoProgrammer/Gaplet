@@ -8,9 +8,9 @@ import { Request } from 'express';
 export class UserController {
   constructor(private userService: UserService) {}
   @Get('me')
-  getMe(@Req() req: Request) {
-    return req.user;
-  }
-
+getMe(@Req() req: Request) {
+  const user = req.user as { id: string };
+  return this.userService.getMe(user.id);
+}
   
 }
