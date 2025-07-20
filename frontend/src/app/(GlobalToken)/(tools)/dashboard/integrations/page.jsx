@@ -119,6 +119,7 @@ export default function IntegrationsPage() {
       }
 
       const data = await res.json();
+      console.log('👉 REDIRECT URL:', data.redirectUrl);
       if (!data.redirectUrl) {
         throw new Error('Missing redirect URL from backend');
       }
