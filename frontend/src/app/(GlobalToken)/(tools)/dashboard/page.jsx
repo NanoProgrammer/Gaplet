@@ -42,7 +42,9 @@ const refreshAccessToken = async () => {
   }
 };
 
-  useEffect(() => {
+  const [isLoading, setIsLoading] = useState(true);
+
+useEffect(() => {
   const fetchData = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     let accessToken = localStorage.getItem('accessToken');
@@ -51,8 +53,8 @@ const refreshAccessToken = async () => {
       accessToken = await refreshAccessToken();
     }
 
-    // ⚠️ Espera a que accessToken esté realmente disponible
     if (!accessToken) {
+      setIsLoading(false);
       return router.replace('/signin');
     }
 
@@ -61,10 +63,7 @@ const refreshAccessToken = async () => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to fetch user');
-      }
-
+      if (!res.ok) throw new Error('Failed to fetch user');
       const user = await res.json();
       setUserInfo(user);
 
@@ -81,13 +80,15 @@ const refreshAccessToken = async () => {
       console.error('Error loading dashboard:', err);
       localStorage.clear();
       router.replace('/signin');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ⚠️ Añadir pequeña espera para asegurar disponibilidad del token
-  const timer = setTimeout(fetchData, 50);
-  return () => clearTimeout(timer);
+  fetchData();
 }, []);
+
+if (isLoading) return null; // o un spinner si quieres
 
 
 
