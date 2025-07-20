@@ -231,8 +231,12 @@ async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
   /* ---------------------------------------------------------
    1)  EXCHANGE TOKEN  +  SAVE IN ConnectedIntegration
 --------------------------------------------------------- */
+/* ---------------------------------------------
+   1) TOKEN EXCHANGE + SAVE — with Google added
+--------------------------------------------- */
+
 async exchangeTokenAndSave(
-  provider: 'calendly' | 'acuity' | 'square',
+  provider: 'acuity' | 'square' | 'google',
   code: string,
   userId: string,
 ) {
@@ -243,39 +247,6 @@ async exchangeTokenAndSave(
   let externalOrgId: string | null = null;
 
   switch (provider) {
-    /* ------------ CALENDLY ------------ */
-    case 'calendly': {
-      tokenRes = await fetch('https://auth.calendly.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          client_id: process.env.CALENDLY_CLIENT_ID,
-          client_secret: process.env.CALENDLY_CLIENT_SECRET,
-          code,
-          redirect_uri: redirect,
-        }),
-      }).then(r => r.json());
-
-      if (!tokenRes.access_token) {
-        console.error('CALENDLY TOKEN ERROR:', tokenRes);
-        throw new Error(
-          `Calendly token error: ${tokenRes.error || 'unknown'} - ${tokenRes.error_description || ''}`,
-        );
-      }
-
-      const me = await fetch('https://api.calendly.com/users/me', {
-        headers: {
-          Authorization: `Bearer ${tokenRes.access_token}`,
-        },
-      }).then(r => r.json());
-
-      externalUserId = me.resource?.uri?.split('/').pop() || null;
-      externalOrgId = me.resource?.current_organization || null;
-      break;
-    }
-
-    /* ------------ ACUITY ------------ */
     case 'acuity': {
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
@@ -291,18 +262,10 @@ async exchangeTokenAndSave(
         body,
       }).then(r => r.json());
 
-      if (!tokenRes.access_token) {
-        console.error('ACUITY TOKEN ERROR:', tokenRes);
-        throw new Error(
-          `Acuity token error: ${tokenRes.error || 'unknown'} - ${tokenRes.error_description || ''}`,
-        );
-      }
-
-      // No external user/org ID disponible en OAuth básico de Acuity
+      if (!tokenRes.access_token) throw new Error(`Acuity token error: ${tokenRes.error}`);
       break;
     }
 
-    /* ------------ SQUARE ------------ */
     case 'square': {
       tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
         method: 'POST',
@@ -316,26 +279,43 @@ async exchangeTokenAndSave(
         }),
       }).then(r => r.json());
 
-      if (!tokenRes.access_token) {
-        console.error('SQUARE TOKEN ERROR:', tokenRes);
-        throw new Error(
-          `Square token error: ${tokenRes.error || 'unknown'} - ${tokenRes.message || ''}`,
-        );
-      }
+      if (!tokenRes.access_token) throw new Error(`Square token error: ${tokenRes.error}`);
 
       const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
-        headers: {
-          Authorization: `Bearer ${tokenRes.access_token}`,
-        },
+        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
       }).then(r => r.json());
 
       externalUserId = merchant.merchant?.id || null;
       break;
     }
+
+    case 'google': {
+      const params = new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: redirect,
+        grant_type: 'authorization_code',
+      });
+
+      tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params,
+      }).then(r => r.json());
+
+      if (!tokenRes.access_token) throw new Error(`Google token error: ${tokenRes.error}`);
+
+      const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
+      }).then(r => r.json());
+
+      externalUserId = profile.id || null;
+      break;
+    }
   }
 
   const { access_token, refresh_token, expires_in, expires_at, scope } = tokenRes;
-
   const expires = expires_in
     ? new Date(Date.now() + expires_in * 1000)
     : expires_at
@@ -367,12 +347,12 @@ async exchangeTokenAndSave(
 }
 
 
+/* ---------------------------------------------
+   2) ENSURE WEBHOOK — Add Google manually later
+--------------------------------------------- */
 
-/* ---------------------------------------------------------
-   2)  ENSURE WEBHOOK  (one per provider)
---------------------------------------------------------- */
 async ensureWebhook(
-  provider: 'calendly' | 'acuity' | 'square',
+  provider: 'acuity' | 'square' | 'google',
   userId: string,
 ) {
   const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({
@@ -380,41 +360,9 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
-
   const target = `${process.env.API_BASE_URL}/webhooks/${provider}`;
 
   switch (provider) {
-    /* ------------ CALENDLY ------------ */
-    case 'calendly': {
-      const me = await fetch('https://api.calendly.com/users/me', {
-        headers: { Authorization: `Bearer ${integration.accessToken}` },
-      }).then(r => r.json());
-
-      const orgId = me.resource.current_organization;
-
-      const res = await fetch('https://api.calendly.com/webhook_subscriptions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: target,
-          events: ['invitee.canceled'],
-          organization: orgId,
-          scope: 'organization',
-        }),
-      }).then(r => r.json());
-
-      await this.prisma.connectedIntegration.update({
-        where: { id: integration.id },
-        data: { webhookId: res.resource?.id, externalOrgId: orgId },
-      });
-
-      break;
-    }
-
-    /* ------------ ACUITY ------------ */
     case 'acuity': {
       const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
         method: 'POST',
@@ -424,16 +372,14 @@ async ensureWebhook(
         },
         body: JSON.stringify({ url: target, event: 'appointment.canceled' }),
       }).then(r => r.json());
-
+      console.log("Webhook registered:", res.id);
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
         data: { webhookId: res.id?.toString() },
       });
-
       break;
     }
 
-    /* ------------ SQUARE ------------ */
     case 'square': {
       const res = await fetch('https://connect.squareup.com/v2/webhooks/subscriptions', {
         method: 'POST',
@@ -448,16 +394,53 @@ async ensureWebhook(
           notification_url: target,
         }),
       }).then(r => r.json());
-
+      console.log("Webhook registered:", res.id);
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
         data: { webhookId: res.subscription?.id },
       });
-
       break;
     }
+
+    case 'google': {
+  const channelId = `gaplet-${crypto.randomUUID()}`; // ID único de canal
+  const calendarId = 'primary'; // Puedes hacerlo dinámico si manejas múltiples calendarios
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${integration.accessToken}`,
+      },
+      body: JSON.stringify({
+        id: channelId, // ID único para el canal, usado luego para detener el webhook
+        type: 'web_hook',
+        address: target, // Tu endpoint, debe ser HTTPS público y válido
+      }),
+    }
+  ).then(r => r.json());
+
+  if (!res.id || !res.resourceId) {
+    console.error('Google webhook response error:', res);
+    throw new Error('Google Calendar webhook setup failed');
+  }
+console.log("Webhook registered:", res.id);
+  await this.prisma.connectedIntegration.update({
+    where: { id: integration.id },
+    data: {
+      webhookId: res.id, // El ID del canal
+      externalOrgId: res.resourceId, // El resourceId necesario para detener el webhook
+    },
+  });
+
+  break;
+}
+
   }
 }
+
 
 async validateAccessToken(token: string) {
   try {

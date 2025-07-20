@@ -124,20 +124,17 @@ async savePreference(
 @UseGuards(AuthGuard('jwt'))
 @Get('connect/:provider')
 async connectProvider(
-  @Param('provider') provider:   'acuity' | 'square',
+  @Param('provider') provider: 'acuity' | 'square' | 'google',
   @Req() req: RequestWithUser,
   @Res() res: Response,
 ) {
   const userId = req.user.id;
   const apiBase = process.env.API_BASE_URL;
   const redirect = `${apiBase}/auth/callback/${provider}`;
-
   const state = userId;
   let url = '';
 
   switch (provider) {
-
-
     case 'acuity': {
       const scope = 'api-v1';
       url = `https://acuityscheduling.com/oauth2/authorize` +
@@ -150,13 +147,12 @@ async connectProvider(
     }
 
     case 'square': {
-      // Scopes válidos según referencia OAuth Square
       const scope = [
         'APPOINTMENTS_READ',
         'APPOINTMENTS_WRITE',
         'CUSTOMERS_READ',
         'MERCHANT_PROFILE_READ',
-      ].join('+'); // Square usa '+' como separador
+      ].join('+');
       url = `https://connect.squareup.com/oauth2/authorize` +
         `?client_id=${process.env.SQUARE_CLIENT_ID}` +
         `&response_type=code` +
@@ -164,6 +160,23 @@ async connectProvider(
         `&scope=${scope}` +
         `&state=${state}` +
         `&session=false`;
+      break;
+    }
+
+    case 'google': {
+      const scope = [
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+      ].join(' ');
+
+      url = `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${process.env.GOOGLE_CLIENT_ID}` +
+        `&response_type=code` +
+        `&redirect_uri=${redirect}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&access_type=offline` + // to get refresh_token
+        `&prompt=consent` +      // to always get consent and refresh_token
+        `&state=${state}`;
       break;
     }
 
@@ -178,7 +191,7 @@ async connectProvider(
 
   @Get('callback/:provider')
   async oauthCallback(
-    @Param('provider') provider: 'calendly' | 'acuity' | 'square',
+    @Param('provider') provider:  'acuity' | 'square' | 'google',
     @Query('code') code: string,
     @Query('state') state: string,
     @Res() res: Response,
