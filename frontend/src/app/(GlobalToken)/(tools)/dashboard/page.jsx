@@ -78,7 +78,15 @@ export default function DashboardPage() {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        setPreferences(prefsRes.ok ? await prefsRes.json() : null);
+        let prefs = null;
+
+if (prefsRes.ok) {
+  const text = await prefsRes.text();
+  prefs = text ? JSON.parse(text) : null;
+}
+
+setPreferences(prefs);
+
       } catch (err) {
         console.error('Error loading dashboard:', err);
         localStorage.clear();
