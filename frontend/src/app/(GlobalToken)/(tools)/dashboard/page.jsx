@@ -44,58 +44,51 @@ const refreshAccessToken = async () => {
 
   useEffect(() => {
   const fetchData = async () => {
-  let accessToken = localStorage.getItem('accessToken');
-  const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+    let accessToken = localStorage.getItem('accessToken');
 
-  if (!accessToken && refreshToken) {
-    accessToken = await refreshAccessToken();
+    if (!accessToken && refreshToken) {
+      accessToken = await refreshAccessToken();
+    }
+
+    // ⚠️ Espera a que accessToken esté realmente disponible
     if (!accessToken) {
+      return router.replace('/signin');
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/user/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch user');
+      }
+
+      const user = await res.json();
+      setUserInfo(user);
+
+      if (user.role === 'USER') {
+        return router.replace('/pricing');
+      }
+
+      const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      setPreferences(prefsRes.ok ? await prefsRes.json() : null);
+    } catch (err) {
+      console.error('Error loading dashboard:', err);
       localStorage.clear();
       router.replace('/signin');
-      return;
     }
-  }
+  };
 
-  if (!accessToken) {
-    router.replace('/signin');
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/user/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) throw new Error('Failed to fetch user');
-
-    const user = await res.json();
-    setUserInfo(user);
-
-    if (user.role === 'USER') {
-      router.replace('/pricing');
-      return;
-    }
-
-    const prefsRes = await fetch(`${API_URL}/auth/preference`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (prefsRes.ok) {
-      const prefs = await prefsRes.json();
-      setPreferences(prefs);
-    } else {
-      setPreferences(null);
-    }
-  } catch (err) {
-    console.error('Error loading dashboard:', err);
-    localStorage.clear();
-    router.replace('/signin');
-  }
-};
-
-
-  fetchData();
+  // ⚠️ Añadir pequeña espera para asegurar disponibilidad del token
+  const timer = setTimeout(fetchData, 50);
+  return () => clearTimeout(timer);
 }, []);
+
 
 
   const replacementLimit =

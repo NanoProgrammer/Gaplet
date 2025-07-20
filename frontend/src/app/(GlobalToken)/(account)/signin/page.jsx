@@ -126,7 +126,7 @@ const refreshAccessToken = async () => {
       });
 
       console.log('SignIn success');
-      router.replace('/dashboard');
+      await router.replace('/dashboard');
     } catch (err) {
       setError(err.message || 'Unexpected error');
     }
