@@ -204,29 +204,37 @@ async saveUserPreference(userId: string, data: CreateUserPreferenceDto) {
   }
 
   async findOrCreateGoogleUser(profile: {
-    email: string;
-    firstName: string;
-    lastName: string;
-  }) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: profile.email },
-    });
+  email: string;
+  firstName: string;
+  lastName: string;
+  refreshToken?: string;
+}) {
+  const existingUser = await this.prisma.user.findUnique({
+    where: { email: profile.email },
+  });
 
-    if (user) {
-      // Ya existe, lo usamos tal como está
-      return user;
+  if (existingUser) {
+    // Si ya existe, actualizamos el refreshToken solo si recibimos uno nuevo
+    if (profile.refreshToken) {
+      await this.prisma.user.update({
+        where: { email: profile.email },
+        data: { googleRefreshToken: profile.refreshToken },
+      });
     }
-    const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
-
-    // Si no existe, lo creamos con password nula (ya hiciste password opcional)
-    return this.prisma.user.create({
-      data: {
-        email: profile.email,
-        name: `${profile.firstName} ${profile.lastName}`,
-        password: hash,
-      },
-    });
+    return existingUser;
   }
+
+  const hash = await argon.hash(this.config.get('DEFAULT_PASSWORD'));
+
+  return this.prisma.user.create({
+    data: {
+      email: profile.email,
+      name: `${profile.firstName} ${profile.lastName}`,
+      password: hash,
+      googleRefreshToken: profile.refreshToken, // ← Guardar token al crear
+    },
+  });
+}
 
   /* ---------------------------------------------------------
    1)  EXCHANGE TOKEN  +  SAVE IN ConnectedIntegration

@@ -14,6 +14,30 @@ export default function SignInPage() {
   const [error, setError] = useState('');
   const router = useRouter();
   
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${refreshToken}`,
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data.accessToken) return null;
+
+    localStorage.setItem('accessToken', data.accessToken);
+    return data.accessToken;
+  } catch (err) {
+    console.error('Error refreshing access token:', err);
+    return null;
+  }
+};
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
   if (!API_URL) {
@@ -110,10 +134,40 @@ export default function SignInPage() {
 
   // Redirigir automáticamente si ya hay sesión
   useEffect(() => {
-    if (user?.accessToken) {
-      router.replace('/dashboard');
+  const verifySession = async () => {
+    let accessToken = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    if (!accessToken && refreshToken) {
+      accessToken = await refreshAccessToken();
     }
-  }, [user, router]);
+
+    if (!accessToken) return;
+
+    try {
+      const res = await fetch(`${API_URL}/user/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      setUser({
+        accessToken,
+        refreshToken,
+        role: data.role,
+      });
+
+      router.replace('/dashboard');
+    } catch (err) {
+      console.error('Error validating session:', err);
+    }
+  };
+
+  verifySession();
+}, [setUser, router]);
+
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-transparent px-6 py-20 overflow-hidden">

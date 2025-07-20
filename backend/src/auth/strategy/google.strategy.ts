@@ -10,7 +10,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientID: config.get('GOOGLE_CLIENT_ID'),
       clientSecret: config.get('GOOGLE_CLIENT_SECRET'),
       callbackURL: config.get('GOOGLE_CALLBACK_URL'),
-      scope: ['email', 'profile'],
+      scope: [
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+      ],
+      accessType: 'offline',
+      prompt: 'consent',
     });
   }
 
@@ -25,6 +32,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       email: emails?.[0]?.value,
       firstName: name?.givenName,
       lastName: name?.familyName,
+      refreshToken, // <- ¡guárdalo aquí!
     };
   }
 }

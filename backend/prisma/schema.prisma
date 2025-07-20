@@ -15,6 +15,7 @@ model User {
   name               String?
   password           String?
   role               String   @default("USER")
+  googleRefreshToken  String?
 
   totalReplacements  Int      @default(0)          // Citas exitosamente llenadas
   totalCancellations Int      @default(0)          // Cancelaciones detectadas

@@ -17,67 +17,97 @@ export default function DashboardPage() {
   const [userInfo, setUserInfo] = useState(null);
   const [preferences, setPreferences] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${refreshToken}`,
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data.accessToken) return null;
+
+    localStorage.setItem('accessToken', data.accessToken);
+    return data.accessToken;
+  } catch (err) {
+    console.error('Error refreshing token:', err);
+    return null;
+  }
+};
 
   useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken');
+  const fetchData = async () => {
+    let accessToken = localStorage.getItem('accessToken');
     const refreshToken = localStorage.getItem('refreshToken');
+
+    if (!accessToken && refreshToken) {
+      // Token expirado o ausente: intenta refrescar
+      const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${refreshToken}` },
+      });
+
+      if (!refreshRes.ok) {
+        console.error('Failed to refresh access token');
+        localStorage.clear();
+        router.replace('/signin');
+        return;
+      }
+
+      const data = await refreshRes.json();
+      accessToken = data.accessToken;
+      localStorage.setItem('accessToken', accessToken);
+    }
 
     if (!accessToken) {
       router.replace('/signin');
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        let res = await fetch(`${API_URL}/user/me`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+    try {
+      // Obtener datos del usuario
+      const res = await fetch(`${API_URL}/user/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-        if (res.status === 401 && refreshToken) {
-          const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${refreshToken}` },
-          });
+      if (!res.ok) throw new Error('Failed to fetch user');
 
-          if (!refreshRes.ok) throw new Error('Refresh failed');
+      const user = await res.json();
+      setUserInfo(user);
 
-          const newTokens = await refreshRes.json();
-          localStorage.setItem('accessToken', newTokens.accessToken);
-
-          res = await fetch(`${API_URL}/user/me`, {
-            headers: { Authorization: `Bearer ${newTokens.accessToken}` },
-          });
-        }
-
-        if (!res.ok) throw new Error('Failed to fetch user');
-        const user = await res.json();
-        setUserInfo(user);
-
-        if (user.role === 'USER') {
-          router.replace('/pricing');
-          return;
-        }
-
-        // 🟩 Usa el endpoint correcto para preferencias
-        const prefsRes = await fetch(`${API_URL}/auth/preference`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-
-        if (prefsRes.ok) {
-          const prefs = await prefsRes.json();
-          setPreferences(prefs);
-        } else {
-          setPreferences(null);
-        }
-      } catch (err) {
-        console.error('Error loading dashboard:', err);
-        localStorage.clear();
-        router.replace('/signin');
+      if (user.role === 'USER') {
+        router.replace('/pricing');
+        return;
       }
-    };
 
-    fetchData();
-  }, []);
+      // Obtener preferencias
+      const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (prefsRes.ok) {
+        const prefs = await prefsRes.json();
+        setPreferences(prefs);
+      } else {
+        setPreferences(null);
+      }
+    } catch (err) {
+      console.error('Error loading dashboard:', err);
+      localStorage.clear();
+      router.replace('/signin');
+    }
+  };
+
+  fetchData();
+}, []);
+
 
   const replacementLimit =
     userInfo?.role === 'PREMIUM'
