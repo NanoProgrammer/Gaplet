@@ -1,16 +1,29 @@
-// context/UserContext.tsx
-'use client'; // Si estás en app router de Next.js
+'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 
 const UserContext = createContext({
   user: null,
-  setUser: (user) => {},
+  setUser: () => {},
 });
 
-
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    if (accessToken && refreshToken) {
+      setUser({ accessToken, refreshToken });
+    }
+  }, []);
 
   return (
     <UserContext.Provider value={{ user, setUser }}>
