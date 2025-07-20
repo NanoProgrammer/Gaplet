@@ -42,9 +42,7 @@ const refreshAccessToken = async () => {
   }
 };
 
-  const [isLoading, setIsLoading] = useState(true);
-
-useEffect(() => {
+  useEffect(() => {
   const fetchData = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     let accessToken = localStorage.getItem('accessToken');
@@ -53,42 +51,55 @@ useEffect(() => {
       accessToken = await refreshAccessToken();
     }
 
+    // ⚠️ Espera a que accessToken esté realmente disponible
     if (!accessToken) {
-      setIsLoading(false);
       return router.replace('/signin');
     }
 
     try {
-      const res = await fetch(`${API_URL}/user/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+  const res = await fetch(`${API_URL}/user/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
-      if (!res.ok) throw new Error('Failed to fetch user');
-      const user = await res.json();
-      setUserInfo(user);
+     const rawText = await res.text();
 
-      if (user.role === 'USER') {
-        return router.replace('/pricing');
-      }
+  if (!res.ok) {
+    console.error('❌ /user/me responded with', res.status, rawText);
+    throw new Error('Failed to fetch user');
+  }
 
-      const prefsRes = await fetch(`${API_URL}/auth/preference`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+  let user;
+  try {
+    user = JSON.parse(text);
+  } catch (err) {
+    console.error('❌ JSON parse error:', text);
+    throw new Error('Invalid JSON from /user/me');
+  }
 
-      setPreferences(prefsRes.ok ? await prefsRes.json() : null);
+  setUserInfo(user);
+
+  if (user.role === 'USER') {
+    return router.replace('/pricing');
+  }
+
+  const prefsRes = await fetch(`${API_URL}/auth/preference`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  setPreferences(prefsRes.ok ? await prefsRes.json() : null);
+
+
     } catch (err) {
       console.error('Error loading dashboard:', err);
       localStorage.clear();
       router.replace('/signin');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  fetchData();
+  // ⚠️ Añadir pequeña espera para asegurar disponibilidad del token
+  const timer = setTimeout(fetchData, 50);
+  return () => clearTimeout(timer);
 }, []);
-
-if (isLoading) return null; // o un spinner si quieres
 
 
 
