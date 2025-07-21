@@ -374,13 +374,21 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
-  let base = 'https://gaplet.onrender.com';
+  const base = this.config.get('API_BASE_URL')?.trim();
+
+if (!base) {
+  throw new Error('Missing API_BASE_URL in environment variables');
+}
   const target = `${base}/webhooks/${provider}`;
 
   switch (provider) {
     case 'acuity': {
       console.log('📦 API_BASE_URL resolved:', base);
 console.log('📦 Target URL:', target);
+console.log('🧪 Sending Acuity webhook payload:', {
+  url: target,
+  event: 'appointment.canceled',
+});
       const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
         method: 'POST',
         headers: {
