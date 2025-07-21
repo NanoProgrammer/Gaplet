@@ -255,7 +255,7 @@ async exchangeTokenAndSave(
   code: string,
   userId: string,
 ) {
-  const api = process.env.API_BASE_URL;
+  const api = this.config.get('API_BASE_URL');
   const redirect = `${api}/auth/callback/${provider}`;
   let tokenRes: any;
   let externalUserId: string | null = null;
