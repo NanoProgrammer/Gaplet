@@ -249,239 +249,251 @@ async findOrCreateGoogleUser(profile: {
 /* ---------------------------------------------
    1) TOKEN EXCHANGE + SAVE — with Google added
 --------------------------------------------- */
-async exchangeTokenAndSave(
-  provider: 'acuity' | 'square' | 'google',
-  code: string,
-  userId: string,
-) {
-  const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
-  let tokenRes: any;
-  let externalUserId: string | null = null;
-  let externalOrgId: string | null = null;
+getAuthorizationUrl(
+    provider: 'acuity' | 'square' | 'google',
+    userId: string,
+  ): string {
+    const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
+    const state = userId;
 
-  switch (provider) {
-    case 'acuity': {
-      const body = new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: process.env.ACUITY_CLIENT_ID!,
-        client_secret: process.env.ACUITY_CLIENT_SECRET!,
-        code,
-        redirect_uri: redirect,
-      });
-
-      tokenRes = await fetch('https://acuityscheduling.com/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-      }).then(r => r.json());
-
-      if (!tokenRes.access_token) {
-        console.error('❌ Acuity token error:', tokenRes);
-        throw new Error(`Acuity token error: ${tokenRes.error}`);
-      }
-      break;
-    }
-
-    case 'square': {
-      tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: process.env.SQUARE_CLIENT_ID,
-          client_secret: process.env.SQUARE_CLIENT_SECRET,
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: redirect,
-        }),
-      }).then(r => r.json());
-
-      if (!tokenRes.access_token) {
-        console.error('❌ Square token error:', tokenRes);
-        throw new Error(`Square token error: ${tokenRes.error}`);
+    switch (provider) {
+      case 'acuity': {
+        const scope = 'api-v1';
+        return `https://acuityscheduling.com/oauth2/authorize?client_id=${process.env.ACUITY_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=${encodeURIComponent(scope)}&state=${state}`;
       }
 
-      const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
-        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
-      }).then(r => r.json());
-
-      externalUserId = merchant.merchant?.id ?? null;
-      break;
-    }
-
-    case 'google': {
-      const params = new URLSearchParams({
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: redirect,
-        grant_type: 'authorization_code',
-      });
-
-      tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params,
-      }).then(r => r.json());
-
-      if (!tokenRes.access_token) {
-        console.error('❌ Google token error:', tokenRes);
-        throw new Error(`Google token error: ${tokenRes.error}`);
+      case 'square': {
+        const scope = [
+          'APPOINTMENTS_READ',
+          'APPOINTMENTS_WRITE',
+          'CUSTOMERS_READ',
+          'MERCHANT_PROFILE_READ',
+          'DEVELOPER_APPLICATION_WEBHOOKS_WRITE',
+        ].join('+');
+        return `https://connect.squareup.com/oauth2/authorize?client_id=${process.env.SQUARE_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=${scope}&state=${state}&session=false`;
       }
 
-      const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
-      }).then(r => r.json());
+      case 'google': {
+        const scope = [
+          'https://www.googleapis.com/auth/calendar',
+          'https://www.googleapis.com/auth/spreadsheets.readonly',
+        ].join(' ');
+        return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${state}`;
+      }
 
-      externalUserId = profile.id ?? null;
-      break;
+      default:
+        throw new Error('Unsupported provider');
     }
   }
 
-  const { access_token, refresh_token, expires_in, expires_at, scope } = tokenRes;
-  const expires = expires_in
-    ? new Date(Date.now() + expires_in * 1000)
-    : expires_at
-    ? new Date(expires_at)
-    : null;
+  async exchangeTokenAndSave(
+    provider: 'acuity' | 'square' | 'google',
+    code: string,
+    userId: string,
+  ) {
+    const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
+    let tokenRes: any;
+    let externalUserId: string | null = null;
+    let externalOrgId: string | null = null;
 
-  await this.prisma.connectedIntegration.upsert({
-    where: { userId },
-    update: {
-      provider,
-      accessToken: access_token,
-      refreshToken: refresh_token ?? null,
-      expiresAt: expires,
-      scope,
-      externalUserId,
-      externalOrgId,
-    },
-    create: {
-      userId,
-      provider,
-      accessToken: access_token,
-      refreshToken: refresh_token ?? null,
-      expiresAt: expires,
-      scope,
-      externalUserId,
-      externalOrgId,
-    },
-  });
-}
+    switch (provider) {
+      case 'acuity': {
+        const body = new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: process.env.ACUITY_CLIENT_ID!,
+          client_secret: process.env.ACUITY_CLIENT_SECRET!,
+          code,
+          redirect_uri: redirect,
+        });
 
+        tokenRes = await fetch('https://acuityscheduling.com/oauth2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        }).then(r => r.json());
 
-
-/* ---------------------------------------------
-   2) ENSURE WEBHOOK — Add Google manually later
---------------------------------------------- */
-async ensureWebhook(
-  provider: 'acuity' | 'square' | 'google',
-  userId: string,
-) {
-  const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({
-    where: { userId },
-  });
-
-  if (integration.webhookId) return;
-
-  const base = this.config.get('API_BASE_URL')?.trim();
-  if (!base) throw new Error('Missing API_BASE_URL in environment variables');
-
-  const target = `${base}/webhooks/${provider}`;
-  console.log(`📡 Registering webhook for ${provider} → ${target}`);
-
-  switch (provider) {
-    case 'acuity': {
-      const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${integration.accessToken}`,
-        },
-        body: JSON.stringify({
-          url: target,
-          event: 'appointment.canceled',
-        }),
-      }).then(r => r.json());
-
-      console.log('🪵 Acuity webhook response:', res);
-
-      if (!res.id) {
-        throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
+        if (!tokenRes.access_token) throw new Error(`Acuity token error: ${JSON.stringify(tokenRes)}`);
+        break;
       }
 
-      await this.prisma.connectedIntegration.update({
-        where: { id: integration.id },
-        data: { webhookId: res.id.toString() },
-      });
-      break;
-    }
+      case 'square': {
+        tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: process.env.SQUARE_CLIENT_ID,
+            client_secret: process.env.SQUARE_CLIENT_SECRET,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirect,
+          }),
+        }).then(r => r.json());
 
-    case 'square': {
-      const res = await fetch('https://connect.squareup.com/v2/webhooks/subscriptions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          idempotency_key: crypto.randomUUID(),
-          name: 'Gaplet–Canceled',
-          event_types: ['bookings.canceled', 'appointments.cancelled'],
-          notification_url: target,
-        }),
-      }).then(r => r.json());
+        if (!tokenRes.access_token) throw new Error(`Square token error: ${JSON.stringify(tokenRes)}`);
 
-      console.log('🪵 Square webhook response:', res);
+        const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
+          headers: { Authorization: `Bearer ${tokenRes.access_token}` },
+        }).then(r => r.json());
 
-      const webhookId = res.subscription?.id;
-      if (!webhookId) {
-        throw new Error(`Square webhook error: ${JSON.stringify(res)}`);
+        externalUserId = merchant.merchant?.id ?? null;
+        break;
       }
 
-      await this.prisma.connectedIntegration.update({
-        where: { id: integration.id },
-        data: { webhookId },
-      });
-      break;
+      case 'google': {
+        const params = new URLSearchParams({
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          redirect_uri: redirect,
+          grant_type: 'authorization_code',
+        });
+
+        tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params,
+        }).then(r => r.json());
+
+        if (!tokenRes.access_token) throw new Error(`Google token error: ${JSON.stringify(tokenRes)}`);
+
+        const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${tokenRes.access_token}` },
+        }).then(r => r.json());
+
+        externalUserId = profile.id ?? null;
+        break;
+      }
     }
 
-    case 'google': {
-      const channelId = `gaplet-${crypto.randomUUID()}`;
-      const calendarId = 'primary';
+    const { access_token, refresh_token, expires_in, expires_at, scope } = tokenRes;
+    const expires = expires_in
+      ? new Date(Date.now() + expires_in * 1000)
+      : expires_at
+      ? new Date(expires_at)
+      : null;
 
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
-        {
+    await this.prisma.connectedIntegration.upsert({
+      where: { userId },
+      update: {
+        provider,
+        accessToken: access_token,
+        refreshToken: refresh_token ?? null,
+        expiresAt: expires,
+        scope,
+        externalUserId,
+        externalOrgId,
+      },
+      create: {
+        userId,
+        provider,
+        accessToken: access_token,
+        refreshToken: refresh_token ?? null,
+        expiresAt: expires,
+        scope,
+        externalUserId,
+        externalOrgId,
+      },
+    });
+  }
+
+  async ensureWebhook(
+    provider: 'acuity' | 'square' | 'google',
+    userId: string,
+  ) {
+    const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({
+      where: { userId },
+    });
+
+    if (integration.webhookId) return;
+
+    const base = this.config.get('API_BASE_URL')?.trim();
+    if (!base || !/^https?:\/\//.test(base)) {
+      throw new Error(`Invalid or missing API_BASE_URL: ${base}`);
+    }
+
+    const target = `${base}/webhooks/${provider}`;
+
+    switch (provider) {
+      case 'acuity': {
+        const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${integration.accessToken}`,
           },
           body: JSON.stringify({
-            id: channelId,
-            type: 'web_hook',
-            address: target,
+            url: target,
+            event: 'appointment.canceled',
           }),
-        }
-      ).then(r => r.json());
+        }).then(r => r.json());
 
-      console.log('🪵 Google webhook response:', res);
+        if (!res.id) throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
 
-      if (!res.id || !res.resourceId) {
-        throw new Error('Google Calendar webhook setup failed');
+        await this.prisma.connectedIntegration.update({
+          where: { id: integration.id },
+          data: { webhookId: res.id.toString() },
+        });
+        break;
       }
 
-      await this.prisma.connectedIntegration.update({
-        where: { id: integration.id },
-        data: {
-          webhookId: res.id,
-          externalOrgId: res.resourceId,
-        },
-      });
-      break;
+      case 'square': {
+        const res = await fetch('https://connect.squareup.com/v2/webhooks/subscriptions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            idempotency_key: crypto.randomUUID(),
+            name: 'Gaplet–Canceled',
+            event_types: ['bookings.canceled', 'appointments.cancelled'],
+            notification_url: target,
+          }),
+        }).then(r => r.json());
+
+        const webhookId = res.subscription?.id;
+        if (!webhookId) throw new Error(`Square webhook error: ${JSON.stringify(res)}`);
+
+        await this.prisma.connectedIntegration.update({
+          where: { id: integration.id },
+          data: { webhookId },
+        });
+        break;
+      }
+
+      case 'google': {
+        const channelId = `gaplet-${crypto.randomUUID()}`;
+        const calendarId = 'primary';
+
+        const res = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${integration.accessToken}`,
+            },
+            body: JSON.stringify({
+              id: channelId,
+              type: 'web_hook',
+              address: target,
+            }),
+          },
+        ).then(r => r.json());
+
+        if (!res.id || !res.resourceId) throw new Error('Google Calendar webhook setup failed');
+
+        await this.prisma.connectedIntegration.update({
+          where: { id: integration.id },
+          data: {
+            webhookId: res.id,
+            externalOrgId: res.resourceId,
+          },
+        });
+        break;
+      }
     }
   }
-}
 
 
 

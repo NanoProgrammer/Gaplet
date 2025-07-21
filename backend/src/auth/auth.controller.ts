@@ -9,6 +9,9 @@ import {
   Res,
   Param,
   Query,
+  HttpException,
+  HttpStatus,
+  
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {CreateUserPreferenceDto} from './dto/create-user-preference.dto'
@@ -121,77 +124,24 @@ async savePreference(
   }
 
 
-@UseGuards(AuthGuard('jwt'))
 @Get('connect/:provider')
-async connectProvider(
-  @Param('provider') provider: 'acuity' | 'square' | 'google',
-  @Req() req: RequestWithUser,
-  @Res() res: Response,
-) {
-  const userId = req.user.id;
-  const apiBase = process.env.API_BASE_URL;
-  const redirect = `${apiBase}/auth/callback/${provider}`;
-  const state = userId;
-  let url = '';
-
-  switch (provider) {
-    case 'acuity': {
-      const scope = 'api-v1';
-      url = `https://acuityscheduling.com/oauth2/authorize` +
-        `?client_id=${process.env.ACUITY_CLIENT_ID}` +
-        `&response_type=code` +
-        `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&state=${state}`;
-      break;
+  async connectProvider(
+    @Param('provider') provider: 'acuity' | 'square' | 'google',
+    @Req() req: RequestWithUser,
+    @Res() res: Response,
+  ) {
+    const userId = req.user.id;
+    try {
+      const url = this.authService.getAuthorizationUrl(provider, userId);
+      return res.json({ redirectUrl: url });
+    } catch (err) {
+      throw new HttpException('Unsupported provider', HttpStatus.BAD_REQUEST);
     }
-
-    case 'square': {
-      const scope = [
-        'APPOINTMENTS_READ',
-        'APPOINTMENTS_WRITE',
-        'CUSTOMERS_READ',
-        'MERCHANT_PROFILE_READ',
-      ].join('+');
-      url = `https://connect.squareup.com/oauth2/authorize` +
-        `?client_id=${process.env.SQUARE_CLIENT_ID}` +
-        `&response_type=code` +
-        `&redirect_uri=${redirect}` +
-        `&scope=${scope}` +
-        `&state=${state}` +
-        `&session=false`;
-      break;
-    }
-
-    case 'google': {
-      const scope = [
-        'https://www.googleapis.com/auth/calendar',
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-      ].join(' ');
-
-      url = `https://accounts.google.com/o/oauth2/v2/auth` +
-        `?client_id=${process.env.GOOGLE_CLIENT_ID}` +
-        `&response_type=code` +
-        `&redirect_uri=${redirect}` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&access_type=offline` + // to get refresh_token
-        `&prompt=consent` +      // to always get consent and refresh_token
-        `&state=${state}`;
-      break;
-    }
-
-    default:
-      return res.status(400).send('Unsupported provider');
   }
-
-  return res.json({ redirectUrl: url });
-}
-
-
 
   @Get('callback/:provider')
   async oauthCallback(
-    @Param('provider') provider:  'acuity' | 'square' | 'google',
+    @Param('provider') provider: 'acuity' | 'square' | 'google',
     @Query('code') code: string,
     @Query('state') state: string,
     @Res() res: Response,
@@ -206,9 +156,8 @@ async connectProvider(
       console.error('OAuth callback error:', err);
       return res
         .status(500)
-        .send(`Error while connecting ${provider}: ` + err.message);
+        .send(`Error while connecting ${provider}: ${err.message}`);
     }
   }
-
-
 }
+
