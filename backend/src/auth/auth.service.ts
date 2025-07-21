@@ -379,6 +379,8 @@ async ensureWebhook(
 
   switch (provider) {
     case 'acuity': {
+      console.log('📦 API_BASE_URL resolved:', base);
+console.log('📦 Target URL:', target);
       const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
         method: 'POST',
         headers: {
@@ -394,8 +396,7 @@ async ensureWebhook(
         console.error('❌ Acuity webhook creation failed:', res);
         throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
       }
-      console.log('📦 API_BASE_URL resolved:', base);
-console.log('📦 Target URL:', target);
+  
 
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
