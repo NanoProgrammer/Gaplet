@@ -365,7 +365,6 @@ async exchangeTokenAndSave(
 /* ---------------------------------------------
    2) ENSURE WEBHOOK — Add Google manually later
 --------------------------------------------- */
-
 async ensureWebhook(
   provider: 'acuity' | 'square' | 'google',
   userId: string,
@@ -375,6 +374,7 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
+
   const target = `${process.env.API_BASE_URL}/webhooks/${provider}`;
 
   switch (provider) {
@@ -387,10 +387,17 @@ async ensureWebhook(
         },
         body: JSON.stringify({ url: target, event: 'appointment.canceled' }),
       }).then(r => r.json());
-      console.log("Webhook registered:", res.id);
+
+      console.log('🪵 Acuity full webhook response:', res);
+
+      if (!res.id) {
+        console.error('❌ Acuity webhook creation failed:', res);
+        throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
+      }
+
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
-        data: { webhookId: res.id?.toString() },
+        data: { webhookId: res.id.toString() },
       });
       break;
     }
@@ -409,52 +416,61 @@ async ensureWebhook(
           notification_url: target,
         }),
       }).then(r => r.json());
-      console.log("Webhook registered:", res.id);
+
+      console.log('🪵 Square webhook response:', res);
+
+      const webhookId = res.subscription?.id;
+      if (!webhookId) {
+        console.error('❌ Square webhook creation failed:', res);
+        throw new Error(`Square webhook error: ${JSON.stringify(res)}`);
+      }
+
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
-        data: { webhookId: res.subscription?.id },
+        data: { webhookId },
       });
       break;
     }
 
     case 'google': {
-  const channelId = `gaplet-${crypto.randomUUID()}`; // ID único de canal
-  const calendarId = 'primary'; // Puedes hacerlo dinámico si manejas múltiples calendarios
+      const channelId = `gaplet-${crypto.randomUUID()}`;
+      const calendarId = 'primary';
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${integration.accessToken}`,
-      },
-      body: JSON.stringify({
-        id: channelId, // ID único para el canal, usado luego para detener el webhook
-        type: 'web_hook',
-        address: target, // Tu endpoint, debe ser HTTPS público y válido
-      }),
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${integration.accessToken}`,
+          },
+          body: JSON.stringify({
+            id: channelId,
+            type: 'web_hook',
+            address: target,
+          }),
+        }
+      ).then(r => r.json());
+
+      console.log('🪵 Google webhook response:', res);
+
+      if (!res.id || !res.resourceId) {
+        console.error('❌ Google webhook creation failed:', res);
+        throw new Error('Google Calendar webhook setup failed');
+      }
+
+      await this.prisma.connectedIntegration.update({
+        where: { id: integration.id },
+        data: {
+          webhookId: res.id,
+          externalOrgId: res.resourceId,
+        },
+      });
+      break;
     }
-  ).then(r => r.json());
-
-  if (!res.id || !res.resourceId) {
-    console.error('Google webhook response error:', res);
-    throw new Error('Google Calendar webhook setup failed');
-  }
-console.log("Webhook registered:", res.id);
-  await this.prisma.connectedIntegration.update({
-    where: { id: integration.id },
-    data: {
-      webhookId: res.id, // El ID del canal
-      externalOrgId: res.resourceId, // El resourceId necesario para detener el webhook
-    },
-  });
-
-  break;
-}
-
   }
 }
+
 
 
 async validateAccessToken(token: string) {
