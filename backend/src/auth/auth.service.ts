@@ -374,8 +374,8 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
-
-  const target = `${process.env.API_BASE_URL}/webhooks/${provider}`;
+  let base = this.config.get('API_BASE_URL');
+  const target = `${base}/webhooks/${provider}`;
 
   switch (provider) {
     case 'acuity': {
