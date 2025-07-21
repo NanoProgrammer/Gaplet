@@ -255,7 +255,7 @@ async exchangeTokenAndSave(
   code: string,
   userId: string,
 ) {
-  const api = this.config.get('API_BASE_URL');
+  const api = 'https://gaplet.onrender.com'
   const redirect = `${api}/auth/callback/${provider}`;
   let tokenRes: any;
   let externalUserId: string | null = null;
@@ -374,7 +374,7 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
-  let base = this.config.get('API_BASE_URL');
+  let base = 'https://gaplet.onrender.com';
   const target = `${base}/webhooks/${provider}`;
 
   switch (provider) {
