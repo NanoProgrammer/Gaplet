@@ -249,14 +249,12 @@ async findOrCreateGoogleUser(profile: {
 /* ---------------------------------------------
    1) TOKEN EXCHANGE + SAVE — with Google added
 --------------------------------------------- */
-
 async exchangeTokenAndSave(
   provider: 'acuity' | 'square' | 'google',
   code: string,
   userId: string,
 ) {
-  const api = 'https://gaplet.onrender.com'
-  const redirect = `${api}/auth/callback/${provider}`;
+  const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
   let tokenRes: any;
   let externalUserId: string | null = null;
   let externalOrgId: string | null = null;
@@ -277,7 +275,10 @@ async exchangeTokenAndSave(
         body,
       }).then(r => r.json());
 
-      if (!tokenRes.access_token) throw new Error(`Acuity token error: ${tokenRes.error}`);
+      if (!tokenRes.access_token) {
+        console.error('❌ Acuity token error:', tokenRes);
+        throw new Error(`Acuity token error: ${tokenRes.error}`);
+      }
       break;
     }
 
@@ -294,13 +295,16 @@ async exchangeTokenAndSave(
         }),
       }).then(r => r.json());
 
-      if (!tokenRes.access_token) throw new Error(`Square token error: ${tokenRes.error}`);
+      if (!tokenRes.access_token) {
+        console.error('❌ Square token error:', tokenRes);
+        throw new Error(`Square token error: ${tokenRes.error}`);
+      }
 
       const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
         headers: { Authorization: `Bearer ${tokenRes.access_token}` },
       }).then(r => r.json());
 
-      externalUserId = merchant.merchant?.id || null;
+      externalUserId = merchant.merchant?.id ?? null;
       break;
     }
 
@@ -319,13 +323,16 @@ async exchangeTokenAndSave(
         body: params,
       }).then(r => r.json());
 
-      if (!tokenRes.access_token) throw new Error(`Google token error: ${tokenRes.error}`);
+      if (!tokenRes.access_token) {
+        console.error('❌ Google token error:', tokenRes);
+        throw new Error(`Google token error: ${tokenRes.error}`);
+      }
 
       const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: { Authorization: `Bearer ${tokenRes.access_token}` },
       }).then(r => r.json());
 
-      externalUserId = profile.id || null;
+      externalUserId = profile.id ?? null;
       break;
     }
   }
@@ -362,6 +369,7 @@ async exchangeTokenAndSave(
 }
 
 
+
 /* ---------------------------------------------
    2) ENSURE WEBHOOK — Add Google manually later
 --------------------------------------------- */
@@ -374,37 +382,32 @@ async ensureWebhook(
   });
 
   if (integration.webhookId) return;
-  const base = this.config.get('API_BASE_URL')?.trim();
 
-if (!base) {
-  throw new Error('Missing API_BASE_URL in environment variables');
-}
+  const base = this.config.get('API_BASE_URL')?.trim();
+  if (!base) throw new Error('Missing API_BASE_URL in environment variables');
+
   const target = `${base}/webhooks/${provider}`;
+  console.log(`📡 Registering webhook for ${provider} → ${target}`);
 
   switch (provider) {
     case 'acuity': {
-      console.log('📦 API_BASE_URL resolved:', base);
-console.log('📦 Target URL:', target);
-console.log('🧪 Sending Acuity webhook payload:', {
-  url: target,
-  event: 'appointment.canceled',
-});
       const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${integration.accessToken}`,
         },
-        body: JSON.stringify({ url: target, event: 'appointment.canceled' }),
+        body: JSON.stringify({
+          url: target,
+          event: 'appointment.canceled',
+        }),
       }).then(r => r.json());
 
-      console.log('🪵 Acuity full webhook response:', res);
+      console.log('🪵 Acuity webhook response:', res);
 
       if (!res.id) {
-        console.error('❌ Acuity webhook creation failed:', res);
         throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
       }
-  
 
       await this.prisma.connectedIntegration.update({
         where: { id: integration.id },
@@ -432,7 +435,6 @@ console.log('🧪 Sending Acuity webhook payload:', {
 
       const webhookId = res.subscription?.id;
       if (!webhookId) {
-        console.error('❌ Square webhook creation failed:', res);
         throw new Error(`Square webhook error: ${JSON.stringify(res)}`);
       }
 
@@ -466,7 +468,6 @@ console.log('🧪 Sending Acuity webhook payload:', {
       console.log('🪵 Google webhook response:', res);
 
       if (!res.id || !res.resourceId) {
-        console.error('❌ Google webhook creation failed:', res);
         throw new Error('Google Calendar webhook setup failed');
       }
 
@@ -481,6 +482,7 @@ console.log('🧪 Sending Acuity webhook payload:', {
     }
   }
 }
+
 
 
 
