@@ -360,6 +360,7 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
     where: { userId },
     update: {
       // No actualizamos `provider` porque el campo `userId` es único
+      provider,
       accessToken: access_token,
       refreshToken: refresh_token ?? null,
       expiresAt: expires,
