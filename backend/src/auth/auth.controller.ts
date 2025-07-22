@@ -125,39 +125,41 @@ async savePreference(
 
 @UseGuards(AuthGuard('jwt'))
 @Get('connect/:provider')
-  async connectProvider(
-    @Param('provider') provider: 'acuity' | 'square' | 'google',
-    @Req() req: RequestWithUser,
-    @Res() res: Response,
-  ) {
-    const userId = req.user.id;
-    try {
-      const url = this.authService.getAuthorizationUrl(provider, userId);
-      return res.json({ redirectUrl: url });
-    } catch (err) {
-      throw new HttpException('Unsupported provider', HttpStatus.BAD_REQUEST);
-    }
+async connectProvider(
+  @Param('provider') provider: 'acuity' | 'square' | 'google',
+  @Req() req: RequestWithUser,
+  @Res() res: Response,
+) {
+  try {
+    const url = this.authService.getAuthorizationUrl(provider, req.user.id);
+    return res.json({ redirectUrl: url });
+  } catch {
+    throw new HttpException('Unsupported provider', HttpStatus.BAD_REQUEST);
   }
+}
 
-  @Get('callback/:provider')
-  async oauthCallback(
-    @Param('provider') provider: 'acuity' | 'square' | 'google',
-    @Query('code') code: string,
-    @Query('state') state: string,
-    @Res() res: Response,
-  ) {
-    try {
-      await this.authService.exchangeTokenAndSave(provider, code, state);
+@Get('callback/:provider')
+async oauthCallback(
+  @Param('provider') provider: 'acuity' | 'square' | 'google',
+  @Query('code') code: string,
+  @Query('state') state: string,
+  @Res() res: Response,
+) {
+  try {
+    await this.authService.exchangeTokenAndSave(provider, code, state);
+
+    // Solo para Acuity y Google
+    if (provider !== 'square') {
       await this.authService.ensureWebhook(provider, state);
-      return res.redirect(
-        `${process.env.FRONTEND_ORIGIN}/dashboard/integrations?provider=${provider}&status=success`,
-      );
-    } catch (err) {
-      console.error('OAuth callback error:', err);
-      return res
-        .status(500)
-        .send(`Error while connecting ${provider}: ${err.message}`);
     }
+
+    return res.redirect(
+      `${process.env.FRONTEND_ORIGIN}/dashboard/integrations?provider=${provider}&status=success`
+    );
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    return res.status(500).send(`Error connecting ${provider}: ${err.message}`);
   }
+}
 }
 
