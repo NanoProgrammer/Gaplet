@@ -11,7 +11,6 @@ import {
   Query,
   HttpException,
   HttpStatus,
-  
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {CreateUserPreferenceDto} from './dto/create-user-preference.dto'
@@ -19,6 +18,7 @@ import { CreateAuthDto } from './dto/create-auth.dto';
 import { ResetPasswordDto } from './dto/newpassword.dto';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { use } from 'passport';
 
 
 interface RequestWithUser extends Request {
@@ -123,7 +123,7 @@ async savePreference(
     }
   }
 
-
+@UseGuards(AuthGuard('jwt'))
 @Get('connect/:provider')
   async connectProvider(
     @Param('provider') provider: 'acuity' | 'square' | 'google',
