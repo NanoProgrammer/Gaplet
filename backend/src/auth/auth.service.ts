@@ -422,7 +422,7 @@ getAuthorizationUrl(
             Authorization: `Bearer ${integration.accessToken}`,
           },
           body: JSON.stringify({
-            url: target,
+            target: target,
             event: 'appointment.canceled',
           }),
         }).then(r => r.json());
