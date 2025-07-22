@@ -392,25 +392,52 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
   const target = `${base}/webhooks/${provider}`;
 
   if (provider === 'acuity') {
-    const res = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
-      method: 'POST',
+  const response = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${integration.accessToken}`,
+    },
+    body: JSON.stringify({
+      target,
+      event: 'appointment.canceled',
+    }),
+  });
+
+  const res = await response.json();
+
+  if (response.status === 400 && res.error === 'duplicate_webhook') {
+    // Ya existe un webhook con ese target, vamos a obtenerlo
+    const allWebhooks = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${integration.accessToken}`,
       },
-      body: JSON.stringify({
-        target,
-        event: 'appointment.canceled',
-      }),
     }).then(r => r.json());
 
-    if (!res.id) throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
+    const existing = allWebhooks.find(
+      (wh: any) => wh.target === target && wh.event === 'appointment.canceled',
+    );
+
+    if (!existing?.id) {
+      throw new Error('Duplicate webhook found, but ID not retrievable.');
+    }
 
     await this.prisma.connectedIntegration.update({
       where: { id: integration.id },
-      data: { webhookId: res.id.toString() },
+      data: { webhookId: existing.id.toString() },
     });
+
+    return; // Ya todo hecho
   }
+
+  if (!res.id) throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
+
+  await this.prisma.connectedIntegration.update({
+    where: { id: integration.id },
+    data: { webhookId: res.id.toString() },
+  });
+}
+
 
   if (provider === 'google') {
     const channelId = `gaplet-${crypto.randomUUID()}`;
