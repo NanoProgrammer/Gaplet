@@ -25,7 +25,7 @@ async function bootstrap() {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   } else {
     app.enableCors({
-      origin: 'https://gaplet.vercel.app',
+      origin: 'https://gaplets.com',
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       credentials: true,
     });
