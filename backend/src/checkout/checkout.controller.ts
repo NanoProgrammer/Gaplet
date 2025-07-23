@@ -122,7 +122,6 @@ async cancelSubscription(@Req() req: Request) {
   const userId = user.id;
   const email = user.email;
 
-  // 1. Buscar cliente en Stripe
   const customers = await this.stripe.customers.list({ email, limit: 10 });
   const stripeCustomer = customers.data.find(c => c.email === email);
 
@@ -130,7 +129,6 @@ async cancelSubscription(@Req() req: Request) {
     throw new BadRequestException('Stripe customer not found for this user.');
   }
 
-  // 2. Buscar suscripciones activas
   const subscriptions = await this.stripe.subscriptions.list({
     customer: stripeCustomer.id,
     status: 'active',
@@ -143,57 +141,52 @@ async cancelSubscription(@Req() req: Request) {
 
   const now = Date.now();
 
-  // 3. Procesar cada suscripción activa
   for (const sub of subscriptions.data) {
     const isTrial = sub.status === 'trialing' || !!sub.trial_end;
     const trialStillActive = sub.trial_end && sub.trial_end * 1000 > now;
 
-    // Cancelar al final del período (trial o pago)
-    await this.stripe.subscriptions.update(sub.id, {
-      cancel_at_period_end: true,
-    });
-
-    console.log(`⏳ Subcripción ${sub.id} marcada para cancelación al final del período`);
-
-    // 4. Si estaba en trial pero ya fue cobrado → emitir refund
     if (isTrial && !trialStillActive) {
-      // Buscar invoice más reciente
+      // ⛔️ Estaba en trial, pero ya lo cobraron → cancelar YA + refund
+      await this.stripe.subscriptions.cancel(sub.id);
+
+      console.log(`❌ Cancelado inmediatamente por cobro en trial → ${sub.id}`);
+
       const invoices = await this.stripe.invoices.list({
         subscription: sub.id,
         limit: 1,
       });
 
       const invoice = invoices.data[0];
-      if (!invoice) {
-        console.log(`ℹ️ No invoice found for subscription ${sub.id}`);
-        continue;
-      }
+      if (!invoice) continue;
 
-      // Usar el nuevo endpoint invoicePayments para obtener el payment_intent
       const invoicePayments = await this.stripe.invoicePayments.list({
         invoice: invoice.id,
         limit: 1,
       });
 
       const paymentIntent = invoicePayments.data[0]?.payment?.payment_intent;
+      const paymentIntentId =
+        typeof paymentIntent === 'string'
+          ? paymentIntent
+          : paymentIntent?.id;
 
-const paymentIntentId =
-  typeof paymentIntent === 'string'
-    ? paymentIntent
-    : paymentIntent?.id;
-
-if (paymentIntentId) {
-  await this.stripe.refunds.create({ payment_intent: paymentIntentId });
-  console.log(`💸 Refund creado para payment_intent ${paymentIntentId}`);
-} else {
-  console.log(`ℹ️ No se encontró payment_intent válido para refund`);
-}
-
+      if (paymentIntentId) {
+        await this.stripe.refunds.create({ payment_intent: paymentIntentId });
+        console.log(`💸 Refund automático emitido para ${paymentIntentId}`);
+      } else {
+        console.log(`ℹ️ No se encontró payment_intent para ${sub.id}`);
+      }
+    } else {
+      // 🟢 Suscripción normal o trial aún activo → cancelar al final del período
+      await this.stripe.subscriptions.update(sub.id, {
+        cancel_at_period_end: true,
+      });
+      console.log(`⏳ Sub ${sub.id} cancelada al final del período`);
     }
   }
 
   return {
-    message: 'Suscripciones canceladas al final del período. Refund automático emitido si aplicaba.',
+    message: 'Cancelación procesada. Refund automático emitido si aplicaba.',
   };
 }
 
