@@ -61,8 +61,17 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
   });
 
   for (const sub of subscriptions.data) {
-    await this.stripe.subscriptions.cancel(sub.id); // ❌ Cancela inmediatamente
+  // Si la suscripción está en trial, cancélala al final del trial
+  if (sub.status === 'trialing') {
+    await this.stripe.subscriptions.update(sub.id, {
+      cancel_at_period_end: true,
+    });
+  } else {
+    // Si ya está activa, cancela inmediatamente
+    await this.stripe.subscriptions.cancel(sub.id);
   }
+}
+
 
   // 3. Verificar si el usuario es elegible para trial
   const hasPremiumFeatures = await this.prisma.user.findUnique({
@@ -138,8 +147,17 @@ async cancelSubscription(@Req() req: Request) {
 
   // 3. Cancelar todas las suscripciones activas (normalmente solo una)
   for (const sub of subscriptions.data) {
+  if (sub.status === 'trialing') {
+    // Marca para cancelarse cuando termine el trial
+    await this.stripe.subscriptions.update(sub.id, {
+      cancel_at_period_end: true,
+    });
+  } else {
+    // Cancela inmediatamente si ya está activa
     await this.stripe.subscriptions.cancel(sub.id);
   }
+}
+
 
   return {
     message: 'Active subscription(s) cancelled immediately.',

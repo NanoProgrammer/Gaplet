@@ -37,7 +37,7 @@ export default function StepsSections() {
             Inform the Cancellation of the Appointment
           </h3>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Simply delete the appointment from your calendar app — it’s that easy.
+            Simply delete the appointment from your calendar app.
           </p>
         </div>
       </motion.section>

@@ -16,8 +16,9 @@ export default function SetUpSection() {
           <div className="max-w-md text-center md:text-left">
             <h3 className="text-2xl font-semibold mb-4">Connect Your Tools</h3>
             <p>
-              Easily connect your Google Calendar and your scheduling or CRM platforms—
-              like Jane, Square, Calendly, or Mindbody. Keep everything in sync, effortlessly.
+              Easily connect your Client management system platforms—
+              like Square Appointments, or Acuity Scheduling. Keep everything in sync, effortlessly.
+              We are actively working on integrating with more platforms like Google Calendar, Google Sheets, and Mindbody.
             </p>
           </div>
 

@@ -7,7 +7,7 @@ const faqs = [
   {
     question: "Do I need to change my booking system?",
     answer:
-      "No. Gaplet works with your existing booking system or calendar. We integrate with popular platforms and keep integrating more constantly.",
+      "No. Gaplet works with your existing booking system or calendar. We integrate with popular platforms and keep integrating more constantly. right now, Square, and Acuity Scheduling. But soon, we will support more platforms like google calendar, google sheets, or Mindbody. we are actively working on it.",
   },
   {
     question: "Do my clients need to download an app?",
@@ -17,23 +17,28 @@ const faqs = [
   {
     question: "Can I choose which appointments trigger notifications?",
     answer:
-      "Yes. You can set filters by service type, provider, time windows, timezone, and even client history—like if they haven’t booked in a while or have a booking coming soon.",
-  },
-  {
-    question: "Can I edit the replacement appointment?",
-    answer:
-      "Absolutely. The replacement inherits the original details by default, but you can edit date, time, or client info before confirming.",
+      "Yes. You can set filters by service type, the last appointment date, and next appointment date. This way, you control which appointments are eligible for replacements.",
   },
   {
     question: "How fast do replacements usually happen?",
     answer:
-      "Most replacements happen within minutes, especially when notifications go out simultaneously to multiple eligible clients.",
+      "Most replacements happen within an hour or two, especially when notifications go out simultaneously to multiple eligible clients.",
   },
   {
     question: "Is Gaplet secure and private?",
     answer:
       "Yes. All data is encrypted in transit and at rest. We comply with data protection standards across Canada and the U.S.",
   },
+  {
+    question: "what is considered last minute cancellation?",
+    answer:
+      "A last minute cancellation is typically defined as any cancellation made within 3 days to 2 hours before the scheduled appointment time. This is when Gaplet can help find replacements quickly.",
+  },
+  {
+    question: "What if I have more questions?",
+    answer:
+      "Feel free to reach out to our support team via email or chat. We’re here to help you get the most out of Gaplet.",
+  }
 ];
 
 export default function FAQ() {
