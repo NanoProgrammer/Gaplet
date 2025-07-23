@@ -116,25 +116,21 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 }
 
 
-  @Post('cancel-subscription')
+@Post('cancel-subscription')
 async cancelSubscription(@Req() req: Request) {
   const user = req.user as any;
   const userId = user.id;
   const email = user.email;
 
   // 1. Buscar cliente en Stripe
-  const customers = await this.stripe.customers.list({
-    email,
-    limit: 10,
-  });
-
+  const customers = await this.stripe.customers.list({ email, limit: 10 });
   const stripeCustomer = customers.data.find(c => c.email === email);
 
   if (!stripeCustomer) {
     throw new BadRequestException('Stripe customer not found for this user.');
   }
 
-  // 2. Buscar suscripción activa asociada a este customer
+  // 2. Buscar suscripciones activas
   const subscriptions = await this.stripe.subscriptions.list({
     customer: stripeCustomer.id,
     status: 'active',
@@ -145,20 +141,59 @@ async cancelSubscription(@Req() req: Request) {
     throw new BadRequestException('No active subscription found for this user.');
   }
 
-  // 3. Cancelar todas las suscripciones activas (normalmente solo una)
-  for (const sub of subscriptions.data) {
-  // Cancela al final del periodo (sea trial o pago)
-  await this.stripe.subscriptions.update(sub.id, {
-    cancel_at_period_end: true,
-  });
+  const now = Date.now();
 
-  console.log(`⏳ Subcripción ${sub.id} marcada para cancelación al final del período`);
+  // 3. Procesar cada suscripción activa
+  for (const sub of subscriptions.data) {
+    const isTrial = sub.status === 'trialing' || !!sub.trial_end;
+    const trialStillActive = sub.trial_end && sub.trial_end * 1000 > now;
+
+    // Cancelar al final del período (trial o pago)
+    await this.stripe.subscriptions.update(sub.id, {
+      cancel_at_period_end: true,
+    });
+
+    console.log(`⏳ Subcripción ${sub.id} marcada para cancelación al final del período`);
+
+    // 4. Si estaba en trial pero ya fue cobrado → emitir refund
+    if (isTrial && !trialStillActive) {
+      // Buscar invoice más reciente
+      const invoices = await this.stripe.invoices.list({
+        subscription: sub.id,
+        limit: 1,
+      });
+
+      const invoice = invoices.data[0];
+      if (!invoice) {
+        console.log(`ℹ️ No invoice found for subscription ${sub.id}`);
+        continue;
+      }
+
+      // Usar el nuevo endpoint invoicePayments para obtener el payment_intent
+      const invoicePayments = await this.stripe.invoicePayments.list({
+        invoice: invoice.id,
+        limit: 1,
+      });
+
+      const paymentIntent = invoicePayments.data[0]?.payment?.payment_intent;
+
+const paymentIntentId =
+  typeof paymentIntent === 'string'
+    ? paymentIntent
+    : paymentIntent?.id;
+
+if (paymentIntentId) {
+  await this.stripe.refunds.create({ payment_intent: paymentIntentId });
+  console.log(`💸 Refund creado para payment_intent ${paymentIntentId}`);
+} else {
+  console.log(`ℹ️ No se encontró payment_intent válido para refund`);
 }
 
-
+    }
+  }
 
   return {
-    message: 'Active subscription(s) cancelled immediately.',
+    message: 'Suscripciones canceladas al final del período. Refund automático emitido si aplicaba.',
   };
 }
 
