@@ -119,57 +119,59 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 async cancelSubscription(@Req() req: Request) {
   const email = (req.user as any).email;
 
-  // 1. El customer
-  const customers = await this.stripe.customers.list({ email, limit: 1 });
-  const cust = customers.data[0];
-  if (!cust) throw new BadRequestException('Stripe customer not found.');
+  // 1. Obtener cliente de Stripe
+  const { data: customers } = await this.stripe.customers.list({ email, limit: 1 });
+  const customer = customers[0];
+  if (!customer) throw new BadRequestException('Stripe customer not found.');
 
-  // 2. La suscripción activa + última factura
-  const subsList = await this.stripe.subscriptions.list({
-    customer: cust.id,
+  // 2. Obtener suscripción activa con última factura expandida
+  const { data: subs } = await this.stripe.subscriptions.list({
+    customer: customer.id,
     status: 'active',
     limit: 1,
     expand: ['data.latest_invoice'],
   });
-  const sub = subsList.data[0];
+  const sub = subs[0];
   if (!sub) throw new BadRequestException('No active subscription found.');
 
   const invoice = sub.latest_invoice as Stripe.Invoice;
-
-  const trialEnd = sub.trial_end;
-  const feeStart = invoice.lines.data[0]?.period.start;
+  const trialStart = sub.trial_start;
+  const billStart = invoice.lines.data[0]?.period.start;
   const amountPaid = invoice.amount_paid || 0;
 
-  const wasChargedAfterTrial =
-    trialEnd &&
-    feeStart === trialEnd &&
+  // 3. Detectar si fue un trial cobrado inmediatamente
+  const trialCharged =
+    trialStart &&
+    billStart === trialStart &&
     amountPaid > 0;
 
-  if (wasChargedAfterTrial) {
-    // 🛑 Cancelar inmediatamente
+  if (trialCharged) {
+    // 4a. Cancelación inmediata
     await this.stripe.subscriptions.cancel(sub.id);
-    console.log(`❌ Subscription canceled immediately (trial charged).`);
+    console.log(`❌ Subscription ${sub.id} canceled immediately (trial charged).`);
 
-    // 🔍 Listar InvoicePayment para obtener el payment_intent
-    const pays = await this.stripe.invoicePayments.list({
+    // 5a. Buscar invoicePayment para reembolso
+    const { data: pays } = await this.stripe.invoicePayments.list({
       invoice: invoice.id,
       limit: 1,
     });
-    const piRef = pays.data[0]?.payment?.payment_intent;
-    const piId = typeof piRef === 'string' ? piRef : piRef?.id;
+    const pay = pays[0];
+    const piId = typeof pay.payment.payment_intent === 'string'
+      ? pay.payment.payment_intent
+      : pay.payment.payment_intent?.id;
+
     if (piId) {
       await this.stripe.refunds.create({ payment_intent: piId });
-      console.log(`💸 Refund created for PI ${piId}`);
+      console.log(`💸 Refund created for PaymentIntent ${piId}`);
     } else {
-      console.warn(`⚠️ No payment_intent found; no refund.`);
+      console.warn(`⚠️ No payment_intent found; cannot refund.`);
     }
-
   } else {
-    // 🕓 Cancelar al final del ciclo
+    // 4b. Cancelación al final del ciclo (trial activo u otro caso)
     await this.stripe.subscriptions.update(sub.id, {
       cancel_at_period_end: true,
     });
-    console.log(`⏳ Subscription scheduled to cancel at period end.`);
+    console.log(`⏳ Subscription ${sub.id} scheduled to end at period end.`);
   }
 
   return { message: 'Subscription cancellation processed.' };
