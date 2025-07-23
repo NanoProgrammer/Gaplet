@@ -147,16 +147,14 @@ async cancelSubscription(@Req() req: Request) {
 
   // 3. Cancelar todas las suscripciones activas (normalmente solo una)
   for (const sub of subscriptions.data) {
-  if (sub.status === 'trialing') {
-    // Marca para cancelarse cuando termine el trial
-    await this.stripe.subscriptions.update(sub.id, {
-      cancel_at_period_end: true,
-    });
-  } else {
-    // Cancela inmediatamente si ya está activa
-    await this.stripe.subscriptions.cancel(sub.id);
-  }
+  // Cancela al final del periodo (sea trial o pago)
+  await this.stripe.subscriptions.update(sub.id, {
+    cancel_at_period_end: true,
+  });
+
+  console.log(`⏳ Subcripción ${sub.id} marcada para cancelación al final del período`);
 }
+
 
 
   return {
