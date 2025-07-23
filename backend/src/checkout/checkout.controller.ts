@@ -156,4 +156,5 @@ async cancelSubscription(@Req() req: Request) {
 
   return { message: 'Cancelación procesada correctamente.' };
 }
+
 }
