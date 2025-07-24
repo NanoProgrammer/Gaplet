@@ -89,28 +89,25 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 
   // 4. Crear la sesión de pago
   const session = await this.stripe.checkout.sessions.create({
-    mode: 'subscription',
-    customer: stripeCustomer.id,
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
-      },
-    ],
-    subscription_data: {
-      ...(trialEligible ? { trial_period_days: 7 } : {}),
-      metadata: {
-        userId,
+  mode: 'subscription',
+  customer: stripeCustomer.id,
+  payment_method_collection: 'if_required', // solo pide método de pago si es necesario
+  line_items: [{ price: priceId, quantity: 1 }],
+  subscription_data: {
+    trial_period_days: trialEligible ? 7 : undefined,
+    trial_settings: {
+      end_behavior: {
+        missing_payment_method: 'cancel', 
+        // o 'pause' si prefieres pausar hasta que agregue método
       },
     },
-    metadata: {
-      userId,
-      priceId,
-    },
-    success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
-    cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
-  });
+    metadata: { userId },
+  },
+  metadata: { userId, priceId },
+  success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
+  cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
+});
+
 
   return { url: session.url };
 }
