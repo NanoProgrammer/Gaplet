@@ -166,9 +166,9 @@ setPreferences(prefs);
         </section>
       )}
       {userInfo?.role && (
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Your Role: <span className="text-blue-600">{userInfo.role.toLowerCase()}</span>
-        </h2>
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+          Your Role: <strong className="text-blue-600">{userInfo.role.toLowerCase()}</strong>
+        </h3>
       )}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
         <StatCard label="Replacements" value={`${userInfo?.totalReplacements || 0}/${replacementLimit}`} icon={<RefreshCw className="w-6 h-6 text-blue-500" />} color="border-l-blue-500" />
