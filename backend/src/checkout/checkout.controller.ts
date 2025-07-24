@@ -119,42 +119,44 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 async cancelSubscription(@Req() req: Request) {
   const email = (req.user as any).email;
 
-  // 1. Encontrar el cliente por email
+  // 1. Buscar cliente
   const customer = (await this.stripe.customers.list({ email, limit: 1 })).data[0];
-  if (!customer) throw new BadRequestException('Stripe customer not found');
+  if (!customer) throw new BadRequestException('Cliente de Stripe no encontrado.');
 
-  // 2. Buscar suscripción activa
+  // 2. Obtener suscripción activa con factura + intent expandido
   const subscription = (await this.stripe.subscriptions.list({
     customer: customer.id,
     status: 'active',
-    expand: ['data.latest_invoice.payment_intent'],
     limit: 1,
+    expand: ['data.latest_invoice.payment_intent'], // NECESARIO
   })).data[0];
 
-  if (!subscription) throw new BadRequestException('No active subscription found');
+  if (!subscription) throw new BadRequestException('No se encontró suscripción activa.');
 
   const invoice = subscription.latest_invoice as Stripe.Invoice;
-  const paymentIntent = (invoice as any).payment_intent as Stripe.PaymentIntent;
-  const wasTrial = !!subscription.trial_start;
+  const paymentIntent = (invoice as any).payment_intent as Stripe.PaymentIntent | null;
+
+  const isTrial = !!subscription.trial_start;
   const wasCharged = invoice.amount_paid > 0;
 
-  if (wasTrial && wasCharged && paymentIntent?.id) {
-    // 🚨 CANCELACIÓN INMEDIATA
+  if (isTrial && wasCharged && paymentIntent?.id) {
+    // 🚨 Cancelar de inmediato
     await this.stripe.subscriptions.cancel(subscription.id);
-    console.log(`❌ Sub ${subscription.id} cancelada inmediatamente.`);
 
-    // 💸 REFUND
-    await this.stripe.refunds.create({ payment_intent: paymentIntent.id });
-    console.log(`💸 Refund realizado para ${paymentIntent.id}`);
-  } else {
-    // ⏳ CANCELACIÓN AL FINAL
-    await this.stripe.subscriptions.update(subscription.id, {
-      cancel_at_period_end: true,
+    // 💸 Refund inmediato
+    await this.stripe.refunds.create({
+      payment_intent: paymentIntent.id,
     });
-    console.log(`⏳ Sub ${subscription.id} marcada para cancelar al final.`);
+
+    return { message: 'Suscripción cancelada y reembolso emitido.' };
   }
 
-  return { message: 'Cancelación procesada correctamente.' };
+  // ⏳ Cancelar al final del ciclo si no aplica refund
+  await this.stripe.subscriptions.update(subscription.id, {
+    cancel_at_period_end: true,
+  });
+
+  return { message: 'Suscripción programada para cancelación al final del período.' };
 }
 
 }
