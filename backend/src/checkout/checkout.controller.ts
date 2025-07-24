@@ -103,8 +103,8 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
   },
   payment_method_collection: 'if_required', // ✅ muy importante
   metadata: { userId, priceId },
-  success_url: `${origin}/payment-success`,
-  cancel_url: `${origin}/payment-cancel`,
+  success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
+  cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
 });
 
 
