@@ -34,12 +34,11 @@ const fetchWithAuth = async (url, options = {}) => {
     localStorage.setItem('accessToken', newAccessToken);
     accessToken = newAccessToken;
 
-    res = await doFetch(newAccessToken); // retry with new token
+    res = await doFetch(newAccessToken);
   }
 
   return res;
 };
-
 
 const unitOptions = [
   { label: 'Minutes', value: 1 },
@@ -66,76 +65,75 @@ export default function SettingsPage() {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
-  if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
-  const access = localStorage.getItem('accessToken');
-  const refresh = localStorage.getItem('refreshToken');
+    const access = localStorage.getItem('accessToken');
+    const refresh = localStorage.getItem('refreshToken');
 
-  if (!access) {
-    router.push('/signin');
-    return;
-  }
-
-  const tryFetchData = async (tokenToUse) => {
-    try {
-      const prefRes = await fetch(`${apiBase}/auth/preference`, {
-        headers: { Authorization: `Bearer ${tokenToUse}` },
-      });
-
-      if (prefRes.status === 401 && refresh) {
-        const refreshRes = await fetch(`${apiBase}/auth/refresh`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${refresh}` },
-        });
-
-        if (!refreshRes.ok) throw new Error('Refresh token invalid or expired');
-
-        const newTokens = await refreshRes.json();
-        if (!newTokens.accessToken) throw new Error('No new access token');
-
-        localStorage.setItem('accessToken', newTokens.accessToken);
-        setAccessToken(newTokens.accessToken);
-
-        return await tryFetchData(newTokens.accessToken); // Retry with new token
-      }
-
-      if (!prefRes.ok) throw new Error('Unauthorized');
-
-      const prefText = await prefRes.text();
-      if (prefText) {
-        const data = JSON.parse(prefText);
-        setForm({
-          matchAppointmentType: data.matchAppointmentType,
-          notifyBefore: {
-            value: data.notifyBeforeMinutes / 1440 || '',
-            unit: 1440,
-          },
-          notifyAfter: {
-            value: data.notifyAfterMinutes / 1440 || '',
-            unit: 1440,
-          },
-          maxNotificationsPerGap: data.maxNotificationsPerGap || '',
-        });
-      }
-
-      const userRes = await fetch(`${apiBase}/user/me`, {
-        headers: { Authorization: `Bearer ${tokenToUse}` },
-      });
-
-      if (!userRes.ok) throw new Error('Failed to fetch user');
-
-      const userData = await userRes.json();
-      setUser(userData);
-    } catch (err) {
-      console.error('[Auth Fetch Error]', err);
+    if (!access) {
       router.push('/signin');
+      return;
     }
-  };
 
-  setAccessToken(access); // save current access token
-  tryFetchData(access);   // start fetch flow
-}, []);
+    const tryFetchData = async (tokenToUse) => {
+      try {
+        const prefRes = await fetch(`${apiBase}/auth/preference`, {
+          headers: { Authorization: `Bearer ${tokenToUse}` },
+        });
 
+        if (prefRes.status === 401 && refresh) {
+          const refreshRes = await fetch(`${apiBase}/auth/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${refresh}` },
+          });
+
+          if (!refreshRes.ok) throw new Error('Refresh token invalid or expired');
+
+          const newTokens = await refreshRes.json();
+          if (!newTokens.accessToken) throw new Error('No new access token');
+
+          localStorage.setItem('accessToken', newTokens.accessToken);
+          setAccessToken(newTokens.accessToken);
+
+          return await tryFetchData(newTokens.accessToken);
+        }
+
+        if (!prefRes.ok) throw new Error('Unauthorized');
+
+        const prefText = await prefRes.text();
+        if (prefText) {
+          const data = JSON.parse(prefText);
+          setForm({
+            matchAppointmentType: data.matchAppointmentType,
+            notifyBefore: {
+              value: data.notifyBeforeMinutes / 1440 || '',
+              unit: 1440,
+            },
+            notifyAfter: {
+              value: data.notifyAfterMinutes / 1440 || '',
+              unit: 1440,
+            },
+            maxNotificationsPerGap: data.maxNotificationsPerGap || '',
+          });
+        }
+
+        const userRes = await fetch(`${apiBase}/user/me`, {
+          headers: { Authorization: `Bearer ${tokenToUse}` },
+        });
+
+        if (!userRes.ok) throw new Error('Failed to fetch user');
+
+        const userData = await userRes.json();
+        setUser(userData);
+      } catch (err) {
+        console.error('[Auth Fetch Error]', err);
+        router.push('/signin');
+      }
+    };
+
+    setAccessToken(access);
+    tryFetchData(access);
+  }, []);
 
   const handleValueChange = (e, field) => {
     const value = e.target.value;
@@ -152,30 +150,6 @@ export default function SettingsPage() {
       [field]: { ...prev[field], unit },
     }));
   };
-
- async function handleCancel(e) {
-  e.preventDefault();
-
-  try {
-    const res = await fetchWithAuth(`/checkout/cancel-subscription`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
-
-    if (!res.ok) throw new Error(data.message || 'Failed to cancel subscription');
-
-    // ✅ Redirige al Customer Portal automáticamente
-    router.push('/');
-  } catch (err) {
-    console.error('❌ Cancel error:', err.message);
-    // Puedes mostrar un banner o toast si tienes uno implementado
-  }
-}
 
   const handleSimpleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -206,6 +180,25 @@ export default function SettingsPage() {
     if (res.ok) {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
+    }
+  };
+
+  const handleCancel = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth(`/checkout/cancel-subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (!res.ok) throw new Error(data.message || 'Failed to cancel subscription');
+
+      router.push('/');
+    } catch (err) {
+      console.error('❌ Cancel error:', err.message);
     }
   };
 
@@ -240,31 +233,30 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <label className="flex items-center justify-between">
               <span className="text-base font-medium">Match appointment type exactly</span>
-              <motion.div
-                className={`relative inline-block w-11 h-6  transition rounded-full ${form.matchAppointmentType ? 'bg-blue-600' : 'bg-gray-300'}`}
+              <motion.button
+                onClick={() =>
+                  handleSimpleChange({
+                    target: {
+                      name: 'matchAppointmentType',
+                      type: 'checkbox',
+                      checked: !form.matchAppointmentType,
+                    },
+                  })
+                }
+                className="flex items-center w-16 h-8 rounded-full p-1 transition-colors"
+                style={{
+                  backgroundColor: form.matchAppointmentType ? '#4f46e5' : '#d1d5db',
+                  justifyContent: form.matchAppointmentType ? 'flex-end' : 'flex-start',
+                }}
+                layout
               >
-                <input
-                  type="checkbox"
-                  id="matchAppointmentType"
-                  name="matchAppointmentType"
-                  checked={form.matchAppointmentType}
-                  onChange={(e) =>
-                    handleSimpleChange({
-                      target: {
-                        name: 'matchAppointmentType',
-                        type: 'checkbox',
-                        checked: e.target.checked,
-                      },
-                    })
-                  }
-                  className="sr-only"
+                <motion.div
+                  className="w-6 h-6 rounded-full shadow"
+                  style={{ backgroundColor: '#fff' }}
+                  layout
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
-                <motion.span
-                  className="absolute right-5.5 top-0.5 w-5 h-5 bg-white rounded-full shadow"
-                  animate={{ x: form.matchAppointmentType ? 18 : 0 }}
-                  transition={{ type: 'ease' }}
-                />
-              </motion.div>
+              </motion.button>
             </label>
 
             <div className="space-y-4">
@@ -309,7 +301,6 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-            
             </div>
           </div>
 
@@ -334,17 +325,16 @@ export default function SettingsPage() {
             <p className="mb-4">User ID: <span className="font-mono">{user.id}</span></p>
             <div className="flex gap-4">
               <a href="/pricing">
-              <button className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded hover:bg-indigo-100 font-medium">
-                Upgrade Plan
-              </button></a>
-              
+                <button className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded hover:bg-indigo-100 font-medium">
+                  Upgrade Plan
+                </button>
+              </a>
               <button
-    onClick={handleCancel}
-    className="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200 font-medium"
-  >
-    Cancel Subscription
-  </button>
-
+                onClick={handleCancel}
+                className="bg-red-100 text-red-600 px-4 py-2 rounded hover:bg-red-200 font-medium"
+              >
+                Cancel Subscription
+              </button>
             </div>
           </motion.div>
         )}
