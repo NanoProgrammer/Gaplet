@@ -116,44 +116,61 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 async cancelSubscription(@Req() req: Request) {
   const email = (req.user as any).email;
 
-  // 1. Buscar cliente
-  const customer = (await this.stripe.customers.list({ email, limit: 1 })).data[0];
+  // 1. Buscar el cliente de Stripe por email
+  const customers = await this.stripe.customers.list({ email, limit: 1 });
+  const customer = customers.data[0];
   if (!customer) throw new BadRequestException('Cliente de Stripe no encontrado.');
 
-  // 2. Obtener suscripción activa con factura + intent expandido
-  const subscription = (await this.stripe.subscriptions.list({
+  // 2. Obtener la suscripción activa del cliente
+  const subs = await this.stripe.subscriptions.list({
     customer: customer.id,
     status: 'active',
-    limit: 1,
-    expand: ['data.latest_invoice.payment_intent'], // NECESARIO
-  })).data[0];
-
+    limit: 1
+  });
+  const subscription = subs.data[0];
   if (!subscription) throw new BadRequestException('No se encontró suscripción activa.');
 
-  const invoice = subscription.latest_invoice as Stripe.Invoice;
-  const paymentIntent = (invoice as any).payment_intent as Stripe.PaymentIntent | null;
-
-  const isTrial = !!subscription.trial_start;
-  const wasCharged = invoice.amount_paid > 0;
-
-  if (isTrial && wasCharged && paymentIntent?.id) {
-    // 🚨 Cancelar de inmediato
-    await this.stripe.subscriptions.cancel(subscription.id);
-
-    // 💸 Refund inmediato
-    await this.stripe.refunds.create({
-      payment_intent: paymentIntent.id,
-    });
-
-    return { message: 'Suscripción cancelada y reembolso emitido.' };
+  // 3. Si la suscripción está en período de prueba, cancelar al final del período de prueba
+  if (subscription.status === 'trialing') {
+    // Cancela al final de la prueba para que no se cobre nada
+    await this.stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+    return { message: 'Suscripción en prueba programada para cancelarse al finalizar el trial.' };
   }
 
-  // ⏳ Cancelar al final del ciclo si no aplica refund
-  await this.stripe.subscriptions.update(subscription.id, {
-    cancel_at_period_end: true,
-  });
+  // 4. Obtener la última factura y expandir sus pagos para ubicar el PaymentIntent
+  const latestInvoiceId = typeof subscription.latest_invoice === 'string'
+    ? subscription.latest_invoice 
+    : subscription.latest_invoice?.id;
+  let paymentIntentId: string | undefined = undefined;
+  let amountPaid = 0;
+  if (latestInvoiceId) {
+    const invoice = await this.stripe.invoices.retrieve(latestInvoiceId, { expand: ['payments'] });
+    amountPaid = invoice.amount_paid ?? 0;
+    if (invoice.payments?.data?.length) {
+      // Tomar el primer pago asociado (el PaymentIntent de la última factura)
+      const paymentEntry = invoice.payments.data[0];
+      if (paymentEntry.payment?.type === 'payment_intent') {
+        // `paymentEntry.payment.payment_intent` puede ser ID (string) o objeto expandido
+        const pi = paymentEntry.payment.payment_intent;
+        paymentIntentId = typeof pi === 'string' ? pi : pi.id;
+      }
+    }
+  }
 
-  return { message: 'Suscripción programada para cancelación al final del período.' };
+  const tuvoTrial = !!subscription.trial_start; 
+  const fueCobrado = amountPaid > 0 && paymentIntentId;
+  if (tuvoTrial && fueCobrado && paymentIntentId) {
+    // Si la suscripción originalmente tuvo un trial y ya hubo un cobro, asumimos que es el primer cobro post-trial.
+    // Cancelar inmediatamente y reembolsar ese pago.
+    await this.stripe.subscriptions.cancel(subscription.id);
+    await this.stripe.refunds.create({ payment_intent: paymentIntentId });
+    return { message: 'Suscripción cancelada inmediatamente y pago reembolsado.' };
+  }
+
+  // 5. Para suscripciones sin trial (o cobros fuera del primer ciclo), cancelar al final del periodo vigente
+  await this.stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+  return { message: 'Suscripción cancelada al final del período actual.' };
 }
+
 
 }
