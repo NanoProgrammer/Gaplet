@@ -7,7 +7,7 @@ import { useUser } from '@/context/UserContext';
 const plans = [
   {
     name: 'starter',
-    price: '$19/mo',
+    price: '$49/mo',
     shadow: 'shadow-blue-400/30 hover:shadow-blue-400/50',
     features: ['20 auto-fills per month', 'Email notifications', '2 hour response time'],
     buttonColor: 'bg-blue-600 hover:bg-blue-700',
@@ -15,7 +15,7 @@ const plans = [
   },
   {
     name: 'pro',
-    price: '$49/mo',
+    price: '$110/mo',
     shadow: 'shadow-green-400/30 hover:shadow-green-400/50',
     features: [
       '50 auto-fills per month',
@@ -29,7 +29,7 @@ const plans = [
   },
   {
     name: 'premium',
-    price: '$99/mo',
+    price: '$180/mo',
     shadow: 'shadow-amber-400/30 hover:shadow-amber-400/50',
     features: [
       '100 auto-fills per month',

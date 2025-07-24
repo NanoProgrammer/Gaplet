@@ -3,7 +3,7 @@ import Link from 'next/link';
 const plans = [
   {
     name: 'Starter',
-    price: '$19/mo',
+    price: '$49/mo',
     shadow: 'shadow-[0_0_16px_rgba(59,130,246,0.4)] hover:shadow-[0_0_22px_rgba(59,130,246,0.6)]',
     features: [
       '20 auto-fills per month',
@@ -16,7 +16,7 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: '$49/mo',
+    price: '$110/mo',
     shadow: 'shadow-[0_0_18px_rgba(34,197,94,0.4)] hover:shadow-[0_0_28px_rgba(34,197,94,0.6)]',
     features: [
       '50 auto-fills per month',
@@ -31,7 +31,7 @@ const plans = [
   },
   {
     name: 'Premium',
-    price: '$99/mo',
+    price: '$180/mo',
     shadow: 'shadow-[0_0_20px_rgba(253,186,116,0.4)] hover:shadow-[0_0_32px_rgba(253,186,116,0.6)]',
     features: [
       '100/mo auto-fills',
