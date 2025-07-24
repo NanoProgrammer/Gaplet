@@ -232,32 +232,31 @@ export default function SettingsPage() {
         >
           <div className="space-y-4">
             <label className="flex items-center justify-between">
-              <span className="text-base font-medium">Match appointment type exactly</span>
-              <motion.button
-                onClick={() =>
-                  handleSimpleChange({
-                    target: {
-                      name: 'matchAppointmentType',
-                      type: 'checkbox',
-                      checked: !form.matchAppointmentType,
-                    },
-                  })
-                }
-                className="flex items-center w-16 h-8 rounded-full p-1 transition-colors"
-                style={{
-                  backgroundColor: form.matchAppointmentType ? '#4f46e5' : '#d1d5db',
-                  justifyContent: form.matchAppointmentType ? 'flex-end' : 'flex-start',
-                }}
-                layout
-              >
-                <motion.div
-                  className="w-6 h-6 rounded-full shadow"
-                  style={{ backgroundColor: '#fff' }}
-                  layout
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              </motion.button>
-            </label>
+  <span className="text-base font-medium">Match appointment type exactly</span>
+  <motion.button
+    type="button" // 🔧 Previene envío accidental
+    onClick={() =>
+      setForm((prev) => ({
+        ...prev,
+        matchAppointmentType: !prev.matchAppointmentType,
+      }))
+    }
+    className="flex items-center w-13 h-8 rounded-full p-1 transition-colors"
+    style={{
+      backgroundColor: form.matchAppointmentType ? '#155dfc' : '#d1d5db',
+      justifyContent: form.matchAppointmentType ? 'flex-end' : 'flex-start',
+    }}
+    layout
+  >
+    <motion.div
+      className="w-6 h-6 rounded-full shadow"
+      style={{ backgroundColor: '#fff' }}
+      layout
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    />
+  </motion.button>
+</label>
+
 
             <div className="space-y-4">
               <div>
