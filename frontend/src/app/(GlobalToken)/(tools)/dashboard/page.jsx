@@ -165,7 +165,7 @@ setPreferences(prefs);
           </ul>
         </section>
       )}
-      {userInfo.role && (
+      {userInfo?.role && (
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
           Your Role: <span className="text-blue-600">{userInfo.role.toLowerCase()}</span>
         </h2>
