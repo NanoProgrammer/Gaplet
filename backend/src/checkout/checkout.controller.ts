@@ -42,38 +42,61 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
     throw new BadRequestException(`Invalid plan: ${plan}`);
   }
 
-  // 1. Buscar (o crear) el cliente en Stripe
-  const customers = await this.stripe.customers.list({ email, limit: 10 });
-  let stripeCustomer = customers.data.find((c) => c.email === email);
-
-  if (!stripeCustomer) {
-    stripeCustomer = await this.stripe.customers.create({
+  // 1. Buscar o crear cliente
+  const customers = await this.stripe.customers.list({ email, limit: 1 });
+  let customer = customers.data[0];
+  if (!customer) {
+    customer = await this.stripe.customers.create({
       email,
       metadata: { userId },
     });
   }
 
-  // 2. Cancelar cualquier suscripción activa del cliente
-  const subscriptions = await this.stripe.subscriptions.list({
-    customer: stripeCustomer.id,
-    status: 'active',
+  // 2. Buscar suscripciones activas
+  const subs = await this.stripe.subscriptions.list({
+    customer: customer.id,
+    status: 'all',
     limit: 5,
   });
 
-  for (const sub of subscriptions.data) {
-  // Si la suscripción está en trial, cancélala al final del trial
-  if (sub.status === 'trialing') {
-    await this.stripe.subscriptions.update(sub.id, {
-      cancel_at_period_end: true,
-    });
-  } else {
-    // Si ya está activa, cancela inmediatamente
-    await this.stripe.subscriptions.cancel(sub.id);
+  const activeSub = subs.data.find((s) =>
+    ['active', 'trialing'].includes(s.status)
+  );
+
+  if (activeSub) {
+    const invoiceId = typeof activeSub.latest_invoice === 'string'
+      ? activeSub.latest_invoice
+      : (activeSub.latest_invoice as any)?.id;
+
+    let piId: string | undefined;
+    let amountPaid = 0;
+
+    if (invoiceId) {
+      const invoice = await this.stripe.invoices.retrieve(invoiceId, {
+        expand: ['payment_intent'],
+      });
+
+      amountPaid = invoice.amount_paid ?? 0;
+      const pi = (invoice as any).payment_intent as Stripe.PaymentIntent | undefined;
+      piId = pi?.id;
+    }
+
+    const hadTrial = !!activeSub.trial_start;
+    const charged = amountPaid > 0 && piId;
+
+    // Si estaba en trial y ya pagó → reembolsar
+    if (hadTrial && charged && piId) {
+      await this.stripe.subscriptions.cancel(activeSub.id);
+      await this.stripe.refunds.create({ payment_intent: piId });
+    } else {
+      // Si no ha pagado o no tuvo trial → cancelar al final
+      await this.stripe.subscriptions.update(activeSub.id, {
+        cancel_at_period_end: true,
+      });
+    }
   }
-}
 
-
-  // 3. Verificar si el usuario es elegible para trial
+  // 3. Validar elegibilidad para trial
   const hasPremiumFeatures = await this.prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -87,10 +110,10 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
     !hasPremiumFeatures?.connectedIntegration &&
     !hasPremiumFeatures?.preferences;
 
-  // 4. Crear la sesión de pago
+  // 4. Crear nueva sesión
   const session = await this.stripe.checkout.sessions.create({
     mode: 'subscription',
-    customer: stripeCustomer.id,
+    customer: customer.id,
     payment_method_types: ['card'],
     line_items: [
       {
@@ -100,9 +123,7 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
     ],
     subscription_data: {
       ...(trialEligible ? { trial_period_days: 7 } : {}),
-      metadata: {
-        userId,
-      },
+      metadata: { userId },
     },
     metadata: {
       userId,
@@ -114,6 +135,7 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 
   return { url: session.url };
 }
+
 
 @Post('cancel-subscription')
 async cancelSubscription(@Req() req: Request) {
