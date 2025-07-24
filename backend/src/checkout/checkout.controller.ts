@@ -89,25 +89,28 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 
   // 4. Crear la sesión de pago
   const session = await this.stripe.checkout.sessions.create({
-  mode: 'subscription',
-  customer: stripeCustomer.id,
-  payment_method_types: ['card'],
-  line_items: [{ price: priceId, quantity: 1 }],
-  subscription_data: {
-    trial_period_days: trialEligible ? 7 : undefined,
-    trial_settings: {
-      end_behavior: {
-        missing_payment_method: 'cancel', // evita cobrar si no agregó método
+    mode: 'subscription',
+    customer: stripeCustomer.id,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    subscription_data: {
+      ...(trialEligible ? { trial_period_days: 7 } : {}),
+      metadata: {
+        userId,
       },
     },
-  },
-  payment_method_collection: 'if_required', // ✅ muy importante
-  metadata: { userId, priceId },
-  success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
-  cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
-});
-
-
+    metadata: {
+      userId,
+      priceId,
+    },
+    success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
+    cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
+  });
 
   return { url: session.url };
 }
@@ -171,6 +174,5 @@ async cancelSubscription(@Req() req: Request) {
   await this.stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
   return { message: 'Suscripción cancelada al final del período actual.' };
 }
-
 
 }
