@@ -91,22 +91,22 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
   const session = await this.stripe.checkout.sessions.create({
   mode: 'subscription',
   customer: stripeCustomer.id,
-  payment_method_collection: 'if_required', // solo pide método de pago si es necesario
+  payment_method_types: ['card'],
   line_items: [{ price: priceId, quantity: 1 }],
   subscription_data: {
     trial_period_days: trialEligible ? 7 : undefined,
     trial_settings: {
       end_behavior: {
-        missing_payment_method: 'cancel', 
-        // o 'pause' si prefieres pausar hasta que agregue método
+        missing_payment_method: 'cancel', // evita cobrar si no agregó método
       },
     },
-    metadata: { userId },
   },
+  payment_method_collection: 'if_required', // ✅ muy importante
   metadata: { userId, priceId },
-  success_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-success`,
-  cancel_url: `${this.configService.get('FRONTEND_ORIGIN')}/payment-cancel`,
+  success_url: `${origin}/payment-success`,
+  cancel_url: `${origin}/payment-cancel`,
 });
+
 
 
   return { url: session.url };
