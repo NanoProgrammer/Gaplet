@@ -102,7 +102,7 @@ export class AuthService {
       { expiresIn: '15m', secret: this.config.get('JWT_ACCESS_SECRET') },
     );
 
-    const resetLink = `https://gaplet.vercel.app/recoverPassword/${token}`;
+    const resetLink = `https://gaplets.com/recoverPassword/${token}`;
     console.log('🔗 Reset link:', resetLink);
 
     // 3. Verificar credenciales de correo
