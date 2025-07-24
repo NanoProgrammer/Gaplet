@@ -56,7 +56,7 @@ const refreshAccessToken = async () => {
     const allowedOrigins = [
       new URL(API_URL).origin,
       'http://localhost:4000',
-      'https://gaplet.vercel.app',
+      'https://gaplets.com',
     ];
 
     if (!allowedOrigins.includes(event.origin)) {
