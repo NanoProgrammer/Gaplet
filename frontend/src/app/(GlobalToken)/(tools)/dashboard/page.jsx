@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [userInfo, setUserInfo] = useState(null);
   const [preferences, setPreferences] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   const refreshAccessToken = async () => {
@@ -48,6 +49,18 @@ export default function DashboardPage() {
       const refreshToken = localStorage.getItem('refreshToken');
       let accessToken = localStorage.getItem('accessToken');
 
+      // Payment success message
+      if (document.referrer?.includes('/payment-success')) {
+        setToastMessage('✅ Your subscription was updated successfully.');
+        setTimeout(() => setToastMessage(''), 5000);
+      }
+
+      // Cancellation message trigger
+      if (document.referrer?.includes('/cancel-confirmation')) {
+        setToastMessage('🛑 Your subscription has been canceled. You will retain access until the end of your billing period.');
+        setTimeout(() => setToastMessage(''), 5000);
+      }
+
       if (!accessToken && refreshToken) {
         accessToken = await refreshAccessToken();
       }
@@ -79,14 +92,11 @@ export default function DashboardPage() {
         });
 
         let prefs = null;
-
-if (prefsRes.ok) {
-  const text = await prefsRes.text();
-  prefs = text ? JSON.parse(text) : null;
-}
-
-setPreferences(prefs);
-
+        if (prefsRes.ok) {
+          const text = await prefsRes.text();
+          prefs = text ? JSON.parse(text) : null;
+        }
+        setPreferences(prefs);
       } catch (err) {
         console.error('Error loading dashboard:', err);
         localStorage.clear();
@@ -109,14 +119,18 @@ setPreferences(prefs);
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
-      <header className="mb-10">
+      {toastMessage && (
+        <div className="fixed top-5 right-5 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in-out">
+          {toastMessage}
+        </div>
+      )}
 
+      <header className="mb-10">
         <h1 className="text-3xl font-bold text-gray-800">
           Welcome back{userInfo?.name ? `, ${userInfo.name.split(' ')[0]} 👋` : ' 👋'}
         </h1>
         <p className="text-gray-500 mt-1">
-          Let’s optimize your calendar. Latest recovery:{' '}
-          {userInfo?.lastReplacementAt || '—'}
+          Let’s optimize your calendar. Latest recovery: {userInfo?.lastReplacementAt || '—'}
         </p>
       </header>
 
