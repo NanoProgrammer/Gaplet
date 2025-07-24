@@ -309,18 +309,7 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-
-              <div>
-                <label className="block font-medium mb-1">Max users notified per open slot <span className="text-gray-500">(optional)</span>:</label>
-                <input
-                  type="number"
-                  name="maxNotificationsPerGap"
-                  value={form.maxNotificationsPerGap}
-                  onChange={handleSimpleChange}
-                  className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                  placeholder="e.g. 10"
-                />
-              </div>
+            
             </div>
           </div>
 
