@@ -119,59 +119,55 @@ async createCheckoutSession(@Req() req: Request, @Body('plan') plan: string) {
 async cancelSubscription(@Req() req: Request) {
   const email = (req.user as any).email;
 
-  // 1. Buscar el cliente de Stripe por email
+  // 1. Buscar cliente en Stripe
   const customers = await this.stripe.customers.list({ email, limit: 1 });
   const customer = customers.data[0];
-  if (!customer) throw new BadRequestException('Cliente de Stripe no encontrado.');
+  if (!customer) throw new BadRequestException('Cliente no encontrado.');
 
-  // 2. Obtener la suscripción activa del cliente
+  // 2. Obtener suscripción activa o en prueba
   const subs = await this.stripe.subscriptions.list({
     customer: customer.id,
-    status: 'active',
-    limit: 1
+    status: 'all',
+    limit: 5,
   });
-  const subscription = subs.data[0];
-  if (!subscription) throw new BadRequestException('No se encontró suscripción activa.');
+  const sub = subs.data.find(s => ['active', 'trialing'].includes(s.status));
+  if (!sub) throw new BadRequestException('No se encontró suscripción activa o en trial.');
 
-  // 3. Si la suscripción está en período de prueba, cancelar al final del período de prueba
-  if (subscription.status === 'trialing') {
-    // Cancela al final de la prueba para que no se cobre nada
-    await this.stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
-    return { message: 'Suscripción en prueba programada para cancelarse al finalizar el trial.' };
+  // 3. Si está en período de prueba, cancela al final del trial
+  if (sub.status === 'trialing') {
+    await this.stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+    return { message: 'Suscripción en trial cancelada al final del período.' };
   }
 
-  // 4. Obtener la última factura y expandir sus pagos para ubicar el PaymentIntent
-  const latestInvoiceId = typeof subscription.latest_invoice === 'string'
-    ? subscription.latest_invoice 
-    : subscription.latest_invoice?.id;
-  let paymentIntentId: string | undefined = undefined;
+  // 4. Obtener última factura y el PaymentIntent expandido
+  const invoiceId = typeof sub.latest_invoice === 'string'
+    ? sub.latest_invoice
+    : (sub.latest_invoice as any)?.id;
+  let piId: string | undefined;
   let amountPaid = 0;
-  if (latestInvoiceId) {
-    const invoice = await this.stripe.invoices.retrieve(latestInvoiceId, { expand: ['payments'] });
+
+  if (invoiceId) {
+    const invoice = await this.stripe.invoices.retrieve(invoiceId, {
+      expand: ['payment_intent'], // Expande correctamente el PaymentIntent
+    });
+
     amountPaid = invoice.amount_paid ?? 0;
-    if (invoice.payments?.data?.length) {
-      // Tomar el primer pago asociado (el PaymentIntent de la última factura)
-      const paymentEntry = invoice.payments.data[0];
-      if (paymentEntry.payment?.type === 'payment_intent') {
-        // `paymentEntry.payment.payment_intent` puede ser ID (string) o objeto expandido
-        const pi = paymentEntry.payment.payment_intent;
-        paymentIntentId = typeof pi === 'string' ? pi : pi.id;
-      }
-    }
+    const pi = (invoice as any).payment_intent as Stripe.PaymentIntent | undefined;
+    piId = pi?.id;
   }
 
-  const tuvoTrial = !!subscription.trial_start; 
-  const fueCobrado = amountPaid > 0 && paymentIntentId;
-  if (tuvoTrial && fueCobrado && paymentIntentId) {
-    // Si la suscripción originalmente tuvo un trial y ya hubo un cobro, asumimos que es el primer cobro post-trial.
-    // Cancelar inmediatamente y reembolsar ese pago.
-    await this.stripe.subscriptions.cancel(subscription.id);
-    await this.stripe.refunds.create({ payment_intent: paymentIntentId });
+  const hadTrial = !!sub.trial_start;
+  const charged = amountPaid > 0 && piId;
+
+  // 5. Si hubo trial y cobro, cancelas y haces refund
+  if (hadTrial && charged && piId) {
+    await this.stripe.subscriptions.cancel(sub.id);
+    await this.stripe.refunds.create({ payment_intent: piId });
     return { message: 'Suscripción cancelada inmediatamente y pago reembolsado.' };
   }
 
-  // 5. Para suscripciones sin trial (o cobros fuera del primer ciclo), cancelar al final del periodo vigente
-  await this.stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+  // 6. En caso contrario, cancelas al final del ciclo
+  await this.stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
   return { message: 'Suscripción cancelada al final del período actual.' };
 }
 
