@@ -30,12 +30,12 @@ export const metadata: Metadata = {
     "calendar integration",
     "clinic no-show solution",
   ],
-  metadataBase: new URL("https://gaplet.vercel.app/"),
+  metadataBase: new URL("https://gaplets.com/"),
   openGraph: {
     title: "Gaplets | Fill Last-Minute Appointments with Automation",
     description:
       "Stop losing revenue on no-shows. Gaplets fills last-minute cancellations using your own waitlist — fully automated.",
-    url: "https://gaplet.vercel.app/",
+    url: "https://gaplets.com/",
     siteName: "Gaplets",
     type: "website",
     images: [
