@@ -31,7 +31,7 @@ export class WebhooksController {
       throw new BadRequestException('Invalid JSON body');
     }
 
-    console.log(`📩 Webhook from ${provider}`, { headers, body });
+    console.log(`\ud83d\udce9 Webhook from ${provider}`, { headers, body });
 
     if (provider === 'acuity') {
       const acuitySignature = headers['x-acuity-signature'];
@@ -57,16 +57,18 @@ export class WebhooksController {
       }
     } else if (provider === 'square') {
       const signature = headers['x-square-hmacsha256-signature'];
-      const secret = process.env.WEBHOOK_SQUARE_KEY;
+      const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
       const payloadToSign = fullUrl + rawBody;
 
+      // Decode Square key from base64 to raw bytes for correct HMAC
+      const secret = Buffer.from(signatureKey, 'base64');
       const expectedSignature = crypto.createHmac('sha256', secret).update(payloadToSign).digest('base64');
 
-      console.log('🔐 Full URL:', fullUrl);
-      console.log('📦 Raw body:', rawBody);
-      console.log('🔐 Expected:', expectedSignature);
-      console.log('🔐 Received:', signature);
+      console.log('\ud83d\udd10 Full URL:', fullUrl);
+      console.log('\ud83d\udce6 Raw body:', rawBody);
+      console.log('\ud83d\udd10 Expected:', expectedSignature);
+      console.log('\ud83d\udd10 Received:', signature);
 
       if (signature !== expectedSignature) {
         throw new BadRequestException('Invalid Square signature');
@@ -91,7 +93,7 @@ export class WebhooksController {
         await this.notificationService.startCampaign('square', integration, { bookingId });
       }
     } else {
-      console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
+      console.warn(`\u26a0\ufe0f Webhook from unknown provider: ${provider}`);
     }
 
     return { received: true };
