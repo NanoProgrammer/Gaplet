@@ -157,7 +157,7 @@ export class WebhooksController {
       // Si la respuesta es positiva (contiene "yes"/"sí"), actualizar métricas...
       const textLower = emailText.toLowerCase();
       const positiveReply =
-        textLower.includes('yes') || textLower.includes('sí') || textLower.includes('si');
+        textLower.includes('yes')
       if (positiveReply) {
         // Buscar integración (Square o Acuity) para incrementar reemplazos
         let integration = await this.prisma.connectedIntegration.findFirst({

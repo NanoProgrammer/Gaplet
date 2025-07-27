@@ -696,6 +696,11 @@ export class NotificationService {
     }
     if (!campaignId) {
       console.warn(`No active campaign found for email reply to ${toEmail}`);
+      console.log('📨 [Email Reply] from:', fromEmail);
+console.log('📨 [Email Reply] to:', toEmail);
+console.log('🔍 [Lookup] key from toEmail:', toEmail.split('@')[0]);
+console.log('🔍 [Lookup] campaignId from map:', campaignId);
+
       return;
     }
     const campaign = this.activeCampaigns.get(campaignId);
@@ -773,6 +778,10 @@ export class NotificationService {
       return;
     }
     // Verify confirmation phrase in the reply
+    console.log('📝 Raw body text:', bodyText);
+console.log('📝 Lowercased:', bodyText?.toLowerCase());
+console.log('✅ Contains confirmation?', bodyText?.toLowerCase().includes('i will take it'));
+
     if (!bodyText || bodyText.toLowerCase().includes('i will take it') === false) {
       console.log(`Email from ${fromEmail} does not contain the confirmation phrase. Ignoring.`);
       return;
