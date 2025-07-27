@@ -6,8 +6,10 @@ import {
   HttpCode,
   BadRequestException,
   Req,
+  UseInterceptors,
   Res,
 } from '@nestjs/common';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
@@ -124,15 +126,24 @@ export class WebhooksController {
     return { received: true };
   }
 
-  @Post('email-response')
+   @Post('email-response')
   @HttpCode(200)
+  @UseInterceptors(AnyFilesInterceptor())
   async handleEmailResponse(@Req() req: Request) {
     const body: any = req.body;
+
     const fromEmail: string = body.from || body.envelope?.from;
     const toEmail: string = Array.isArray(body.to)
       ? body.to[0]
       : body.to || body.envelope?.to;
     const emailText: string = body.text || body.plain || '';
+
+    console.log('📩 Webhook from email-response', {
+      fromEmail,
+      toEmail,
+      emailText,
+    });
+
     if (fromEmail && toEmail) {
       // Procesar la respuesta del email
       const responseHandled = await this.notificationService.handleEmailReply(
@@ -140,12 +151,15 @@ export class WebhooksController {
         toEmail,
         emailText,
       );
+      console.log('📧 Email response handled', responseHandled);
+
       // Verificar si la respuesta fue positiva (ej. el cliente aceptó la cita)
       const text = emailText.toLowerCase();
       const positiveReply =
         text.includes('yes') || text.includes('sí') || text.includes('si');
+
       if (positiveReply) {
-        // Buscar la integración del usuario para actualizar sus métricas de reemplazo
+        // Buscar la integración del usuario para actualizar métricas
         let integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'square' },
         });
@@ -154,6 +168,7 @@ export class WebhooksController {
             where: { provider: 'acuity' },
           });
         }
+
         if (integration) {
           const userId = integration.userId;
           await this.prisma.user.update({
@@ -166,6 +181,7 @@ export class WebhooksController {
         }
       }
     }
+
     return { received: true };
   }
 
@@ -174,6 +190,7 @@ export class WebhooksController {
     const body: any = req.body;
     const fromPhone: string = body.From;
     const smsText: string = body.Body || '';
+    console.log('📱 SMS response received', { fromPhone, smsText });
     if (fromPhone && smsText) {
       // Procesar la respuesta SMS
       await this.notificationService.handleSmsReply(fromPhone, smsText);
