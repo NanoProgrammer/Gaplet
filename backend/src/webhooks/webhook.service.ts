@@ -87,7 +87,7 @@ export class NotificationService {
     const notifyBefore = preferences.notifyBeforeMinutes ?? 0;
     const notifyAfter = preferences.notifyAfterMinutes ?? 0;
     const maxNotifications = preferences.maxNotificationsPerGap ?? 10;
-    const plan: string = user.role || 'starter';
+    const plan: string = user.role || '';
 
     // Details of the canceled appointment slot
     let slotTime: Date;
