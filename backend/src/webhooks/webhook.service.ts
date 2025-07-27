@@ -462,7 +462,7 @@ export class NotificationService {
       const batchSize = 5;
       for (let i = 0; i < emailList.length; i += batchSize) {
         const batchRecipients = emailList.slice(i, i + batchSize);
-        const delayMs = (i / batchSize) * 60_000;
+        const delayMs = (i / batchSize) * 60;
         setTimeout(() => {
           this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
         }, delayMs);
