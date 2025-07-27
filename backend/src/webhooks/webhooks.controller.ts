@@ -3,9 +3,7 @@ import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
-function toBase64Url(base64: string) {
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
+
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -90,21 +88,24 @@ else if (provider === 'square') {
 
   const payloadToSign = fullUrl + rawBody;
 
-  const expectedSignature = toBase64Url(
-    crypto.createHmac('sha256', secret).update(payloadToSign).digest('base64')
-  );
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payloadToSign)
+    .digest('base64'); // ✅ SIN base64url
+
+  console.log('🔐 Full URL:', fullUrl);
+  console.log('📦 Raw body:', rawBody);
+  console.log('🧾 Payload to sign:', payloadToSign);
+  console.log('🔐 Expected:', expectedSignature);
+  console.log('🔐 Received:', signature);
 
   if (signature !== expectedSignature) {
-    console.warn('❌ Invalid Square signature');
-    console.log('🔐 Full URL:', fullUrl);
-    console.log('📦 Raw body:', rawBody);
-    console.log('🧾 Payload to sign:', payloadToSign);
-    console.log('🔐 Expected:', expectedSignature);
-    console.log('🔐 Received:', signature);
+    console.warn('❌ SIGNATURE MISMATCH');
     throw new BadRequestException('Invalid Square signature');
   }
 
-  console.log('✅ Valid Square signature');
+  console.log('✅ Valid Square signature!');
+  // Continúa con el procesamiento del evento...
 
   const eventType = body.type;
   const eventObj = body.data?.object;
