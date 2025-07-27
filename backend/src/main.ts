@@ -3,18 +3,20 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
+import * as multer from 'multer';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Raw body for Stripe and Square webhooks (firma de verificación)
+  // Raw body for Stripe and Square webhooks
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // 🆕 URL-encoded parser para SendGrid email-response (manejo de formularios)
-  app.use('/webhooks/email-response', express.urlencoded({ extended: true }));
+  // ✅ Multer middleware for SendGrid email-response (multipart/form-data)
+  const upload = multer(); // uses memoryStorage by default
+  app.use('/webhooks/email-response', upload.none());
 
-  // JSON parser para todas las demás rutas
+  // JSON parser for all other routes
   const rawNeededRoutes = [
     '/webhooks/stripe',
     '/webhooks/square',
@@ -27,7 +29,7 @@ async function bootstrap() {
     bodyParser.json()(req, res, next);
   });
 
-  // CORS
+  // CORS setup
   if (process.env.NODE_ENV === 'development') {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   } else {
@@ -38,7 +40,7 @@ async function bootstrap() {
     });
   }
 
-  // Validaciones globales
+  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
