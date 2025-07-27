@@ -11,8 +11,9 @@ import {
   Clock,
   MessageSquare,
 } from 'lucide-react';
+
 function toCapitalize(str) {
-  if(str.length === 0) return str;
+  if (str.length === 0) return str;
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
@@ -20,7 +21,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const [userInfo, setUserInfo] = useState(null);
   const [showToast, setShowToast] = useState(false);
-
   const [preferences, setPreferences] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -85,14 +85,12 @@ export default function DashboardPage() {
         });
 
         let prefs = null;
+        if (prefsRes.ok) {
+          const text = await prefsRes.text();
+          prefs = text ? JSON.parse(text) : null;
+        }
 
-if (prefsRes.ok) {
-  const text = await prefsRes.text();
-  prefs = text ? JSON.parse(text) : null;
-}
-
-setPreferences(prefs);
-
+        setPreferences(prefs);
       } catch (err) {
         console.error('Error loading dashboard:', err);
         localStorage.clear();
@@ -113,16 +111,37 @@ setPreferences(prefs);
       ? 20
       : 0;
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return date.toLocaleString();
+  };
+
+  const recentActivity = [];
+
+  if (userInfo?.lastCancellationAt) {
+    recentActivity.push({
+      time: formatDate(userInfo.lastCancellationAt),
+      description: 'Last cancellation detected',
+    });
+  }
+
+  if (userInfo?.lastReplacementAt) {
+    recentActivity.push({
+      time: formatDate(userInfo.lastReplacementAt),
+      description: 'Last replacement successfully filled',
+    });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-10">
       <header className="mb-10">
-
         <h1 className="text-3xl font-bold text-gray-800">
           Welcome back{userInfo?.name ? `, ${userInfo.name.split(' ')[0]} 👋` : ' 👋'}
         </h1>
         <p className="text-gray-500 mt-1">
           Let’s optimize your calendar. Latest recovery:{' '}
-          {userInfo?.lastReplacementAt || '—'}
+          {userInfo?.lastReplacementAt ? formatDate(userInfo.lastReplacementAt) : '—'}
         </p>
       </header>
 
@@ -169,16 +188,18 @@ setPreferences(prefs);
           </ul>
         </section>
       )}
+
       {userInfo?.role && (
         <h3 className="text-xl font-semibold text-gray-800 mb-4">
           Your Role: <strong className="text-blue-600">{toCapitalize(userInfo.role)}</strong>
         </h3>
       )}
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
         <StatCard label="Replacements" value={`${userInfo?.totalReplacements || 0}/${replacementLimit}`} icon={<RefreshCw className="w-6 h-6 text-blue-500" />} color="border-l-blue-500" />
         <StatCard label="Cancellations" value={userInfo?.totalCancellations || 0} icon={<Slash className="w-6 h-6 text-red-500" />} color="border-l-red-500" />
         <StatCard label="Recovery Rate" value={`${userInfo?.recoveryRate || 0}%`} icon={<TrendingUp className="w-6 h-6 text-green-500" />} color="border-l-green-500" />
-        <StatCard label="Last Recovery" value={userInfo?.lastReplacementAt || '—'} icon={<Clock className="w-6 h-6 text-purple-500" />} color="border-l-purple-500" />
+        <StatCard label="Last Recovery" value={userInfo?.lastReplacementAt ? formatDate(userInfo.lastReplacementAt) : '—'} icon={<Clock className="w-6 h-6 text-purple-500" />} color="border-l-purple-500" />
         <StatCard label="SMS Sent" value={userInfo?.smsSent || 0} icon={<MessageSquare className="w-6 h-6 text-pink-500" />} color="border-l-pink-500" />
         <StatCard label="Emails Sent" value={userInfo?.emailSent || 0} icon={<Mail className="w-6 h-6 text-indigo-500" />} color="border-l-indigo-500" />
       </div>
@@ -186,8 +207,8 @@ setPreferences(prefs);
       <section className="mt-12">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h2>
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4 transition hover:shadow-lg hover:scale-[1.01] duration-200">
-          {userInfo?.recentActivity?.length > 0 ? (
-            userInfo.recentActivity.map((event, idx) => (
+          {recentActivity.length > 0 ? (
+            recentActivity.map((event, idx) => (
               <ActivityRow key={idx} time={event.time} description={event.description} />
             ))
           ) : (
