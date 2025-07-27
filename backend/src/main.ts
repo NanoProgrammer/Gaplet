@@ -7,16 +7,14 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Raw body for Stripe and Square webhooks (required for signature validation)
+  // Raw body for Stripe and Square webhooks
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // JSON parser for all other routes (must come after the raw middleware)
+  // JSON parser for all other routes, except those that need raw/multipart
+  const rawNeededRoutes = ['/webhooks/stripe', '/webhooks/square', '/webhooks/email-response'];
   app.use((req, res, next) => {
-    if (
-      req.originalUrl === '/webhooks/stripe' ||
-      req.originalUrl === '/webhooks/square'
-    ) {
+    if (rawNeededRoutes.includes(req.originalUrl)) {
       return next();
     }
     bodyParser.json()(req, res, next);
@@ -33,7 +31,7 @@ async function bootstrap() {
     });
   }
 
-  // Global validation pipe
+  // Global validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
