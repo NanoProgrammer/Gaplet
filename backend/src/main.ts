@@ -7,12 +7,19 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Raw body for Stripe and Square webhooks
+  // Raw body for Stripe and Square webhooks (firma de verificación)
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // JSON parser for all other routes, except those that need raw/multipart
-  const rawNeededRoutes = ['/webhooks/stripe', '/webhooks/square', '/webhooks/email-response'];
+  // 🆕 URL-encoded parser para SendGrid email-response (manejo de formularios)
+  app.use('/webhooks/email-response', express.urlencoded({ extended: true }));
+
+  // JSON parser para todas las demás rutas
+  const rawNeededRoutes = [
+    '/webhooks/stripe',
+    '/webhooks/square',
+    '/webhooks/email-response',
+  ];
   app.use((req, res, next) => {
     if (rawNeededRoutes.includes(req.originalUrl)) {
       return next();
@@ -20,7 +27,7 @@ async function bootstrap() {
     bodyParser.json()(req, res, next);
   });
 
-  // CORS setup
+  // CORS
   if (process.env.NODE_ENV === 'development') {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   } else {
@@ -31,7 +38,7 @@ async function bootstrap() {
     });
   }
 
-  // Global validation
+  // Validaciones globales
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
