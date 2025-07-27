@@ -62,8 +62,11 @@ export class WebhooksController {
       const payloadToSign = fullUrl + rawBody;
 
       // Decode Square key from base64 to raw bytes for correct HMAC
-      const secret = Buffer.from(signatureKey, 'base64');
-      const expectedSignature = crypto.createHmac('sha256', secret).update(payloadToSign).digest('base64');
+      const expectedSignature = crypto
+  .createHmac('sha256', signatureKey) // <--- usar texto plano directamente
+  .update(payloadToSign)
+  .digest('base64');
+
 
       console.log('\ud83d\udd10 Full URL:', fullUrl);
       console.log('\ud83d\udce6 Raw body:', rawBody);
