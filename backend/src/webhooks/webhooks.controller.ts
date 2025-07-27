@@ -1,4 +1,13 @@
-import { Controller, Post, Param, Headers, HttpCode, BadRequestException, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  Headers,
+  HttpCode,
+  BadRequestException,
+  Req,
+  Res,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
@@ -18,25 +27,30 @@ export class WebhooksController {
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
-    const rawBody = (req as any).body?.toString?.();
-    if (!rawBody) {
+    const isSquare = provider === 'square';
+    const rawBody = (req as any).body instanceof Buffer
+      ? (req as any).body.toString('utf8')
+      : '';
+
+    if (isSquare && !rawBody) {
       console.warn('⚠️ rawBody is missing for Square webhook');
       throw new BadRequestException('Missing rawBody');
     }
 
     let body: any;
     try {
-      body = JSON.parse(rawBody);
+      body = isSquare ? JSON.parse(rawBody) : req.body;
     } catch (e) {
       throw new BadRequestException('Invalid JSON body');
     }
 
-    console.log(`\ud83d\udce9 Webhook from ${provider}`, { headers, body });
+    console.log(`📩 Webhook from ${provider}`, { headers, body });
 
     if (provider === 'acuity') {
-      const acuitySignature = headers['x-acuity-signature'];
       if (body.status === 'canceled' || body.action === 'canceled') {
-        const integration = await this.prisma.connectedIntegration.findFirst({ where: { provider: 'acuity' } });
+        const integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'acuity' },
+        });
         if (!integration) return { received: true };
         const userId = integration.userId;
         await this.prisma.user.update({
@@ -48,30 +62,29 @@ export class WebhooksController {
         });
         await this.notificationService.startCampaign('acuity', integration, {
           appointmentId: body.id,
-          appointmentTypeID: body.appointmentTypeID || body.appointmentTypeId,
+          appointmentTypeID:
+            body.appointmentTypeID || body.appointmentTypeId,
           datetime: body.datetime,
           firstName: body.firstName,
           lastName: body.lastName,
           email: body.email,
         });
       }
-    } else if (provider === 'square') {
+    } else if (isSquare) {
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
       const payloadToSign = fullUrl + rawBody;
 
-      // Decode Square key from base64 to raw bytes for correct HMAC
       const expectedSignature = crypto
-  .createHmac('sha256', signatureKey) // <--- usar texto plano directamente
-  .update(payloadToSign)
-  .digest('base64');
+        .createHmac('sha256', signatureKey)
+        .update(payloadToSign)
+        .digest('base64');
 
-
-      console.log('\ud83d\udd10 Full URL:', fullUrl);
-      console.log('\ud83d\udce6 Raw body:', rawBody);
-      console.log('\ud83d\udd10 Expected:', expectedSignature);
-      console.log('\ud83d\udd10 Received:', signature);
+      console.log('🔐 Full URL:', fullUrl);
+      console.log('📦 Raw body:', rawBody);
+      console.log('🔐 Expected:', expectedSignature);
+      console.log('🔐 Received:', signature);
 
       if (signature !== expectedSignature) {
         throw new BadRequestException('Invalid Square signature');
@@ -79,7 +92,10 @@ export class WebhooksController {
 
       const eventType = body.type;
       const eventObj = body.data?.object;
-      if (eventType === 'booking.updated' || eventType === 'appointments.cancelled') {
+      if (
+        eventType === 'booking.updated' ||
+        eventType === 'appointments.cancelled'
+      ) {
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'square', externalUserId: body.merchant_id },
         });
@@ -93,10 +109,12 @@ export class WebhooksController {
           },
         });
         const bookingId = eventObj?.booking_id || eventObj?.id;
-        await this.notificationService.startCampaign('square', integration, { bookingId });
+        await this.notificationService.startCampaign('square', integration, {
+          bookingId,
+        });
       }
     } else {
-      console.warn(`\u26a0\ufe0f Webhook from unknown provider: ${provider}`);
+      console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
     }
 
     return { received: true };
@@ -107,10 +125,16 @@ export class WebhooksController {
   async handleEmailResponse(@Req() req: Request) {
     const body: any = req.body;
     const fromEmail: string = body.from || body.envelope?.from;
-    const toEmail: string = Array.isArray(body.to) ? body.to[0] : (body.to || body.envelope?.to);
+    const toEmail: string = Array.isArray(body.to)
+      ? body.to[0]
+      : body.to || body.envelope?.to;
     const emailText: string = body.text || body.plain || '';
     if (fromEmail && toEmail) {
-      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+      await this.notificationService.handleEmailReply(
+        fromEmail,
+        toEmail,
+        emailText,
+      );
     }
     return { received: true };
   }
@@ -119,7 +143,6 @@ export class WebhooksController {
   async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
     const body: any = req.body;
     const fromPhone: string = body.From;
-    const toPhone: string = body.To;
     const smsText: string = body.Body || '';
     if (fromPhone && smsText) {
       await this.notificationService.handleSmsReply(fromPhone, smsText);

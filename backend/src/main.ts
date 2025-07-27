@@ -7,25 +7,22 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 🟢 Webhook de Stripe – raw body para firma
+  // Raw body for Stripe and Square webhooks (required for signature validation)
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
-
-  // ✅ Webhook de Square – también raw
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // 🔴 El resto de rutas puede usar body-parser normal
+  // JSON parser for all other routes (must come after the raw middleware)
   app.use((req, res, next) => {
     if (
       req.originalUrl === '/webhooks/stripe' ||
       req.originalUrl === '/webhooks/square'
     ) {
-      next(); // no parsear
-    } else {
-      bodyParser.json()(req, res, next);
+      return next();
     }
+    bodyParser.json()(req, res, next);
   });
 
-  // CORS
+  // CORS setup
   if (process.env.NODE_ENV === 'development') {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   } else {
@@ -36,14 +33,15 @@ async function bootstrap() {
     });
   }
 
-  // Global Pipes
+  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-    }),
+    })
   );
 
   await app.listen(process.env.PORT ?? 4000);
 }
+
 bootstrap();
