@@ -460,9 +460,10 @@ export class NotificationService {
     if (plan === 'starter') {
       // Starter: email in batches of 5, 1 minute apart
       const batchSize = 5;
+      console.log('✉️ Email list:', emailList);
       for (let i = 0; i < emailList.length; i += batchSize) {
         const batchRecipients = emailList.slice(i, i + batchSize);
-        const delayMs = 1000;
+        const delayMs = (i / batchSize) * 60_000;
         setTimeout(() => {
           this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
         }, delayMs);
