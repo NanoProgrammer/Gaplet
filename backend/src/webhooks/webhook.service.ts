@@ -341,8 +341,8 @@ export class NotificationService {
       if (!client.email && !client.phone) {
         continue;
       }
-      // Starter plan: only email (skip if no email)
-      if (plan === 'starter' && !client.email) {
+      // sTARTER plan: only email (skip if no email)
+      if (plan === 'STARTER' && !client.email) {
         continue;
       }
       // Passed all filters
@@ -367,17 +367,17 @@ export class NotificationService {
     // Separate recipients into Email vs SMS groups
     let emailList: Recipient[] = [];
     let smsList: Recipient[] = [];
-    if (plan === 'starter') {
+    if (plan === 'STARTER') {
       emailList = notifyList.filter(c => c.email);
       smsList = [];
-    } else if (plan === 'pro' || plan === 'premium') {
-      if (plan === 'pro') {
+    } else if (plan === 'PRO' || plan === 'PREMIUM') {
+      if (plan === 'PRO') {
         const emailPhaseCap = Math.min(100, notifyList.length);
         emailList = notifyList.slice(0, emailPhaseCap).filter(c => c.email);
         const remainingForSms = notifyList.slice(emailPhaseCap);
         const smsPhaseCap = Math.min(25, remainingForSms.length);
         smsList = remainingForSms.slice(0, smsPhaseCap).filter(c => c.phone);
-      } else if (plan === 'premium') {
+      } else if (plan === 'PREMIUM') {
         const emailPhaseCap = Math.min(160, notifyList.length);
         emailList = notifyList.slice(0, emailPhaseCap).filter(c => c.email);
         const remainingForSms = notifyList.slice(emailPhaseCap);
@@ -457,7 +457,7 @@ export class NotificationService {
     const smsText = `${businessName}: An appointment on ${slotTimeStr} just opened up. Reply "I will take it" to claim it.`;
 
     /* Schedule notification batches according to the user's plan */
-    if (plan === 'starter') {
+    if (plan === 'STARTER') {
       // Starter: email in batches of 5, 1 minute apart
       const batchSize = 5;
       console.log('✉️ Email list:', emailList);
@@ -471,7 +471,7 @@ export class NotificationService {
       // No SMS for starter plan
     }
 
-    if (plan === 'pro') {
+    if (plan === 'PRO') {
       // Phase 1: Email waves for 50 minutes (every 5 min, batches of 10)
       const emailBatchSize = 10;
       const emailIntervalMs = 5 * 60_000;
@@ -540,7 +540,7 @@ export class NotificationService {
       }
     }
 
-    if (plan === 'premium') {
+    if (plan === 'PREMIUM') {
       // Phase 1: Rapid email waves (every 3 min for ~48 min, batches of 10)
       const emailBatchSize = 10;
       const emailIntervalMs = 3 * 60_000;
