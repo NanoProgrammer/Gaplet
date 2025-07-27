@@ -82,17 +82,25 @@ export class WebhooksController {
     throw new BadRequestException('Missing signature validation data');
   }
 
+  const payloadToSign = fullUrl + rawBody;
+
   const expectedSignature = crypto
     .createHmac('sha256', secret)
-    .update(fullUrl + rawBody)
+    .update(payloadToSign)
     .digest('base64');
 
+  // 👇 Agrega logs completos para debug si hay fallo
   if (signature !== expectedSignature) {
     console.warn('❌ Invalid Square signature');
+    console.log('🔐 Full URL:', fullUrl);
+    console.log('📦 Raw body:', rawBody);
+    console.log('🧾 Payload to sign:', payloadToSign);
     console.log('🔐 Expected:', expectedSignature);
     console.log('🔐 Received:', signature);
     throw new BadRequestException('Invalid Square signature');
   }
+
+  console.log('✅ Valid Square signature');
 
   const eventType = body.type;
   const eventObj = body.data?.object;
@@ -130,6 +138,7 @@ export class WebhooksController {
       .catch(err => console.error('Error in Square notification campaign:', err));
   }
 }
+
 
     else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
