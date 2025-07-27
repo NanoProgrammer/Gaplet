@@ -26,7 +26,10 @@ model User {
   emailSent          Int      @default(0)          // Créditos usados en Email
 
   connectedIntegration ConnectedIntegration?       // Relación 1:1 con integración
-  preferences          UserPreference?             // Relación 1:1 con config personalizada
+  preferences          UserPreference?  
+  cancelationLogs  OpenSlot[]
+  ReplacementLogs  ReplacementLog[]
+  
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -66,6 +69,39 @@ model UserPreference {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model OpenSlot {
+  id              String   @id @default(cuid())
+  gapletSlotId    String   @unique                 // ID que usas en reply email (ej. UUID)
+  provider        String                            // 'square' | 'acuity'
+  providerBookingId String                         // ID original en el proveedor
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  startAt         DateTime
+  durationMinutes Int
+  teamMemberId    String
+  serviceVariationId String
+  locationId      String
+
+  isTaken         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  takenAt         DateTime?
+}
+model ReplacementLog {
+  id               String   @id @default(cuid())
+  userId           String                      // Dueño de la cuenta (negocio)
+  user             User     @relation(fields: [userId], references: [id])
+
+  clientEmail      String                      // Cliente que respondió “I will take it”
+  clientPhone      String?                     // Si está disponible
+  clientName       String?                     // Si está disponible
+  appointmentTime  DateTime                    // Hora del nuevo booking asignado
+  provider         String                      // 'square' | 'acuity'
+  providerBookingId String                     // ID de la nueva cita creada
+
+  respondedAt      DateTime                    // Fecha del email de respuesta
+  createdAt        DateTime @default(now())    // Fecha de la creación del nuevo booking
 }
 
 
