@@ -20,7 +20,12 @@ export class WebhooksController {
     @Req() req: Request,
   ) {
     console.log(`📩 Webhook from ${provider}`, { headers, body });
-    const rawBody = JSON.stringify(body);
+    const rawBody = (req as any).rawBody; 
+    if (!rawBody) {
+  console.warn('⚠️ rawBody is missing for Square webhook');
+  throw new BadRequestException('Missing rawBody');
+}
+
 
     /* -------------------- CALENDLY -------------------- */
     if (provider === 'calendly') {
