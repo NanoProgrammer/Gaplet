@@ -29,6 +29,67 @@ export class WebhooksController {
     private readonly prisma: PrismaManagerService,
   ) {}
 
+  @Post('email-response')
+  @HttpCode(200)
+  @UseInterceptors(AnyFilesInterceptor(multerOptions))
+  async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
+    const body: any = req.body;
+    const fromEmail: string = body.from || body['envelope[from]'];
+    const toEmail: string = Array.isArray(body.to)
+      ? body.to[0]
+      : body.to || body['envelope[to]'];
+    const emailText: string = body.text || body.plain || body.html || '';
+    const originalSubject: string = body.subject || '';
+
+    console.log('📩 Webhook from email-response', { fromEmail, toEmail, emailText });
+    if (fromEmail && toEmail) {
+      // Process the email reply and handle booking or responses
+      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText, originalSubject);
+      console.log('📧 Email response handled');
+      // (Metrics updates are handled within handleEmailReply on successful booking)
+    }
+    return res.status(200).send({ received: true });
+  }
+
+  @Post('sms-response')
+  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
+    const body: any = req.body;
+    const fromPhone: string = body.From;
+    const smsText: string = body.Body || '';
+    console.log('📱 SMS response received', { fromPhone, smsText });
+    if (fromPhone && smsText) {
+      // Process the SMS response
+      await this.notificationService.handleSmsReply(fromPhone, smsText);
+      // Check for a positive confirmation in SMS (e.g., client responded "Yes" or "Sí")
+      const text = smsText.toLowerCase();
+      const positiveReply =
+        text.includes('yes') || text.includes('sí') || text.includes('si');
+      if (positiveReply) {
+        // Find an integration (Square or Acuity) to update metrics
+        let integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'square' },
+        });
+        if (!integration) {
+          integration = await this.prisma.connectedIntegration.findFirst({
+            where: { provider: 'acuity' },
+          });
+        }
+        if (integration) {
+          const userId = integration.userId;
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              totalReplacements: { increment: 1 },
+              lastReplacementAt: new Date(),
+            },
+          });
+        }
+      }
+    }
+    // Respond with empty TwiML to acknowledge SMS
+    res.type('text/xml').send('<Response></Response>');
+  }
+
   @Post(':provider')
   @HttpCode(200)
   async handleWebhook(
@@ -56,14 +117,14 @@ export class WebhooksController {
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
     if (provider === 'acuity') {
-      // Manejo de cancelación de Acuity
+      // Handle Acuity appointment cancellations
       if (body.status === 'canceled' || body.action === 'canceled') {
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'acuity' },
         });
         if (!integration) return { received: true };
         const userId = integration.userId;
-        // Incrementar cancelaciones y actualizar última cancelación
+        // Increment cancellations count and update lastCancellationAt
         await this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -71,7 +132,7 @@ export class WebhooksController {
             lastCancellationAt: new Date(),
           },
         });
-        // Iniciar campaña usando datos del webhook de Acuity
+        // Start a notification campaign for the newly opened slot
         await this.notificationService.startCampaign('acuity', integration, {
           appointmentId: body.id,
           appointmentTypeID: body.appointmentTypeID || body.appointmentTypeId,
@@ -82,7 +143,7 @@ export class WebhooksController {
         });
       }
     } else if (isSquare) {
-      // Verificación de firma HMAC para Square
+      // Verify HMAC signature for Square webhooks
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
@@ -112,7 +173,7 @@ export class WebhooksController {
         });
         if (!integration) return { received: true };
         const userId = integration.userId;
-        // Incrementar cancelaciones y actualizar última cancelación
+        // Increment cancellations count and update lastCancellationAt
         await this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -120,10 +181,8 @@ export class WebhooksController {
             lastCancellationAt: new Date(),
           },
         });
-        // Obtener el ID de reserva correctamente desde el objeto booking del webhook
+        // Start a notification campaign for the newly opened slot (pass the booking info directly)
         const booking = eventObj?.booking;
-        const bookingId = booking?.id;
-        // Iniciar campaña usando el objeto completo de la reserva (sin fetch adicional a Square)
         await this.notificationService.startCampaign('square', integration, { booking });
       }
     } else {
@@ -132,93 +191,5 @@ export class WebhooksController {
 
     return { received: true };
   }
-
-  
-
-@Post('email-response')
-  @HttpCode(200)
-  @UseInterceptors(AnyFilesInterceptor(multerOptions))
-  async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
-    const body: any = req.body;
-
-    const fromEmail: string = body.from || body['envelope[from]'];
-    const toEmail: string = Array.isArray(body.to)
-      ? body.to[0]
-      : body.to || body['envelope[to]'];
-    const emailText: string = body.text || body.plain || body.html || '';
-
-    console.log('📩 Webhook from email-response', { fromEmail, toEmail, emailText });
-
-    if (fromEmail && toEmail) {
-      // Procesar respuesta del email...
-      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
-      console.log('📧 Email response handled');
-
-      // Si la respuesta es positiva (contiene "yes"/"sí"), actualizar métricas...
-      const textLower = emailText.toLowerCase();
-      const positiveReply =
-        textLower.includes('yes')
-      if (positiveReply) {
-        // Buscar integración (Square o Acuity) para incrementar reemplazos
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
-        });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-        if (integration) {
-          const userId = integration.userId;
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
-      }
-    }
-
-    return res.status(200).send({ received: true });
-  }
-
-  @Post('sms-response')
-  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
-    const body: any = req.body;
-    const fromPhone: string = body.From;
-    const smsText: string = body.Body || '';
-    console.log('📱 SMS response received', { fromPhone, smsText });
-    if (fromPhone && smsText) {
-      // Procesar la respuesta SMS
-      await this.notificationService.handleSmsReply(fromPhone, smsText);
-      // Verificar respuesta positiva en el SMS (ej. cliente respondió "Sí")
-      const text = smsText.toLowerCase();
-      const positiveReply =
-        text.includes('yes') || text.includes('sí') || text.includes('si');
-      if (positiveReply) {
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
-        });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-        if (integration) {
-          const userId = integration.userId;
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
-      }
-    }
-    // Respuesta vacía para confirmar recepción al servicio SMS
-    res.type('text/xml').send('<Response></Response>');
-  }
 }
+
