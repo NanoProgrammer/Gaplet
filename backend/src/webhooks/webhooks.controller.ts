@@ -72,49 +72,64 @@ export class WebhooksController {
 
     /* -------------------- SQUARE -------------------- */
     else if (provider === 'square') {
-      const signature = headers['x-square-signature'];
-      const secret = process.env.WEBHOOK_SQUARE_KEY;
-      // Square’s signature is HMAC-SHA1 of the URL + request body
-      const payload = `${process.env.API_BASE_URL}/webhooks/square${rawBody}`;
-      const expectedSignature = crypto
-  .createHmac('sha256', secret!)
-  .update(`${process.env.API_BASE_URL}/webhooks/square${rawBody}`)
-  .digest('base64');
+  const signature = headers['x-square-hmacsha256-signature'];
+  const secret = process.env.WEBHOOK_SQUARE_KEY;
+  const rawBody = (req as any).rawBody;
+  const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
 
-      if (signature !== expectedSignature) {
-        throw new BadRequestException('Invalid Square signature');
-      }
-      const eventType = body.event_type;
-      const eventObj = body.data?.object;
-      if (eventType === 'bookings.canceled' || eventType === 'appointments.cancelled') {
-        console.log('Square cancellation:', {
-          bookingId: eventObj?.booking_id || eventObj?.id,
-          canceledAt: body.created_at,
-          merchant: body.merchant_id,
-        });
-        // Find the integration by merchant (externalUserId)
-        const integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square', externalUserId: body.merchant_id },
-        });
-        if (!integration) {
-          console.warn(`No Square integration found for merchant ${body.merchant_id}`);
-          return { received: true };
-        }
-        const userId = integration.userId;
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: {
-            totalCancellations: { increment: 1 },
-            lastCancellationAt: new Date(),
-          },
-        });
-        // Trigger notification campaign for this cancellation
-        const bookingId = eventObj?.booking_id || eventObj?.id;
-        this.notificationService.startCampaign('square', integration, { bookingId }).catch(err =>
-          console.error('Error in Square notification campaign:', err),
-        );
-      }
+  if (!rawBody || !signature || !secret) {
+    console.error('❌ Missing rawBody, signature or secret');
+    throw new BadRequestException('Missing signature validation data');
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(fullUrl + rawBody)
+    .digest('base64');
+
+  if (signature !== expectedSignature) {
+    console.warn('❌ Invalid Square signature');
+    console.log('🔐 Expected:', expectedSignature);
+    console.log('🔐 Received:', signature);
+    throw new BadRequestException('Invalid Square signature');
+  }
+
+  const eventType = body.type;
+  const eventObj = body.data?.object;
+
+  if (eventType === 'booking.updated' || eventType === 'appointments.cancelled') {
+    console.log('✅ Square cancellation received:', {
+      bookingId: eventObj?.booking_id || eventObj?.id,
+      canceledAt: body.created_at,
+      merchant: body.merchant_id,
+    });
+
+    const integration = await this.prisma.connectedIntegration.findFirst({
+      where: { provider: 'square', externalUserId: body.merchant_id },
+    });
+
+    if (!integration) {
+      console.warn(`⚠️ No Square integration found for merchant ${body.merchant_id}`);
+      return { received: true };
     }
+
+    const userId = integration.userId;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        totalCancellations: { increment: 1 },
+        lastCancellationAt: new Date(),
+      },
+    });
+
+    const bookingId = eventObj?.booking_id || eventObj?.id;
+
+    this.notificationService
+      .startCampaign('square', integration, { bookingId })
+      .catch(err => console.error('Error in Square notification campaign:', err));
+  }
+}
 
     else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
