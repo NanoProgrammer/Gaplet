@@ -688,48 +688,41 @@ export class NotificationService {
   }
 
   // Handle an incoming email reply from a client
-  async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string, originalSubject?: string) {
+ async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string, originalSubject?: string) {
   const normalizedFrom = fromEmail.toLowerCase();
+
+  // 1. Obtener identificador único de la cita desde el correo "to"
   let campaignId = this.emailToCampaign.get(toEmail.split('@')[0]);
   if (!campaignId) {
+    // Intentar también con el remitente (por si usamos su correo como clave)
     campaignId = this.emailToCampaign.get(normalizedFrom);
   }
   if (!campaignId) {
-    console.warn(`No active campaign found for email reply to ${toEmail}`);
-    console.log('📨 [Email Reply] from:', fromEmail);
-    console.log('📨 [Email Reply] to:', toEmail);
-    console.log('🔍 [Lookup] key from toEmail:', toEmail.split('@')[0]);
-    console.log('🔍 [Lookup] campaignId from map:', campaignId);
+    console.warn(`No se encontró campaña activa para email reply dirigido a ${toEmail}`);
     return;
   }
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) {
-    console.warn(`Campaign ${campaignId} not found or already completed.`);
+    console.warn(`Campaña ${campaignId} no encontrada o ya completada.`);
     return;
   }
 
-  // If the slot is already filled by someone else, send an apology email
+  // 2. Si la cita ya fue tomada (slot ya estaba marcado como lleno)
   if (campaign.filled) {
-    const recipient = campaign.recipients.find(
-      r => r.email && r.email.toLowerCase() === normalizedFrom
-    );
-    // Construct apology message
-    let apologyMessage = `Hello${recipient && recipient.name && recipient.name !== 'Client' ? ' ' + recipient.name.split(' ')[0] : ''},\n\n`;
+    const recipient = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
+    // Construir mensaje de disculpa
+    let apologyMessage = `Hello${recipient?.name ? ' ' + recipient.name.split(' ')[0] : ''},\n\n`;
     apologyMessage += `Thank you for your quick response. Unfortunately, that appointment slot has already been filled by another client.\n`;
-
-    // Customize message based on whether the recipient has another appointment
     if (recipient) {
       if (recipient.nextAppt) {
         apologyMessage += `Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed as scheduled.\n`;
       } else {
-        // Include business contact number for rescheduling if no appointment is currently booked
-        apologyMessage += `If you'd like to schedule another appointment, please contact us at `;
-        apologyMessage += `{BUSINESS_PHONE_PLACEHOLDER}.\n`;  // Replace with actual business phone if available
+        apologyMessage += `If you'd like to schedule another appointment, please contact us at {BUSINESS_PHONE_PLACEHOLDER}.\n`;
       }
     }
     apologyMessage += `\nThank you for understanding,\n`;
 
-    // Include business name in the signature (retrieve from provider if possible)
+    // Obtener datos de negocio (nombre y teléfono) dependiendo del proveedor para personalizar el mensaje
     let businessName = 'your business';
     let businessPhone = '';
     if (campaign.provider === 'square' || campaign.provider === 'acuity') {
@@ -739,7 +732,7 @@ export class NotificationService {
             where: { userId: campaign.userId, provider: 'square' },
           });
           if (integration) {
-            // Get business name from Square merchant profile
+            // Obtener nombre de negocio desde Square (Merchants API)
             const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
               headers: {
                 Authorization: `Bearer ${integration.accessToken}`,
@@ -748,9 +741,9 @@ export class NotificationService {
             });
             const merchantsData = await merchantsRes.json();
             if (merchantsData.merchant && merchantsData.merchant.length > 0) {
-              businessName = merchantsData.merchant[0].business_name;
+              businessName = merchantsData.merchant[0].business_name;  // p.ej., "Apple A Day":contentReference[oaicite:10]{index=10}
             }
-            // Get business phone from Square location (if available)
+            // Obtener teléfono del negocio desde Square (Locations API)
             if (campaign.locationId) {
               const locRes = await fetch(`https://connect.squareup.com/v2/locations/${campaign.locationId}`, {
                 headers: {
@@ -761,7 +754,7 @@ export class NotificationService {
               });
               const locData = await locRes.json();
               if (locData.location && locData.location.phone_number) {
-                businessPhone = locData.location.phone_number;
+                businessPhone = locData.location.phone_number;  // p.ej., "+1 650-354-7217":contentReference[oaicite:11]{index=11}
               }
             }
           }
@@ -787,20 +780,22 @@ export class NotificationService {
           }
         }
       } catch {
-        // If API call fails, use default values
+        // En caso de fallo, dejamos valores por defecto
       }
     }
 
-    // If we obtained a business phone, insert it into the apology message (for the earlier placeholder)
+    // Reemplazar placeholder del teléfono en el mensaje de disculpa
     if (businessPhone) {
       apologyMessage = apologyMessage.replace('{BUSINESS_PHONE_PLACEHOLDER}', businessPhone);
     } else {
-      // No business phone available, remove the placeholder and provide a generic statement
-      apologyMessage = apologyMessage.replace('contact us at {BUSINESS_PHONE_PLACEHOLDER}.', 'schedule another appointment with us.');
+      apologyMessage = apologyMessage.replace(
+        'contact us at {BUSINESS_PHONE_PLACEHOLDER}.', 
+        'schedule another appointment with us.'
+      );
     }
-    apologyMessage += `${businessName}`;
+    apologyMessage += businessName;
 
-    // Send apology email as a reply to the client
+    // Enviar correo de disculpa al cliente
     try {
       const replySubject = originalSubject 
         ? (originalSubject.startsWith('Re:') ? originalSubject : 'Re: ' + originalSubject) 
@@ -815,30 +810,29 @@ export class NotificationService {
     } catch (err) {
       console.error('Failed to send apology email:', err);
     }
-    return;
+    return;  // Salir, ya que la cita no está disponible
   }
 
-  // If we reach here, the slot is not yet filled and this client is the first to respond
+  // 3. Validar que el cuerpo contiene "I will take it"
   console.log('📝 Raw body text:', bodyText);
   console.log('📝 Lowercased:', bodyText?.toLowerCase());
   console.log('✅ Contains confirmation?', bodyText?.toLowerCase().includes('i will take it'));
-
   if (!bodyText || bodyText.toLowerCase().includes('i will take it') === false) {
     console.log(`Email from ${fromEmail} does not contain the confirmation phrase. Ignoring.`);
     return;
   }
 
-  // Mark the slot as taken by this client
+  // 4. Marcar la cita como tomada por este cliente (primer respondiente)
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
-  const winner = campaign.recipients.find(r => r.email && r.email.toLowerCase() === normalizedFrom);
+  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
   if (!winner) {
-    console.error('Winner not found in campaign recipient list (email).');
+    console.error('Winner not found in campaign recipient list.');
     return;
   }
   console.log(`🎉 Client ${winner.email} responded first for campaign ${campaignId}. Booking appointment...`);
 
-  // Determine businessName (and phone if needed) for confirmation messages
+  // Obtener nombre de negocio (para usar en confirmaciones)
   let businessName = 'your business';
   try {
     if (campaign.provider === 'square') {
@@ -874,13 +868,14 @@ export class NotificationService {
       }
     }
   } catch {
-    // use default businessName if API calls fail
+    // Ignorar fallos de obtención de nombre de negocio
   }
 
   try {
-    // Book the appointment for the winner via the provider's API
+    // 5. Crear la nueva cita usando la API del proveedor correspondiente
     if (campaign.provider === 'acuity') {
-      const names = winner.name.split(' ');
+      // Preparar datos del cliente para Acuity
+      const names = winner.name ? winner.name.split(' ') : [];
       const firstName = names[0] || 'Valued';
       const lastName = names.slice(1).join(' ') || 'Client';
       const integration = await this.prisma.connectedIntegration.findUnique({
@@ -898,7 +893,7 @@ export class NotificationService {
           lastName,
           email: winner.email,
           phone: winner.phone || '',
-          datetime: campaign.slotTime.toISOString().slice(0, 16), // format: YYYY-MM-DDTHH:mm
+          datetime: campaign.slotTime.toISOString().slice(0, 16), // formatear: YYYY-MM-DDTHH:mm
           appointmentTypeID: campaign.appointmentTypeId,
         }),
       });
@@ -912,7 +907,7 @@ export class NotificationService {
       });
       if (!integration) throw new Error('No Square integration found for booking');
       const newBooking = {
-        start_at: campaign.slotTime.toISOString(),
+        start_at: campaign.slotTime.toISOString(),        // e.g., "2025-07-27T15:00:00Z"
         location_id: campaign.locationId,
         customer_id: winner.customerId,
         customer_note: 'Booked via gap notification',
@@ -939,7 +934,7 @@ export class NotificationService {
       }
     }
 
-    // Update user metrics for successful replacement
+    // 6. Actualizar métricas/BD: marcar reemplazo realizado
     await this.prisma.user.update({
       where: { id: campaign.userId },
       data: {
@@ -948,7 +943,7 @@ export class NotificationService {
       },
     });
 
-    // Send confirmation to the winner via email (and SMS if phone is available)
+    // 7. Enviar confirmación al cliente ganador por email (y SMS opcionalmente)
     const firstName = winner.name ? winner.name.split(' ')[0] : '';
     const confirmationMsg = `Hello${firstName ? ' ' + firstName : ''},\n\n` +
       `Good news! Your appointment on ${campaign.slotTime.toLocaleString()} at ${businessName} has been confirmed. ` +
@@ -959,7 +954,7 @@ export class NotificationService {
         ? (originalSubject.startsWith('Re:') ? originalSubject : 'Re: ' + originalSubject) 
         : `Your appointment on ${campaign.slotTime.toLocaleString()} is confirmed`;
       await sgMail.send({
-        to: winner.email!,
+        to: winner.email,
         from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
         subject: replySubject,
         text: confirmationMsg,
@@ -981,8 +976,8 @@ export class NotificationService {
     }
   } catch (error) {
     console.error('Error during booking for email reply:', error);
-    // Notify the client that the slot could not be booked (likely already taken by another)
-    const firstName = winner && winner.name ? winner.name.split(' ')[0] : '';
+    // Si ocurre algún error al crear la cita (por ej., otro cliente se adelantó)
+    const firstName = winner.name ? winner.name.split(' ')[0] : '';
     const failMsg = `Hello${firstName ? ' ' + firstName : ''},\n\n` +
       `We received your response for the open appointment slot on ${campaign.slotTime.toLocaleString()}, but unfortunately we were unable to book it because it was no longer available. ` +
       `We apologize for the inconvenience.\n\n` +
@@ -998,18 +993,18 @@ export class NotificationService {
         text: failMsg,
       });
     } catch {
-      /* ignore send failures */
+      /* ignorar errores de envío de email de fallo */
     }
-    if (winner && winner.phone) {
+    if (winner.phone) {
       try {
         await this.twilioClient.messages.create({
           to: winner.phone,
           from: process.env.TWILIO_FROM_NUMBER,
           body: `${businessName}: We received your response, but that ${campaign.slotTime.toLocaleString()} slot was already taken. Sorry for the inconvenience.`,
         });
-      } catch { /* ignore SMS failures */ }
+      } catch { /* ignorar errores de SMS */ }
     }
-    // Mark campaign as filled to stop further notifications
+    // Marcar como llena para detener más notificaciones
     campaign.filled = true;
     this.activeCampaigns.set(campaignId, campaign);
   }
