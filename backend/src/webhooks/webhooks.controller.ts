@@ -9,11 +9,18 @@ import {
   UseInterceptors,
   Res,
 } from '@nestjs/common';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import * as multer from 'multer';
+import { FileFieldsInterceptor  } from '@nestjs/platform-express';
 import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
+
+const storage = multer.memoryStorage();
+const multerOptions = {
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+};
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -126,64 +133,65 @@ export class WebhooksController {
     return { received: true };
   }
 
-   @Post('email-response')
-  @HttpCode(200)
-  @UseInterceptors(AnyFilesInterceptor())
-  async handleEmailResponse(@Req() req: Request) {
-    const body: any = req.body;
+  
 
-    const fromEmail: string = body.from || body.envelope?.from;
-    const toEmail: string = Array.isArray(body.to)
-      ? body.to[0]
-      : body.to || body.envelope?.to;
-    const emailText: string = body.text || body.plain || '';
+@Post('email-response')
+@HttpCode(200)
+@UseInterceptors(FileFieldsInterceptor([], multerOptions))
+async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
+  const body: any = req.body;
 
-    console.log('📩 Webhook from email-response', {
+  const fromEmail: string = body.from || body['envelope[from]'];
+  const toEmail: string = Array.isArray(body.to)
+    ? body.to[0]
+    : body.to || body['envelope[to]'];
+  const emailText: string =
+    body.text || body.plain || body.html || '';
+
+  console.log('📩 Webhook from email-response', {
+    fromEmail,
+    toEmail,
+    emailText,
+  });
+
+  if (fromEmail && toEmail) {
+    // Procesar la respuesta del email
+    const responseHandled = await this.notificationService.handleEmailReply(
       fromEmail,
       toEmail,
       emailText,
-    });
+    );
+    console.log('📧 Email response handled', responseHandled);
 
-    if (fromEmail && toEmail) {
-      // Procesar la respuesta del email
-      const responseHandled = await this.notificationService.handleEmailReply(
-        fromEmail,
-        toEmail,
-        emailText,
-      );
-      console.log('📧 Email response handled', responseHandled);
+    // Verificar si la respuesta fue positiva
+    const text = emailText.toLowerCase();
+    const positiveReply =
+      text.includes('yes') || text.includes('sí') || text.includes('si');
 
-      // Verificar si la respuesta fue positiva (ej. el cliente aceptó la cita)
-      const text = emailText.toLowerCase();
-      const positiveReply =
-        text.includes('yes') || text.includes('sí') || text.includes('si');
-
-      if (positiveReply) {
-        // Buscar la integración del usuario para actualizar métricas
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
+    if (positiveReply) {
+      let integration = await this.prisma.connectedIntegration.findFirst({
+        where: { provider: 'square' },
+      });
+      if (!integration) {
+        integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'acuity' },
         });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-
-        if (integration) {
-          const userId = integration.userId;
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
+      }
+      if (integration) {
+        const userId = integration.userId;
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            totalReplacements: { increment: 1 },
+            lastReplacementAt: new Date(),
+          },
+        });
       }
     }
-
-    return { received: true };
   }
+
+  return res.status(200).send({ received: true });
+}
 
   @Post('sms-response')
   async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
