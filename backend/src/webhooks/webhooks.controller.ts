@@ -136,53 +136,27 @@ export class WebhooksController {
   
 
 @Post('email-response')
-  @HttpCode(200)
-  @UseInterceptors(AnyFilesInterceptor(multerOptions))
-  async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
-    const body: any = req.body;
+@HttpCode(200)
+@UseInterceptors(AnyFilesInterceptor(multerOptions))
+async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
+  const body: any = req.body;
 
-    const fromEmail: string = body.from || body['envelope[from]'];
-    const toEmail: string = Array.isArray(body.to)
-      ? body.to[0]
-      : body.to || body['envelope[to]'];
-    const emailText: string = body.text || body.plain || body.html || '';
+  const fromEmail: string = body.from || body['envelope[from]'];
+  const toEmail: string = Array.isArray(body.to)
+    ? body.to[0]
+    : body.to || body['envelope[to]'];
+  const emailText: string = body.text || body.plain || body.html || '';
 
-    console.log('📩 Webhook from email-response', { fromEmail, toEmail, emailText });
+  console.log('📩 Webhook from email-response', { fromEmail, toEmail, emailText });
 
-    if (fromEmail && toEmail) {
-      // Procesar respuesta del email...
-      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
-      console.log('📧 Email response handled');
-
-      // Si la respuesta es positiva (contiene "yes"/"sí"), actualizar métricas...
-      const textLower = emailText.toLowerCase();
-      const positiveReply =
-        textLower.includes('yes')
-      if (positiveReply) {
-        // Buscar integración (Square o Acuity) para incrementar reemplazos
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
-        });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-        if (integration) {
-          const userId = integration.userId;
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
-      }
-    }
-
-    return res.status(200).send({ received: true });
+  if (fromEmail && toEmail) {
+    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+    console.log('📧 Email response handled');
   }
+
+  return res.status(200).send({ received: true });
+}
+
 
   @Post('sms-response')
   async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
