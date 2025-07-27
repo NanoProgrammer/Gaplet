@@ -26,26 +26,6 @@ export class WebhooksController {
   throw new BadRequestException('Missing rawBody');
 }
 
-
-    /* -------------------- CALENDLY -------------------- */
-    if (provider === 'calendly') {
-      const signature = headers['calendly-signature'];
-      const secret = process.env.WEBHOOK_CALENDLY_SECRET;
-      const expectedSignature = crypto.createHmac('sha256', secret!).update(rawBody).digest('hex');
-      if (signature !== expectedSignature) {
-        throw new BadRequestException('Invalid Calendly signature');
-      }
-      if (body.event === 'invitee.canceled') {
-        const event = body.payload;
-        console.log('Calendly cancellation:', {
-          eventType: event.event_type.name,
-          invitee: event.invitee.name,
-          canceledAt: event.canceled_at,
-        });
-        // Calendly integration: we currently only log cancellations (no rebooking campaign implemented for Calendly in this example).
-      }
-    }
-
     /* -------------------- ACUITY -------------------- */
     else if (provider === 'acuity') {
       // Acuity webhooks may not include a signature by default; verification can be done if HMAC key is available.
@@ -96,7 +76,11 @@ export class WebhooksController {
       const secret = process.env.WEBHOOK_SQUARE_KEY;
       // Square’s signature is HMAC-SHA1 of the URL + request body
       const payload = `${process.env.API_BASE_URL}/webhooks/square${rawBody}`;
-      const expectedSignature = crypto.createHmac('sha1', secret!).update(payload).digest('base64');
+      const expectedSignature = crypto
+  .createHmac('sha256', secret!)
+  .update(`${process.env.API_BASE_URL}/webhooks/square${rawBody}`)
+  .digest('base64');
+
       if (signature !== expectedSignature) {
         throw new BadRequestException('Invalid Square signature');
       }
