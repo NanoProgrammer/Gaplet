@@ -47,12 +47,14 @@ export class WebhooksController {
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
     if (provider === 'acuity') {
+      // Manejo de cancelación de Acuity
       if (body.status === 'canceled' || body.action === 'canceled') {
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'acuity' },
         });
         if (!integration) return { received: true };
         const userId = integration.userId;
+        // Incrementar cancelaciones y actualizar última cancelación
         await this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -60,10 +62,10 @@ export class WebhooksController {
             lastCancellationAt: new Date(),
           },
         });
+        // Iniciar campaña usando datos del webhook de Acuity
         await this.notificationService.startCampaign('acuity', integration, {
           appointmentId: body.id,
-          appointmentTypeID:
-            body.appointmentTypeID || body.appointmentTypeId,
+          appointmentTypeID: body.appointmentTypeID || body.appointmentTypeId,
           datetime: body.datetime,
           firstName: body.firstName,
           lastName: body.lastName,
@@ -71,11 +73,11 @@ export class WebhooksController {
         });
       }
     } else if (isSquare) {
+      // Verificación de firma HMAC para Square
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
       const payloadToSign = fullUrl + rawBody;
-
       const expectedSignature = crypto
         .createHmac('sha256', signatureKey)
         .update(payloadToSign)
@@ -101,6 +103,7 @@ export class WebhooksController {
         });
         if (!integration) return { received: true };
         const userId = integration.userId;
+        // Incrementar cancelaciones y actualizar última cancelación
         await this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -108,10 +111,11 @@ export class WebhooksController {
             lastCancellationAt: new Date(),
           },
         });
-        const bookingId = eventObj?.booking_id || eventObj?.id;
-        await this.notificationService.startCampaign('square', integration, {
-          bookingId,
-        });
+        // Obtener el ID de reserva correctamente desde el objeto booking del webhook
+        const booking = eventObj?.booking;
+        const bookingId = booking?.id;
+        // Iniciar campaña usando el objeto completo de la reserva (sin fetch adicional a Square)
+        await this.notificationService.startCampaign('square', integration, { booking });
       }
     } else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
@@ -130,11 +134,37 @@ export class WebhooksController {
       : body.to || body.envelope?.to;
     const emailText: string = body.text || body.plain || '';
     if (fromEmail && toEmail) {
-      await this.notificationService.handleEmailReply(
+      // Procesar la respuesta del email
+      const responseHandled = await this.notificationService.handleEmailReply(
         fromEmail,
         toEmail,
         emailText,
       );
+      // Verificar si la respuesta fue positiva (ej. el cliente aceptó la cita)
+      const text = emailText.toLowerCase();
+      const positiveReply =
+        text.includes('yes') || text.includes('sí') || text.includes('si');
+      if (positiveReply) {
+        // Buscar la integración del usuario para actualizar sus métricas de reemplazo
+        let integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'square' },
+        });
+        if (!integration) {
+          integration = await this.prisma.connectedIntegration.findFirst({
+            where: { provider: 'acuity' },
+          });
+        }
+        if (integration) {
+          const userId = integration.userId;
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              totalReplacements: { increment: 1 },
+              lastReplacementAt: new Date(),
+            },
+          });
+        }
+      }
     }
     return { received: true };
   }
@@ -145,8 +175,34 @@ export class WebhooksController {
     const fromPhone: string = body.From;
     const smsText: string = body.Body || '';
     if (fromPhone && smsText) {
+      // Procesar la respuesta SMS
       await this.notificationService.handleSmsReply(fromPhone, smsText);
+      // Verificar respuesta positiva en el SMS (ej. cliente respondió "Sí")
+      const text = smsText.toLowerCase();
+      const positiveReply =
+        text.includes('yes') || text.includes('sí') || text.includes('si');
+      if (positiveReply) {
+        let integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'square' },
+        });
+        if (!integration) {
+          integration = await this.prisma.connectedIntegration.findFirst({
+            where: { provider: 'acuity' },
+          });
+        }
+        if (integration) {
+          const userId = integration.userId;
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              totalReplacements: { increment: 1 },
+              lastReplacementAt: new Date(),
+            },
+          });
+        }
+      }
     }
+    // Respuesta vacía para confirmar recepción al servicio SMS
     res.type('text/xml').send('<Response></Response>');
   }
 }
