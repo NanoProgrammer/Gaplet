@@ -1,9 +1,8 @@
-import { Controller, Post, Param, Body, Headers, HttpCode, BadRequestException, Req, Res } from '@nestjs/common';
+import { Controller, Post, Param, Headers, HttpCode, BadRequestException, Req, Res } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
-
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -16,42 +15,30 @@ export class WebhooksController {
   @HttpCode(200)
   async handleWebhook(
     @Param('provider') provider: 'calendly' | 'acuity' | 'square',
-    @Body() body: any,
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
-    console.log(`📩 Webhook from ${provider}`, { headers, body });
-    const rawBody = (req as any).rawBody; 
+    const rawBody = (req as any).body?.toString?.();
     if (!rawBody) {
-  console.warn('⚠️ rawBody is missing for Square webhook');
-  throw new BadRequestException('Missing rawBody');
-}
+      console.warn('⚠️ rawBody is missing for Square webhook');
+      throw new BadRequestException('Missing rawBody');
+    }
 
-    /* -------------------- ACUITY -------------------- */
-    else if (provider === 'acuity') {
-      // Acuity webhooks may not include a signature by default; verification can be done if HMAC key is available.
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (e) {
+      throw new BadRequestException('Invalid JSON body');
+    }
+
+    console.log(`📩 Webhook from ${provider}`, { headers, body });
+
+    if (provider === 'acuity') {
       const acuitySignature = headers['x-acuity-signature'];
-      if (acuitySignature) {
-        // If needed, verify HMAC-SHA256 with Acuity API key. (Skipping detailed verification for brevity.)
-        // const computed = crypto.createHmac('sha256', ACUITY_API_KEY).update(rawBody).digest('base64');
-        // if (computed !== acuitySignature) throw new BadRequestException('Invalid Acuity signature');
-      }
       if (body.status === 'canceled' || body.action === 'canceled') {
-        console.log('Acuity cancellation:', {
-          id: body.id,
-          name: `${body.firstName || ''} ${body.lastName || ''}`.trim(),
-          email: body.email,
-          appointmentType: body.type,
-          time: body.datetime,
-        });
-        // Identify which user integration this cancellation belongs to.
         const integration = await this.prisma.connectedIntegration.findFirst({ where: { provider: 'acuity' } });
-        if (!integration) {
-          console.warn(`No integrated Acuity account found for cancellation id ${body.id}`);
-          return { received: true };
-        }
+        if (!integration) return { received: true };
         const userId = integration.userId;
-        // Update user cancellation metrics
         await this.prisma.user.update({
           where: { id: userId },
           data: {
@@ -59,134 +46,79 @@ export class WebhooksController {
             lastCancellationAt: new Date(),
           },
         });
-        // Trigger the notification/rebooking campaign (asynchronous, using timers for scheduling)
-        this.notificationService.startCampaign('acuity', integration, {
+        await this.notificationService.startCampaign('acuity', integration, {
           appointmentId: body.id,
           appointmentTypeID: body.appointmentTypeID || body.appointmentTypeId,
           datetime: body.datetime,
           firstName: body.firstName,
           lastName: body.lastName,
           email: body.email,
-        }).catch(err => console.error('Error in Acuity notification campaign:', err));
+        });
       }
-    }
+    } else if (provider === 'square') {
+      const signature = headers['x-square-hmacsha256-signature'];
+      const secret = process.env.WEBHOOK_SQUARE_KEY;
+      const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
+      const payloadToSign = fullUrl + rawBody;
 
-    /* -------------------- SQUARE -------------------- */
-    // Función para convertir base64 normal a base64url
+      const expectedSignature = crypto.createHmac('sha256', secret).update(payloadToSign).digest('base64');
 
+      console.log('🔐 Full URL:', fullUrl);
+      console.log('📦 Raw body:', rawBody);
+      console.log('🔐 Expected:', expectedSignature);
+      console.log('🔐 Received:', signature);
 
-else if (provider === 'square') {
-  const signature = headers['x-square-hmacsha256-signature'];
-  const secret = process.env.WEBHOOK_SQUARE_KEY;
-  const rawBody = (req as any).rawBody;
-  const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
+      if (signature !== expectedSignature) {
+        throw new BadRequestException('Invalid Square signature');
+      }
 
-  if (!rawBody || !signature || !secret) {
-    console.error('❌ Missing rawBody, signature or secret');
-    throw new BadRequestException('Missing signature validation data');
-  }
-
-  const payloadToSign = fullUrl + rawBody;
-
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadToSign)
-    .digest('base64'); // ✅ SIN base64url
-
-  console.log('🔐 Full URL:', fullUrl);
-  console.log('📦 Raw body:', rawBody);
-  console.log('🧾 Payload to sign:', payloadToSign);
-  console.log('🔐 Expected:', expectedSignature);
-  console.log('🔐 Received:', signature);
-
-  if (signature !== expectedSignature) {
-    console.warn('❌ SIGNATURE MISMATCH');
-    throw new BadRequestException('Invalid Square signature');
-  }
-
-  console.log('✅ Valid Square signature!');
-  // Continúa con el procesamiento del evento...
-
-  const eventType = body.type;
-  const eventObj = body.data?.object;
-
-  if (eventType === 'booking.updated' || eventType === 'appointments.cancelled') {
-    console.log('✅ Square cancellation received:', {
-      bookingId: eventObj?.booking_id || eventObj?.id,
-      canceledAt: body.created_at,
-      merchant: body.merchant_id,
-    });
-
-    const integration = await this.prisma.connectedIntegration.findFirst({
-      where: { provider: 'square', externalUserId: body.merchant_id },
-    });
-
-    if (!integration) {
-      console.warn(`⚠️ No Square integration found for merchant ${body.merchant_id}`);
-      return { received: true };
-    }
-
-    const userId = integration.userId;
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        totalCancellations: { increment: 1 },
-        lastCancellationAt: new Date(),
-      },
-    });
-
-    const bookingId = eventObj?.booking_id || eventObj?.id;
-
-    this.notificationService
-      .startCampaign('square', integration, { bookingId })
-      .catch(err => console.error('Error in Square notification campaign:', err));
-  }
-}
-
-
-    else {
+      const eventType = body.type;
+      const eventObj = body.data?.object;
+      if (eventType === 'booking.updated' || eventType === 'appointments.cancelled') {
+        const integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'square', externalUserId: body.merchant_id },
+        });
+        if (!integration) return { received: true };
+        const userId = integration.userId;
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            totalCancellations: { increment: 1 },
+            lastCancellationAt: new Date(),
+          },
+        });
+        const bookingId = eventObj?.booking_id || eventObj?.id;
+        await this.notificationService.startCampaign('square', integration, { bookingId });
+      }
+    } else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
     }
 
-    // Respond 200 OK for all handled webhooks
     return { received: true };
   }
 
-  /**
-   * Endpoint to handle incoming email replies via SendGrid Inbound Parse.
-   * This should be configured as the webhook target for reply emails.
-   */
   @Post('email-response')
   @HttpCode(200)
-  async handleEmailResponse(@Body() body: any) {
+  async handleEmailResponse(@Req() req: Request) {
+    const body: any = req.body;
     const fromEmail: string = body.from || body.envelope?.from;
     const toEmail: string = Array.isArray(body.to) ? body.to[0] : (body.to || body.envelope?.to);
     const emailText: string = body.text || body.plain || '';
-    console.log(`📨 Inbound email reply from ${fromEmail} to ${toEmail}: ${emailText}`);
     if (fromEmail && toEmail) {
       await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
     }
-    // SendGrid doesn't require any specific response content
     return { received: true };
   }
 
-  /**
-   * Endpoint to handle incoming SMS replies via Twilio webhook.
-   * Configure the Twilio phone number's Messaging webhook to point here.
-   */
   @Post('sms-response')
-  async handleSmsResponse(@Body() body: any, @Headers() headers: Record<string, string>, @Res() res: Response) {
-    // (Optional) Verify Twilio signature for security (omitted for brevity)
-    // const twilioSignature = headers['x-twilio-signature'];
+  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
+    const body: any = req.body;
     const fromPhone: string = body.From;
     const toPhone: string = body.To;
     const smsText: string = body.Body || '';
-    console.log(`📨 Inbound SMS reply from ${fromPhone}: "${smsText}"`);
     if (fromPhone && smsText) {
       await this.notificationService.handleSmsReply(fromPhone, smsText);
     }
-    // Respond with empty TwiML to stop further retries or auto-replies from Twilio
     res.type('text/xml').send('<Response></Response>');
   }
 }
