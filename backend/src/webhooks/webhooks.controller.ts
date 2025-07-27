@@ -3,6 +3,9 @@ import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import { NotificationService } from './webhook.service';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
+function toBase64Url(base64: string) {
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -71,7 +74,10 @@ export class WebhooksController {
     }
 
     /* -------------------- SQUARE -------------------- */
-    else if (provider === 'square') {
+    // Función para convertir base64 normal a base64url
+
+
+else if (provider === 'square') {
   const signature = headers['x-square-hmacsha256-signature'];
   const secret = process.env.WEBHOOK_SQUARE_KEY;
   const rawBody = (req as any).rawBody;
@@ -84,12 +90,10 @@ export class WebhooksController {
 
   const payloadToSign = fullUrl + rawBody;
 
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadToSign)
-    .digest('base64');
+  const expectedSignature = toBase64Url(
+    crypto.createHmac('sha256', secret).update(payloadToSign).digest('base64')
+  );
 
-  // 👇 Agrega logs completos para debug si hay fallo
   if (signature !== expectedSignature) {
     console.warn('❌ Invalid Square signature');
     console.log('🔐 Full URL:', fullUrl);
