@@ -827,7 +827,7 @@ async sendSlotTakenReplyEmail(
   await sgMail.send({
     to: recipientEmail,
     from: {
-      email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
       name: businessName,
     },
     replyTo: {
