@@ -647,51 +647,52 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-  async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string, originalSubject?: string) {
+  async handleEmailReply(
+  fromEmail: string,
+  toEmail: string,
+  bodyText: string,
+  originalSubject?: string
+) {
   const normalizedFrom = fromEmail.toLowerCase();
-  const slotId = toEmail.split('@')[0]; // e.g., cf33d507-...
+  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId = this.emailToCampaign.get(slotId) ?? this.emailToCampaign.get(normalizedFrom);
 
-  let campaignId = this.emailToCampaign.get(slotId) || this.emailToCampaign.get(normalizedFrom);
   if (!campaignId) {
-    console.warn(`❌ No active campaign found for reply to: ${toEmail}`);
+    console.warn(`No se encontró campaña activa para email reply dirigido a ${toEmail}`);
     return;
   }
-
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) {
-    console.warn(`⚠️ Campaign ${campaignId} not found or already completed.`);
+    console.warn(`Campaña ${campaignId} no encontrada o ya completada.`);
     return;
   }
 
-  const lowered = bodyText?.toLowerCase() || '';
-  console.log('📩 Received reply body:', lowered);
-  if (!lowered.includes('i will take it')) {
-    console.log(`⛔ Email from ${fromEmail} does not contain 'I will take it'. Skipping.`);
-    return;
-  }
-
-  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
-  if (!winner) {
-    console.warn(`⚠️ Could not find responder ${fromEmail} in campaign ${campaignId} recipients.`);
-    return;
-  }
-
-  // Si ya se tomó
+  // 1) Slot ya reclamado
   if (campaign.filled) {
-    console.log(`📪 Slot already taken for campaign ${campaignId}. Sending apology.`);
+    const recipient = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
+    console.log(`Slot ${campaignId} ya fue rellenado. Enviando email de slot tomado a ${fromEmail}.`);
     await this.sendSlotTakenReplyEmail(
-      winner.email,
-      winner.name || null,
-      campaign.slotTime,
+      fromEmail,
+      recipient?.name,
+      campaign.slotTime
     );
     return;
   }
 
-  console.log(`🎉 ${winner.email} is first to reply! Booking appointment...`);
-  try {
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
+  // 2) Detectamos frase de confirmación
+  if (!bodyText?.toLowerCase().includes('i will take it')) {
+    console.log(`Email de ${fromEmail} no contiene frase de confirmación. Ignorando.`);
+    return;
+  }
 
+  // 3) Primer respondedor: marcamos como filled y hacemos el booking
+  campaign.filled = true;
+  this.activeCampaigns.set(campaignId, campaign);
+  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom)!;
+  console.log(`🎉 ${winner.email} es el primero en responder. Reservando cita...`);
+
+  try {
+    // -- crear cita en Square/Acuity + guardar logs + actualizar DB
     await this.createAppointmentAndNotify(campaign, winner, {
       gapletSlotId: slotId,
       startAt: campaign.slotTime,
@@ -701,22 +702,26 @@ export class NotificationService {
       teamMemberId: campaign.teamMemberId,
     });
 
+    // -- enviar confirmación por email
     await this.sendConfirmationReplyEmail(
       winner.email,
-      winner.name || null,
+      winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime }
     );
 
-    console.log(`✅ Appointment confirmed and confirmation sent to ${winner.email}`);
+    console.log(`✅ Confirmación enviada a ${winner.email}.`);
   } catch (err) {
-    console.error('❌ Error during appointment booking:', err);
+    console.error('Error reservando cita:', err);
+    // Si falla booking, avisamos slot tomado
     await this.sendSlotTakenReplyEmail(
-      winner.email,
-      winner.name || null,
-      campaign.slotTime
+      fromEmail,
+      winner.name,
+      campaign.slotTime,
+      'este horario'
     );
   }
 }
+
 
 
 async sendConfirmationReplyEmail(
