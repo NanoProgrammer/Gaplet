@@ -648,498 +648,289 @@ export class NotificationService {
   }
 
   async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string, originalSubject?: string) {
-    const normalizedFrom = fromEmail.toLowerCase();
-    let campaignId = this.emailToCampaign.get(toEmail.split('@')[0]);
-    if (!campaignId) {
-      campaignId = this.emailToCampaign.get(normalizedFrom);
-    }
-    if (!campaignId) {
-      console.warn(`No se encontró campaña activa para email reply dirigido a ${toEmail}`);
-      return;
-    }
-    const campaign = this.activeCampaigns.get(campaignId);
-    if (!campaign) {
-      console.warn(`Campaña ${campaignId} no encontrada o ya completada.`);
-      return;
-    }
-    if (campaign.filled) {
-      const recipient = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
-      let apologyMessage = `Hello${recipient?.name ? ' ' + recipient.name.split(' ')[0] : ''},\n\n`;
-      apologyMessage += `Thank you for your quick response. Unfortunately, that appointment slot has already been filled by another client.\n`;
-      if (recipient) {
-        if (recipient.nextAppt) {
-          apologyMessage += `Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed as scheduled.\n`;
-        } else {
-          apologyMessage += `If you'd like to schedule another appointment, please contact us at {BUSINESS_PHONE_PLACEHOLDER}.\n`;
-        }
-      }
-      apologyMessage += `\nThank you for understanding,\n`;
-      let businessName = 'your business';
-      let businessPhone = '';
-      try {
-        if (campaign.provider === 'square') {
-          const integration = await this.prisma.connectedIntegration.findUnique({
-            where: { userId: campaign.userId, provider: 'square' },
-          });
-          if (integration) {
-            const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
-              headers: {
-                Authorization: `Bearer ${integration.accessToken}`,
-                'Square-Version': '2025-07-16',
-              },
-            });
-            const merchantsData = await merchantsRes.json();
-            if (merchantsData.merchant && merchantsData.merchant.length > 0) {
-              businessName = merchantsData.merchant[0].business_name;
-            }
-            if (campaign.locationId) {
-              const locRes = await fetch(`https://connect.squareup.com/v2/locations/${campaign.locationId}`, {
-                headers: {
-                  Authorization: `Bearer ${integration.accessToken}`,
-                  'Square-Version': '2025-07-16',
-                  'Content-Type': 'application/json',
-                },
-              });
-              const locData = await locRes.json();
-              if (locData.location && locData.location.phone_number) {
-                businessPhone = locData.location.phone_number;
-              }
-            }
-          }
-        } else if (campaign.provider === 'acuity') {
-          const integration = await this.prisma.connectedIntegration.findUnique({
-            where: { userId: campaign.userId, provider: 'acuity' },
-          });
-          if (integration) {
-            const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
-              headers: { Authorization: `Bearer ${integration.accessToken}` },
-            });
-            const acuityData = await acuityRes.json();
-            if (acuityData.businessName) {
-              businessName = acuityData.businessName;
-            } else if (acuityData.name) {
-              businessName = acuityData.name;
-            }
-            if (acuityData.businessPhone) {
-              businessPhone = acuityData.businessPhone;
-            } else if (acuityData.phone) {
-              businessPhone = acuityData.phone;
-            }
-          }
-        }
-      } catch {
-        // En caso de error, mantener valores por defecto
-      }
-      if (businessPhone) {
-        apologyMessage = apologyMessage.replace('{BUSINESS_PHONE_PLACEHOLDER}', businessPhone);
-      } else {
-        apologyMessage = apologyMessage.replace(
-          'contact us at {BUSINESS_PHONE_PLACEHOLDER}.', 
-          'schedule another appointment with us.'
-        );
-      }
-      apologyMessage += businessName;
-      try {
-        const replySubject = originalSubject 
-          ? (originalSubject.startsWith('Re:') ? originalSubject : 'Re: ' + originalSubject) 
-          : 'Appointment slot no longer available';
-        await sgMail.send({
-          to: fromEmail,
-          from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-          subject: replySubject,
-          text: apologyMessage,
-        });
-        console.log(`Sent apology email to ${fromEmail} (slot already filled).`);
-      } catch (err) {
-        console.error('Failed to send apology email:', err);
-      }
-      return;
-    }
-    console.log('📝 Raw body text:', bodyText);
-    console.log('📝 Lowercased:', bodyText?.toLowerCase());
-    console.log('✅ Contains confirmation?', bodyText?.toLowerCase().includes('i will take it'));
-    if (!bodyText || bodyText.toLowerCase().includes('i will take it') === false) {
-      console.log(`Email from ${fromEmail} does not contain the confirmation phrase. Ignoring.`);
-      return;
-    }
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
-    const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
-    if (!winner) {
-      console.error('Winner not found in campaign recipient list.');
-      return;
-    }
-    console.log(`🎉 Client ${winner.email} responded first for campaign ${campaignId}. Booking appointment...`);
-    let businessName = 'your business';
-    try {
-      if (campaign.provider === 'square') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'square' },
-        });
-        if (integration) {
-          const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
-            headers: {
-              Authorization: `Bearer ${integration.accessToken}`,
-              'Square-Version': '2025-07-16',
-            },
-          });
-          const merchantsData = await merchantsRes.json();
-          if (merchantsData.merchant && merchantsData.merchant.length > 0) {
-            businessName = merchantsData.merchant[0].business_name;
-          }
-        }
-      } else if (campaign.provider === 'acuity') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'acuity' },
-        });
-        if (integration) {
-          const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
-            headers: { Authorization: `Bearer ${integration.accessToken}` },
-          });
-          const acuityData = await acuityRes.json();
-          if (acuityData.businessName) {
-            businessName = acuityData.businessName;
-          } else if (acuityData.name) {
-            businessName = acuityData.name;
-          }
-        }
-      }
-    } catch {}
-    try {
-      if (campaign.provider === 'acuity') {
-        const names = winner.name ? winner.name.split(' ') : [];
-        const firstName = names[0] || 'Valued';
-        const lastName = names.slice(1).join(' ') || 'Client';
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'acuity' },
-        });
-        if (!integration) throw new Error('No Acuity integration found for booking');
-        const createRes = await fetch('https://acuityscheduling.com/api/v1/appointments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${integration.accessToken}`,
-          },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email: winner.email,
-            phone: winner.phone || '',
-            datetime: campaign.slotTime.toISOString().slice(0, 16),
-            appointmentTypeID: campaign.appointmentTypeId,
-          }),
-        });
-        const apptCreated = await createRes.json();
-        if (!apptCreated.id) {
-          throw new Error(`Acuity booking failed: ${JSON.stringify(apptCreated)}`);
-        }
-      } else if (campaign.provider === 'square') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'square' },
-        });
-        if (!integration) throw new Error('No Square integration found for booking');
-        const newBooking = {
-          start_at: campaign.slotTime.toISOString(),
-          location_id: campaign.locationId,
-          customer_id: winner.customerId,
-          customer_note: 'Booked via gap notification',
-          appointment_segments: [
-            {
-              duration_minutes: campaign.duration || 0,
-              service_variation_id: campaign.serviceVariationId,
-              service_variation_version: campaign.serviceVariationVersion || 1,
-              team_member_id: campaign.teamMemberId,
-            },
-          ],
-        };
-        const createRes = await fetch('https://connect.squareup.com/v2/bookings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${integration.accessToken}`,
-          },
-          body: JSON.stringify({ booking: newBooking }),
-        });
-        const result = await createRes.json();
-        if (!result.booking) {
-          throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
-        }
-      }
-      await this.prisma.user.update({
-        where: { id: campaign.userId },
-        data: {
-          totalReplacements: { increment: 1 },
-          lastReplacementAt: new Date(),
-        },
-      });
-      const firstName = winner.name ? winner.name.split(' ')[0] : '';
-      const confirmationMsg = `Hello${firstName ? ' ' + firstName : ''},\n\n` +
-        `Good news! Your appointment on ${campaign.slotTime.toLocaleString()} at ${businessName} has been confirmed. ` +
-        `Thank you for taking the open slot. We look forward to seeing you!\n\n` +
-        `${businessName}`;
-      try {
-        const replySubject = originalSubject 
-          ? (originalSubject.startsWith('Re:') ? originalSubject : 'Re: ' + originalSubject) 
-          : `Your appointment on ${campaign.slotTime.toLocaleString()} is confirmed`;
-        await sgMail.send({
-          to: winner.email,
-          from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-          subject: replySubject,
-          text: confirmationMsg,
-        });
-        console.log(`Sent confirmation email to ${winner.email}.`);
-      } catch (err) {
-        console.error('Failed to send confirmation email:', err);
-      }
-      if (winner.phone) {
-        try {
-          await this.twilioClient.messages.create({
-            to: winner.phone,
-            from: process.env.TWILIO_FROM_NUMBER,
-            body: `${businessName}: Your appointment on ${campaign.slotTime.toLocaleString()} is confirmed. Thank you!`,
-          });
-        } catch (err) {
-          console.error('Failed to send confirmation SMS:', err);
-        }
-      }
-    } catch (error) {
-      console.error('Error during booking for email reply:', error);
-      const firstName = winner.name ? winner.name.split(' ')[0] : '';
-      const failMsg = `Hello${firstName ? ' ' + firstName : ''},\n\n` +
-        `We received your response for the open appointment slot on ${campaign.slotTime.toLocaleString()}, but unfortunately we were unable to book it because it was no longer available. ` +
-        `We apologize for the inconvenience.\n\n` +
-        `${businessName}`;
-      try {
-        const replySubject = originalSubject 
-          ? (originalSubject.startsWith('Re:') ? originalSubject : 'Re: ' + originalSubject) 
-          : `Appointment not available`;
-        await sgMail.send({
-          to: fromEmail,
-          from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-          subject: replySubject,
-          text: failMsg,
-        });
-      } catch {}
-      if (winner.phone) {
-        try {
-          await this.twilioClient.messages.create({
-            to: winner.phone,
-            from: process.env.TWILIO_FROM_NUMBER,
-            body: `${businessName}: We received your response, but that ${campaign.slotTime.toLocaleString()} slot was already taken. Sorry for the inconvenience.`,
-          });
-        } catch {}
-      }
-      campaign.filled = true;
-      this.activeCampaigns.set(campaignId, campaign);
-    }
+  const normalizedFrom = fromEmail.toLowerCase();
+  let campaignId = this.emailToCampaign.get(toEmail.split('@')[0]);
+  if (!campaignId) {
+    campaignId = this.emailToCampaign.get(normalizedFrom);
+  }
+  if (!campaignId) {
+    console.warn(`No se encontró campaña activa para email reply dirigido a ${toEmail}`);
+    return;
+  }
+  const campaign = this.activeCampaigns.get(campaignId);
+  if (!campaign) {
+    console.warn(`Campaña ${campaignId} no encontrada o ya completada.`);
+    return;
   }
 
-  async createAppointmentAndNotify(campaignOrIntegration: any, winner: Recipient | { email: string; name?: string; phone?: string; customerId?: string | null }, slot: any) {
-    const { userId, provider } = campaignOrIntegration;
-    // Obtener integración (en caso de que se haya pasado campaignState)
-    const integration = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: userId, provider: provider },
-    });
-    if (!integration) throw new Error(`${provider} integration not found`);
+  // If the slot is already filled, send an apology email/SMS and exit.
+  if (campaign.filled) {
+    const recipient = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
+    console.log(`Slot for campaign ${campaignId} was already filled. Sending apology to ${fromEmail}.`);
+    await this.sendSlotAlreadyTakenEmail(fromEmail, recipient);
+    return;
+  }
 
-    let providerBookingId: string | null = null;
-    // Si es Square, asegurar que tenemos customerId, o crearlo si no existe
-    if (provider === 'square') {
-      if (!winner.customerId) {
-        try {
-          // Buscar cliente por correo electrónico en Square
-          const searchRes = await fetch('https://connect.squareup.com/v2/customers/search', {
+  console.log('📝 Raw body text:', bodyText);
+  console.log('📝 Lowercased:', bodyText?.toLowerCase());
+  console.log('✅ Contains confirmation?', bodyText?.toLowerCase().includes('i will take it'));
+  if (!bodyText || !bodyText.toLowerCase().includes('i will take it')) {
+    console.log(`Email from ${fromEmail} does not contain the confirmation phrase. Ignoring.`);
+    return;
+  }
+
+  // Mark the campaign as filled since we got a valid confirmation.
+  campaign.filled = true;
+  this.activeCampaigns.set(campaignId, campaign);
+  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
+  if (!winner) {
+    console.error('Winner not found in campaign recipient list.');
+    return;
+  }
+  console.log(`🎉 Client ${winner.email} responded first for campaign ${campaignId}. Booking appointment...`);
+
+  try {
+    // Use the helper function to create the appointment and send confirmation notifications.
+    await this.createAppointmentAndNotify(campaign, winner, {
+      gapletSlotId: campaignId,
+      startAt: campaign.slotTime,
+      locationId: campaign.locationId,
+      durationMinutes: campaign.duration || 0,
+      serviceVariationId: campaign.serviceVariationId,
+      teamMemberId: campaign.teamMemberId
+    });
+    console.log(`✅ Appointment booked and confirmation sent to ${winner.email} for slot ${campaign.slotTime}.`);
+  } catch (error) {
+    console.error('Failed to book appointment for email reply:', error);
+    // If booking failed (e.g., slot no longer available or API error), notify the client that the slot is taken.
+    await this.sendSlotAlreadyTakenEmail(fromEmail, winner);
+  }
+}
+
+  async createAppointmentAndNotify(
+  campaignOrIntegration: any, 
+  winner: Recipient | { email: string; name?: string; phone?: string; customerId?: string | null }, 
+  slot: any
+) { 
+  const { userId, provider } = campaignOrIntegration;
+  // Obtener integración (en caso de que se haya pasado campaignState)
+  const integration = await this.prisma.connectedIntegration.findFirst({
+    where: { userId: userId, provider: provider },
+  });
+  if (!integration) throw new Error(`${provider} integration not found`);
+
+  let providerBookingId: string | null = null;
+
+  // Square provider: ensure we have a customerId for the winner (search or create if needed)
+  if (provider === 'square') {
+    if (!winner.customerId) {
+      try {
+        // Buscar cliente por correo electrónico en Square
+        const searchRes = await fetch('https://connect.squareup.com/v2/customers/search', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: {
+              filter: {
+                email_address: { exact: winner.email }
+              }
+            }
+          }),
+        });
+        const searchData = await searchRes.json();
+        const foundCustomers = searchData.customers;
+        if (foundCustomers && foundCustomers.length > 0) {
+          winner.customerId = foundCustomers[0].id;
+          if (!winner.name || winner.name === '' || winner.name === 'Client') {
+            const name = `${foundCustomers[0].given_name || ''} ${foundCustomers[0].family_name || ''}`.trim();
+            if (name) {
+              winner.name = name;
+            }
+          }
+          if (!winner.phone && foundCustomers[0].phone_number) {
+            winner.phone = foundCustomers[0].phone_number;
+          }
+        } else {
+          // Crear cliente nuevo en Square si no existe
+          const nameParts = winner.name ? winner.name.split(' ') : [];
+          let givenName = nameParts[0] || '';
+          let familyName = nameParts.slice(1).join(' ');
+          if (!givenName && !familyName) {
+            // Derivar nombre del correo electrónico si es posible
+            const localPart = winner.email.split('@')[0];
+            const [first, ...rest] = localPart.replace(/[^a-zA-Z0-9]+/g, ' ').split(' ').filter(s => s);
+            givenName = first || 'Valued';
+            familyName = rest.join(' ') || 'Client';
+          }
+          const createCustRes = await fetch('https://connect.squareup.com/v2/customers', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${integration.accessToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              query: {
-                filter: {
-                  email_address: { exact: winner.email }
-                }
-              }
+              given_name: givenName,
+              family_name: familyName || undefined,
+              email_address: winner.email,
+              phone_number: winner.phone || undefined,
             }),
           });
-          const searchData = await searchRes.json();
-          const foundCustomers = searchData.customers;
-          if (foundCustomers && foundCustomers.length > 0) {
-            winner.customerId = foundCustomers[0].id;
-            if (!winner.name || winner.name === '' || winner.name === 'Client') {
-              const name = `${foundCustomers[0].given_name || ''} ${foundCustomers[0].family_name || ''}`.trim();
-              if (name) {
-                winner.name = name;
-              }
-            }
-            if (!winner.phone && foundCustomers[0].phone_number) {
-              winner.phone = foundCustomers[0].phone_number;
-            }
-          } else {
-            // Crear cliente nuevo en Square si no existe
-            const nameParts = winner.name ? winner.name.split(' ') : [];
-            let givenName = nameParts[0] || '';
-            let familyName = nameParts.slice(1).join(' ');
-            if (!givenName && !familyName) {
-              // derivar nombre del correo electrónico si posible
-              const localPart = winner.email.split('@')[0];
-              const [first, ...rest] = localPart.replace(/[^a-zA-Z0-9]+/g, ' ').split(' ').filter(s => s);
-              givenName = first || 'Valued';
-              familyName = rest.join(' ') || 'Client';
-            }
-            const createCustRes = await fetch('https://connect.squareup.com/v2/customers', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${integration.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                given_name: givenName,
-                family_name: familyName || undefined,
-                email_address: winner.email,
-                phone_number: winner.phone || undefined,
-              }),
-            });
-            const createCustData = await createCustRes.json();
-            if (createCustData.customer && createCustData.customer.id) {
-              winner.customerId = createCustData.customer.id;
-            }
+          const createCustData = await createCustRes.json();
+          if (createCustData.customer && createCustData.customer.id) {
+            winner.customerId = createCustData.customer.id;
           }
-        } catch (err) {
-          console.error('Error searching/creating Square customer:', err);
         }
+      } catch (err) {
+        console.error('Error searching/creating Square customer:', err);
       }
-      // Crear la reserva en Square
-      const bookingPayload = {
-        booking: {
-          start_at: slot.startAt.toISOString(),
-          location_id: slot.locationId,
-          customer_id: winner.customerId,
-          customer_note: 'Booked via Gaplet auto-replacement',
-          appointment_segments: [
-            {
-              duration_minutes: slot.durationMinutes,
-              service_variation_id: slot.serviceVariationId,
-              service_variation_version: 1,
-              team_member_id: slot.teamMemberId,
-            },
-          ],
-        }
-      };
-      const response = await fetch('https://connect.squareup.com/v2/bookings', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingPayload),
-      });
-      const result = await response.json();
-      if (!result.booking?.id) {
-        throw new Error('Failed to create Square booking');
-      }
-      providerBookingId = result.booking.id;
     }
 
-    if (provider === 'acuity') {
-      const [firstName, ...rest] = (winner.name || 'Valued Client').split(' ');
-      const lastName = rest.join(' ') || 'Client';
-      const response = await fetch('https://acuityscheduling.com/api/v1/appointments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${integration.accessToken}`,
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email: winner.email,
-          phone: winner.phone || '',
-          datetime: slot.startAt.toISOString().slice(0, 16),
-          appointmentTypeID: (campaignOrIntegration.appointmentTypeId ?? parseInt(slot.serviceVariationId)) || undefined,
-        }),
-      });
-      const result = await response.json();
-      if (!result.id) {
-        throw new Error('Failed to create Acuity booking');
+    // Crear la reserva en Square
+    const bookingPayload = {
+      booking: {
+        start_at: slot.startAt.toISOString(),
+        location_id: slot.locationId,
+        customer_id: winner.customerId,
+        customer_note: 'Booked via Gaplet auto-replacement',
+        appointment_segments: [
+          {
+            duration_minutes: slot.durationMinutes,
+            service_variation_id: slot.serviceVariationId,
+            service_variation_version: 1,
+            team_member_id: slot.teamMemberId,
+          },
+        ],
       }
-      providerBookingId = result.id.toString();
+    };
+    const response = await fetch('https://connect.squareup.com/v2/bookings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${integration.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingPayload),
+    });
+    const result = await response.json();
+    if (!result.booking?.id) {
+      throw new Error('Failed to create Square booking');
     }
-
-    // Registrar ReplacementLog
-    await this.prisma.replacementLog.create({
-      data: {
-        userId,
-        clientEmail: winner.email || '',
-        clientPhone: winner.phone || null,
-        clientName: winner.name || null,
-        appointmentTime: slot.startAt,
-        provider,
-        providerBookingId: providerBookingId!,
-        respondedAt: new Date(),
-      },
-    });
-    // Marcar el slot como tomado
-    await this.prisma.openSlot.update({
-      where: { gapletSlotId: slot.gapletSlotId },
-      data: {
-        isTaken: true,
-        takenAt: new Date(),
-      },
-    });
-    // Actualizar métricas del usuario
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        totalReplacements: { increment: 1 },
-        lastReplacementAt: new Date(),
-      },
-    });
-    // Enviar confirmación al cliente
-    const confirmMessage = `Hello ${winner.name?.split(' ')[0] || ''},\n\nYour appointment on ${slot.startAt.toLocaleString()} has been confirmed.\n\nThank you,\nGaplet Team`;
-    await sgMail.send({
-      to: winner.email,
-      from: `Gaplet <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-      subject: `Appointment confirmed`,
-      text: confirmMessage,
-    });
-    if (winner.phone) {
-      try {
-        await this.twilioClient.messages.create({
-          to: winner.phone,
-          from: process.env.TWILIO_FROM_NUMBER,
-          body: `Your appointment at ${slot.startAt.toLocaleString()} is confirmed. Thank you!`,
-        });
-      } catch {}
-    }
-    return { bookingId: providerBookingId };
+    providerBookingId = result.booking.id;
   }
+
+  // Acuity provider: create appointment via Acuity’s API
+  if (provider === 'acuity') {
+    const [firstName, ...rest] = (winner.name || 'Valued Client').split(' ');
+    const lastName = rest.join(' ') || 'Client';
+    const response = await fetch('https://acuityscheduling.com/api/v1/appointments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${integration.accessToken}`,
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email: winner.email,
+        phone: winner.phone || '',
+        datetime: slot.startAt.toISOString().slice(0, 16),
+        appointmentTypeID: (campaignOrIntegration.appointmentTypeId ?? parseInt(slot.serviceVariationId)) || undefined,
+      }),
+    });
+    const result = await response.json();
+    if (!result.id) {
+      throw new Error('Failed to create Acuity booking');
+    }
+    providerBookingId = result.id.toString();
+  }
+
+  // Registrar ReplacementLog en la base de datos
+  await this.prisma.replacementLog.create({
+    data: {
+      userId,
+      clientEmail: winner.email || '',
+      clientPhone: winner.phone || null,
+      clientName: winner.name || null,
+      appointmentTime: slot.startAt,
+      provider,
+      providerBookingId: providerBookingId!,
+      respondedAt: new Date(),
+    },
+  });
+  // Marcar el slot como tomado en la base de datos
+  await this.prisma.openSlot.update({
+    where: { gapletSlotId: slot.gapletSlotId },
+    data: {
+      isTaken: true,
+      takenAt: new Date(),
+    },
+  });
+  // Actualizar métricas del usuario
+  await this.prisma.user.update({
+    where: { id: userId },
+    data: {
+      totalReplacements: { increment: 1 },
+      lastReplacementAt: new Date(),
+    },
+  });
+  // Enviar confirmación al cliente (correo electrónico y SMS)
+  const firstName = winner.name ? winner.name.split(' ')[0] : '';
+  const confirmMessage = `Hello${firstName ? ' ' + firstName : ''},\n\n` +
+    `Your appointment on ${slot.startAt.toLocaleString()} has been confirmed.\n\n` +
+    `Thank you,\nGaplet Team`;
+  await sgMail.send({
+    to: winner.email,
+    from: `Gaplet <no-reply@${process.env.SENDGRID_DOMAIN}>`,
+    subject: `Appointment confirmed`,
+    text: confirmMessage,
+  });
+  if (winner.phone) {
+    try {
+      await this.twilioClient.messages.create({
+        to: winner.phone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: `Your appointment at ${slot.startAt.toLocaleString()} is confirmed. Thank you!`,
+      });
+    } catch (err) {
+      console.error('Failed to send confirmation SMS:', err);
+    }
+  }
+  return { bookingId: providerBookingId };
+}
+
 
   async sendSlotAlreadyTakenEmail(fromEmail: string, recipient?: Recipient) {
-    let msg = `Hello${recipient?.name ? ' ' + recipient.name.split(' ')[0] : ''},\n\n` +
-      `Thanks for your response. Unfortunately, that appointment slot has already been filled by another client.\n`;
-    if (recipient?.nextAppt) {
-      msg += `Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed.\n`;
-    } else {
-      msg += `If you’d like to book another time, please contact us or check your client portal.\n`;
-    }
-    msg += `\nBest regards,\nGaplet Team`;
-    await sgMail.send({
-      to: fromEmail,
-      from: `Gaplet <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-      subject: `Appointment slot unavailable`,
-      text: msg,
-    });
-    if (recipient?.phone) {
-      try {
-        await this.twilioClient.messages.create({
-          to: recipient.phone,
-          from: process.env.TWILIO_FROM_NUMBER,
-          body: `Sorry, that appointment was already filled. Your current booking remains valid.`,
-        });
-      } catch {}
+  let msg = `Hello${recipient?.name ? ' ' + recipient.name.split(' ')[0] : ''},\n\n` +
+    `Thanks for your response. Unfortunately, that appointment slot has already been filled by another client.\n`;
+  if (recipient?.nextAppt) {
+    msg += `Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed.\n`;
+  } else {
+    msg += `If you’d like to book another time, please contact us or check your client portal.\n`;
+  }
+  msg += `\nBest regards,\nGaplet Team`;
+
+  await sgMail.send({
+    to: fromEmail,
+    from: `Gaplet <no-reply@${process.env.SENDGRID_DOMAIN}>`,
+    subject: `Appointment slot unavailable`,
+    text: msg,
+  });
+  if (recipient?.phone) {
+    try {
+      await this.twilioClient.messages.create({
+        to: recipient.phone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: `Sorry, that appointment was already filled. Your current booking remains valid.`,
+      });
+    } catch (err) {
+      // If SMS fails, just log and continue (no throw needed)
+      console.error('Failed to send slot-taken SMS:', err);
     }
   }
+}
+
 
   async handleSmsReply(fromPhone: string, messageText: string) {
     const campaignId = this.phoneToCampaign.get(fromPhone);
