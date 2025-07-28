@@ -155,8 +155,10 @@ export class WebhooksController {
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
 async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
   const body: any = req.body;
+
   const fromEmail: string = body.from || body['envelope[from]'];
-  const toEmail: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
+  const toEmailRaw: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
+  const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
   const emailText: string = body.text || body.plain || body.html || '';
 
   console.log('📩 Webhook from email-response', { fromEmail, toEmail });
@@ -165,68 +167,15 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
     return res.status(400).send({ error: 'Missing email headers' });
   }
 
-  const textLower = emailText.toLowerCase();
-  const accepted = textLower.includes('i will take it') || textLower.includes('yes') || textLower.includes('sí');
-  console.log('📝 Incoming email text (lowercased):', textLower);
-  console.log('✅ Contains confirmation phrase?', accepted);
-
-  let gapletSlotId: string | null = null;
-  const localPart = toEmail.split('@')[0];
-  gapletSlotId = localPart.startsWith('reply+') ? localPart.slice('reply+'.length) : localPart;
-  console.log('🔍 Extracted gapletSlotId from reply email:', gapletSlotId);
-
-  if (accepted && gapletSlotId) {
-    const slot = await this.prisma.openSlot.findUnique({ where: { gapletSlotId } });
-    if (!slot) {
-      console.warn(`❌ Slot with ID ${gapletSlotId} not found in database.`);
-      return res.status(404).send({ error: 'Slot not found' });
-    }
-
-    if (slot.isTaken) {
-      console.log(`⚠️ Slot ${gapletSlotId} already taken.`);
-      const campaignId = this.notificationService.getCampaignIdBySlotId(gapletSlotId);
-      const campaign = campaignId ? this.notificationService.getCampaign(campaignId) : null;
-      const recipientInfo = campaign?.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
-      await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, recipientInfo);
-      return res.status(200).send({ message: 'Slot already taken' });
-    }
-
-    const user = await this.prisma.user.findUnique({ where: { id: slot.userId } });
-    if (!user) return res.status(404).send({ error: 'User not found' });
-
-    const integration = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: user.id, provider: slot.provider },
-    });
-    if (!integration) return res.status(404).send({ error: 'Integration not found' });
-
-    let winnerInfo: any = { email: fromEmail, name: '', phone: null, customerId: null };
-    const campaignId = this.notificationService.getCampaignIdBySlotId(gapletSlotId);
-    const campaign = campaignId ? this.notificationService.getCampaign(campaignId) : null;
-    const foundRecipient = campaign?.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
-    if (foundRecipient) {
-      winnerInfo = { ...foundRecipient, email: fromEmail };
-    }
-
-    try {
-      await this.notificationService.createAppointmentAndNotify(integration, winnerInfo, slot);
-      if (campaignId) {
-        this.notificationService.markCampaignFilled(campaignId);
-      }
-      return res.status(200).send({ message: 'Appointment booked and confirmed' });
-    } catch (error) {
-      console.error('❌ Error creating appointment or notifying:', error);
-      await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, winnerInfo);
-      if (campaignId) {
-        this.notificationService.markCampaignFilled(campaignId);
-      }
-      return res.status(200).send({ message: 'Slot taken or booking failed' });
-    }
-  } else {
-    console.log('ℹ️ No valid confirmation phrase or slot ID. Forwarding to generic reply handler.');
+  try {
     await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
-    return res.status(200).send({ message: 'Generic reply processed' });
+    return res.status(200).send({ message: 'Reply processed successfully' });
+  } catch (err) {
+    console.error('❌ Error handling email reply:', err);
+    return res.status(500).send({ error: 'Internal server error' });
   }
 }
+
 
 
   @Post('sms-response')
