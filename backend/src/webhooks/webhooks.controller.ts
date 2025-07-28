@@ -28,7 +28,6 @@ export class WebhooksController {
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
 async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
   const body: any    = req.body;
-  const msgId        = req.headers['message‑id'] as string | undefined;
   const fromEmail    = body.from || body['envelope[from]'];
   const toEmailRaw   = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
   const toEmail      = typeof toEmailRaw === 'string' ? toEmailRaw : '';
