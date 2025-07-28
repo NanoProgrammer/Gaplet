@@ -647,80 +647,60 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-  async handleEmailReply(
-  fromEmail: string,
-  toEmail: string,
-  bodyText: string,
-  originalSubject?: string
-) {
-  const normalizedFrom = fromEmail.toLowerCase();
-  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
-  const campaignId = this.emailToCampaign.get(slotId) ?? this.emailToCampaign.get(normalizedFrom);
+async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string) {
+  const slotId    = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId= this.emailToCampaign.get(slotId);
+  if (!campaignId) return;
+  const campaign  = this.activeCampaigns.get(campaignId);
+  if (!campaign) return;
 
-  if (!campaignId) {
-    console.warn(`No se encontró campaña activa para email reply dirigido a ${toEmail}`);
-    return;
-  }
-  const campaign = this.activeCampaigns.get(campaignId);
-  if (!campaign) {
-    console.warn(`Campaña ${campaignId} no encontrada o ya completada.`);
-    return;
-  }
-
-  // 1) Slot ya reclamado
+  // 1) Si ya se llenó, disculpa con sendSlotTakenReplyEmail
   if (campaign.filled) {
-    const recipient = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
-    console.log(`Slot ${campaignId} ya fue rellenado. Enviando email de slot tomado a ${fromEmail}.`);
     await this.sendSlotTakenReplyEmail(
       fromEmail,
-      recipient?.name,
+      undefined,                // no sabemos su nombre si no viene en recipients
       campaign.slotTime
     );
     return;
   }
 
-  // 2) Detectamos frase de confirmación
-  if (!bodyText?.toLowerCase().includes('i will take it')) {
-    console.log(`Email de ${fromEmail} no contiene frase de confirmación. Ignorando.`);
+  // 2) Falta frase de confirmación
+  if (!bodyText.toLowerCase().includes('i will take it')) {
     return;
   }
 
-  // 3) Primer respondedor: marcamos como filled y hacemos el booking
+  // 3) Primer respondedor: marcamos y hacemos el booking
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
-  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom)!;
-  console.log(`🎉 ${winner.email} es el primero en responder. Reservando cita...`);
+  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase())!;
 
   try {
-    // -- crear cita en Square/Acuity + guardar logs + actualizar DB
     await this.createAppointmentAndNotify(campaign, winner, {
       gapletSlotId: slotId,
-      startAt: campaign.slotTime,
-      locationId: campaign.locationId,
+      startAt:       campaign.slotTime,
+      locationId:    campaign.locationId,
       durationMinutes: campaign.duration || 0,
       serviceVariationId: campaign.serviceVariationId,
-      teamMemberId: campaign.teamMemberId,
+      teamMemberId:  campaign.teamMemberId,
     });
 
-    // -- enviar confirmación por email
+    // 4) Enviar confirmación en hilo
     await this.sendConfirmationReplyEmail(
-      winner.email,
+      winner.email!,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime }
     );
-
-    console.log(`✅ Confirmación enviada a ${winner.email}.`);
   } catch (err) {
-    console.error('Error reservando cita:', err);
-    // Si falla booking, avisamos slot tomado
+    console.error('Booking failed:', err);
+    // 5) Si falla el booking, avisamos como “slot ya tomado”
     await this.sendSlotTakenReplyEmail(
       fromEmail,
       winner.name,
-      campaign.slotTime,
-      'este horario'
+      campaign.slotTime
     );
   }
 }
+
 
 
 
