@@ -3,20 +3,18 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import * as multer from 'multer';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Raw body for Stripe and Square webhooks
+  // Raw body para webhooks de Stripe y Square
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // JSON parser for all other routes
+  // JSON parser para TODO lo demás (note que ya NO incluimos '/webhooks/email-response')
   const rawNeededRoutes = [
     '/webhooks/stripe',
     '/webhooks/square',
-    '/webhooks/email-response',
   ];
   app.use((req, res, next) => {
     if (rawNeededRoutes.includes(req.originalUrl)) {
@@ -25,7 +23,7 @@ async function bootstrap() {
     bodyParser.json()(req, res, next);
   });
 
-  // CORS setup
+  // CORS
   if (process.env.NODE_ENV === 'development') {
     app.enableCors({ origin: '*', methods: '*', credentials: true });
   } else {
@@ -36,7 +34,7 @@ async function bootstrap() {
     });
   }
 
-  // Global validation pipe
+  // Pipes globales
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
