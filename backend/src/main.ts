@@ -12,10 +12,6 @@ async function bootstrap() {
   app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
   app.use('/webhooks/square', express.raw({ type: 'application/json' }));
 
-  // ✅ Multer middleware for SendGrid email-response (multipart/form-data)
-  const upload = multer(); // uses memoryStorage by default
-  app.use('/webhooks/email-response', upload.none());
-
   // JSON parser for all other routes
   const rawNeededRoutes = [
     '/webhooks/stripe',
