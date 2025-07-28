@@ -95,6 +95,11 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
+    const allowedProviders = ['square', 'acuity', 'calendly'];
+  if (!allowedProviders.includes(provider)) {
+    console.warn(`❌ Ignoring unknown provider webhook: ${provider}`);
+    throw new BadRequestException('Unknown webhook provider');
+  }
     const isSquare = provider === 'square';
     const rawBody = (req as any).body instanceof Buffer
       ? (req as any).body.toString('utf8')
