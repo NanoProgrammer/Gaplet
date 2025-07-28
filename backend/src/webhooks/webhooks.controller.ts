@@ -43,7 +43,7 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
       fromEmail,
       toEmail,
       emailText,
-      msgId
+      
     );
     return res.status(200).send({ message: 'Reply processed successfully' });
   } catch (err) {

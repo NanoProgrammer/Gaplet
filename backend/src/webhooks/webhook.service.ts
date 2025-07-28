@@ -649,33 +649,34 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-// 2) handleEmailReply: recibimos originalMsgId y lo propagamos
+// 1) Manejador de la respuesta por e‑mail
 async handleEmailReply(
   fromEmailRaw: string,
   toEmail: string,
-  bodyText: string,
-  originalMsgId?: string
+  bodyText: string
 ) {
-  // — parsear “from”
+  // — 1) Parsear remitente
   let fromEmail = fromEmailRaw.trim();
-  let fromName  = '';
+  let fromName = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
   if (m) {
-    fromName  = m[1].trim();
+    fromName = m[1].trim();
     fromEmail = m[2].trim();
   } else {
     fromName = fromEmail.split('@')[0];
   }
   const normalizedFrom = fromEmail.toLowerCase();
 
-  // — campaignId
-  const slotId     = toEmail.split('@')[0].replace(/^reply\+/, '');
-  const campaignId = this.emailToCampaign.get(slotId) ?? this.emailToCampaign.get(normalizedFrom);
+  // — 2) Extraer campaña
+  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId =
+    this.emailToCampaign.get(slotId) ??
+    this.emailToCampaign.get(normalizedFrom);
   if (!campaignId) return;
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) return;
 
-  // — obtener businessName…
+  // — 3) Cargar nombre de la empresa (igual que en startCampaign)
   let businessName = 'your business';
   try {
     if (campaign.provider === 'square') {
@@ -684,44 +685,59 @@ async handleEmailReply(
       });
       if (integ) {
         const res = await fetch('https://connect.squareup.com/v2/merchants', {
-          headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' },
+          headers: {
+            Authorization: `Bearer ${integ.accessToken}`,
+            'Square-Version': '2025-07-16',
+          },
         });
-        const js  = await res.json();
-        if (js.merchant?.length) businessName = js.merchant[0].business_name;
+        const data = await res.json();
+        if (data.merchant?.length) businessName = data.merchant[0].business_name;
       }
     } else {
       const integ = await this.prisma.connectedIntegration.findUnique({
         where: { userId: campaign.userId, provider: 'acuity' },
       });
       if (integ) {
-        const res  = await fetch('https://acuityscheduling.com/api/v1/me', {
+        const res = await fetch('https://acuityscheduling.com/api/v1/me', {
           headers: { Authorization: `Bearer ${integ.accessToken}` },
         });
         const info = await res.json();
         businessName = info.businessName ?? info.name ?? businessName;
       }
     }
-  } catch {/* silent */}
-
-  // — si ya tomado…
-  if (campaign.filled) {
-    return this.sendSlotTakenReplyEmail(
-      fromEmail,
-      fromName,
-      { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName,
-      originalMsgId
-    );
+  } catch {
+    /* fallback silencioso */
   }
 
-  // — solo “I will take it”
+  // — 4) Si ya estaba filled *ANTES* de este mensaje...
+  if (this.isCampaignFilled(campaignId)) {
+    const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
+    if (rec) {
+      // fue uno de los avisados (pero ya estaba lleno)
+      return this.sendSlotTakenReplyEmail(
+        fromEmail,
+        fromName,
+        { gapletSlotId: slotId, startAt: campaign.slotTime },
+        businessName
+      );
+    } else {
+      // cualquier otro: slot ya fue tomado
+      return this.sendSlotAlreadyTakenEmail(
+        fromEmail,
+        fromName,
+        { gapletSlotId: slotId, startAt: campaign.slotTime },
+        businessName
+      );
+    }
+  }
+
+  // — 5) Sólo procesar “I will take it”
   if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-  // — primer respondedor
+  // — 6) Primer respondedor: marcamos y reservamos
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
-  // — armar ganador
   const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
   const winner: Recipient = rec
     ? { ...rec, email: fromEmail }
@@ -733,62 +749,57 @@ async handleEmailReply(
       winner,
       {
         gapletSlotId: slotId,
-        startAt:       campaign.slotTime,
-        locationId:    campaign.locationId,
+        startAt: campaign.slotTime,
+        locationId: campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
-        teamMemberId:  campaign.teamMemberId,
+        teamMemberId: campaign.teamMemberId,
       }
     );
 
-    // — envío de confirmación en hilo
+    // — 7) Enviar confirmación en hilo
     await this.sendConfirmationReplyEmail(
       winner.email!,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName,
-      originalMsgId
+      businessName
     );
   } catch (err) {
     console.error('Booking failed:', err);
+    // — 8) Si falla el booking, tratamos igual como “slot taken”
     await this.sendSlotTakenReplyEmail(
       fromEmail,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName,
-      originalMsgId
+      businessName
     );
   }
 }
 
 
 
-
-// 3a) sendConfirmationReplyEmail (responde en el mismo hilo)
 async sendConfirmationReplyEmail(
   winnerEmail: string,
   winnerName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
-  businessName: string,
-  originalMsgId?: string
+  businessName: string
 ) {
   const firstName = winnerName?.split(' ')[0] || '';
-  const threadId  = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
-  const localpart = this.formatSenderEmail(businessName);
+  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
 
   await sgMail.send({
     to: winnerEmail,
     from: {
-      email: `${localpart}@${process.env.SENDGRID_DOMAIN}`,
-      name:  businessName,
+      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
+      name: businessName,
     },
     replyTo: {
-      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name:  businessName,
+      email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      name: businessName,
     },
     headers: {
-      'In-Reply-To': threadId,
-      'References' : threadId,
+      'In-Reply-To': messageId,
+      'References': messageId,
     },
     subject: `Re: Appointment slot available`,
     text:
@@ -797,6 +808,7 @@ async sendConfirmationReplyEmail(
       `— The ${businessName} Team`,
   });
 }
+
 
 // 3b) sendSlotTakenReplyEmail (idem, mismo hilo)
 async sendSlotTakenReplyEmail(
@@ -1035,35 +1047,38 @@ async sendSlotTakenReplyEmail(
 }
 
 
-  async sendSlotAlreadyTakenEmail(fromEmail: string, recipient?: Recipient) {
-  let msg = `Hello${recipient?.name ? ' ' + recipient.name.split(' ')[0] : ''},\n\n` +
-    `Thanks for your response. Unfortunately, that appointment slot has already been filled by another client.\n`;
-  if (recipient?.nextAppt) {
-    msg += `Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed.\n`;
-  } else {
-    msg += `If you’d like to book another time, please contact us or check your client portal.\n`;
-  }
-  msg += `\nBest regards,\nGaplet Team`;
+async sendSlotAlreadyTakenEmail(
+  recipientEmail: string,
+  recipientName: string | null,
+  slot: { gapletSlotId: string; startAt: Date },
+  businessName: string
+) {
+  const firstName = recipientName?.split(' ')[0] || '';
+  const when = slot.startAt.toLocaleString();
+  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
 
   await sgMail.send({
-    to: fromEmail,
-    from: `Gaplet <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-    subject: `Appointment slot unavailable`,
-    text: msg,
+    to: recipientEmail,
+    from: {
+      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
+      name: businessName,
+    },
+    replyTo: {
+      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      name: businessName,
+    },
+    headers: {
+      'In-Reply-To': messageId,
+      'References': messageId,
+    },
+    subject: `Re: Appointment slot available`,
+    text:
+      `Hi${firstName ? ' ' + firstName : ''},\n\n` +
+      `⚠️ Unfortunately, the slot on ${when} is no longer available.\n\n` +
+      `— The ${businessName} Team`,
   });
-  if (recipient?.phone) {
-    try {
-      await this.twilioClient.messages.create({
-        to: recipient.phone,
-        from: process.env.TWILIO_FROM_NUMBER,
-        body: `Sorry, that appointment was already filled. Your current booking remains valid.`,
-      });
-    } catch (err) {
-      // If SMS fails, just log and continue (no throw needed)
-      console.error('Failed to send slot-taken SMS:', err);
-    }
-  }
 }
+
 
 
 
