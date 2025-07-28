@@ -623,6 +623,8 @@ export class NotificationService {
     body: string,
     userId: string,
   ) {
+
+    
     if (this.isCampaignFilled(campaignId)) return;
     let sentCount = 0;
     for (const rec of recipients) {
@@ -653,7 +655,7 @@ async handleEmailReply(
   toEmail: string,
   bodyText: string
 ) {
-  // — Parsear nombre y dirección
+  // 1) Parsear nombre y dirección
   let fromEmail = fromEmailRaw.trim();
   let fromName = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
@@ -665,7 +667,7 @@ async handleEmailReply(
   }
   const normalizedFrom = fromEmail.toLowerCase();
 
-  // — Sacar campaignId del reply‑to
+  // 2) Extraer campaignId
   const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
   const campaignId =
     this.emailToCampaign.get(slotId) ??
@@ -680,27 +682,62 @@ async handleEmailReply(
     return;
   }
 
-  // — Si ya estaba filled, avisar
-  if (campaign.filled) {
-    await this.sendSlotTakenReplyEmail(
-      fromEmail,
-      fromName,
-      campaign.slotTime
-    );
-    return;
+  // 3) Obtener businessName desde Square o Acuity
+  let businessName = 'your business';
+  try {
+    if (campaign.provider === 'square') {
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'square' },
+      });
+      if (integration) {
+        const res = await fetch('https://connect.squareup.com/v2/merchants', {
+          headers: {
+            Authorization: `Bearer ${integration.accessToken}`,
+            'Square-Version': '2025-07-16',
+          },
+        });
+        const data = await res.json();
+        if (data.merchant?.length) {
+          businessName = data.merchant[0].business_name;
+        }
+      }
+    } else {
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' },
+      });
+      if (integration) {
+        const res = await fetch('https://acuityscheduling.com/api/v1/me', {
+          headers: { Authorization: `Bearer ${integration.accessToken}` },
+        });
+        const info = await res.json();
+        businessName = info.businessName ?? info.name ?? businessName;
+      }
+    }
+  } catch {
+    // fall back sin interrumpir
   }
 
-  // — Ignorar si no confirma
+  // 4) Si ya filled → slot tomado
+  if (campaign.filled) {
+    return this.sendSlotTakenReplyEmail(
+      fromEmail,
+      fromName,
+      { gapletSlotId: slotId, startAt: campaign.slotTime },
+      businessName
+    );
+  }
+
+  // 5) Ignorar si no contiene “I will take it”
   if (!bodyText.toLowerCase().includes('i will take it')) {
     console.log(`Reply from ${fromEmail} ignored (no confirm phrase)`);
     return;
   }
 
-  // — Primer respondedor
+  // 6) Primer respondedor → marcar y reservar
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
-  // — Armar winner info
+  // 7) Armar info del ganador
   const rec = campaign.recipients.find(r =>
     r.email?.toLowerCase() === normalizedFrom
   );
@@ -709,7 +746,6 @@ async handleEmailReply(
     : { name: fromName, email: fromEmail };
 
   try {
-    // -- Crear la cita
     await this.createAppointmentAndNotify(
       campaign,
       winner,
@@ -722,20 +758,23 @@ async handleEmailReply(
         teamMemberId: campaign.teamMemberId,
       }
     );
-    // -- Confirmar por email
+
+    // 8) Enviar confirmación en hilo
     await this.sendConfirmationReplyEmail(
       winner.email!,
       winner.name,
-      { gapletSlotId: slotId, startAt: campaign.slotTime }
+      { gapletSlotId: slotId, startAt: campaign.slotTime },
+      businessName
     );
     console.log(`✅ Confirm sent to ${winner.email}`);
   } catch (err) {
     console.error('Booking failed:', err);
-    // -- Si falla: slot ya tomado
+    // 9) Si falla booking → slot ya tomado
     await this.sendSlotTakenReplyEmail(
       fromEmail,
       winner.name,
-      campaign.slotTime
+      { gapletSlotId: slotId, startAt: campaign.slotTime },
+      businessName
     );
   }
 }
@@ -746,23 +785,30 @@ async sendConfirmationReplyEmail(
   winnerEmail: string,
   winnerName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
+  businessName: string
 ) {
   const firstName = winnerName?.split(' ')[0] || '';
+  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+
   await sgMail.send({
     to: winnerEmail,
     from: {
-      email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
-      name: 'Gaplets',
+      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
+      name: businessName,               // ahora aparece el nombre de la empresa
     },
     replyTo: {
-      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name: 'Gaplets',
+      email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      name: businessName,
+    },
+    headers: {
+      'In-Reply-To': messageId,
+      'References': messageId
     },
     subject: `Re: Appointment slot available`,
     text:
       `Hi${firstName ? ' ' + firstName : ''},\n\n` +
       `✅ Your appointment on ${slot.startAt.toLocaleString()} has been booked!\n\n` +
-      `— The Gaplet Team`,
+      `— The ${businessName} Team`,
   });
 }
 
@@ -770,24 +816,36 @@ async sendConfirmationReplyEmail(
   // 3) Reemplaza sendSlotTakenReplyEmail:
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
-  recipientName?: string,
-  slotDate?: Date,
+  recipientName: string | null,
+  slot: { gapletSlotId: string; startAt: Date },
+  businessName: string
 ) {
   const firstName = recipientName?.split(' ')[0] || '';
-  const when = slotDate?.toLocaleString() || 'that time';
+  const when = slot.startAt.toLocaleString();
+  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+
   await sgMail.send({
     to: recipientEmail,
     from: {
       email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
-      name: 'Gaplets',
+      name: businessName,
+    },
+    replyTo: {
+      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      name: businessName,
+    },
+    headers: {
+      'In-Reply-To': messageId,
+      'References': messageId,
     },
     subject: `Re: Appointment slot available`,
     text:
       `Hi${firstName ? ' ' + firstName : ''},\n\n` +
       `⚠️ Unfortunately, the slot on ${when} is no longer available.\n\n` +
-      `— The Gaplet Team`,
+      `— The ${businessName} Team`,
   });
 }
+
 
 
 
@@ -871,6 +929,9 @@ async sendSlotTakenReplyEmail(
         console.error('Error searching/creating Square customer:', err);
       }
     }
+    if (!winner.customerId) {
+  throw new Error('Cannot create booking: missing customerId');
+}
 
     // Crear la reserva en Square
     const bookingPayload = {
