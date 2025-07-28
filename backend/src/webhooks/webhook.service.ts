@@ -648,156 +648,162 @@ export class NotificationService {
   }
 
 async handleEmailReply(
-  fromEmailRaw: string,
-  toEmail: string,
-  bodyText: string
-) {
-  // 1) Parsear nombre y email
-  let fromEmail = fromEmailRaw.trim();
-  let fromName = '';
-  const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
-  if (m) {
-    fromName = m[1].trim();
-    fromEmail = m[2].trim();
-  } else {
-    // si no hay "<>", tomamos la parte antes de "@"
-    fromName = fromEmail.split('@')[0];
-  }
-  const normalizedFrom = fromEmail.toLowerCase();
+    fromEmailRaw: string,
+    toEmail: string,
+    bodyText: string
+  ) {
+    // 1) Parsear nombre y email
+    let fromEmail = fromEmailRaw.trim();
+    let fromName = '';
+    const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
+    if (m) {
+      fromName = m[1].trim();
+      fromEmail = m[2].trim();
+    } else {
+      fromName = fromEmail.split('@')[0];
+    }
+    const normalizedFrom = fromEmail.toLowerCase();
 
-  // 2) Extraer campaignId del reply-to
-  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
-  const campaignId =
-    this.emailToCampaign.get(slotId) ??
-    this.emailToCampaign.get(normalizedFrom);
-  if (!campaignId) {
-    console.warn(`No campaign for reply to ${toEmail}`);
-    return;
-  }
-  const campaign = this.activeCampaigns.get(campaignId);
-  if (!campaign) {
-    console.warn(`Campaign ${campaignId} not found`);
-    return;
-  }
+    // 2) Extraer campaignId del reply-to
+    const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+    const campaignId =
+      this.emailToCampaign.get(slotId) ??
+      this.emailToCampaign.get(normalizedFrom);
+    if (!campaignId) {
+      console.warn(`No campaign for reply to ${toEmail}`);
+      return;
+    }
+    const campaign = this.activeCampaigns.get(campaignId);
+    if (!campaign) {
+      console.warn(`Campaign ${campaignId} not found`);
+      return;
+    }
 
-  // 3) Si ya está filled, enviamos “slot taken”
-  if (campaign.filled) {
-    await this.sendSlotTakenReplyEmail(
-      fromEmail,
-      fromName,
-      campaign.slotTime
+    // 3) Si ya está filled, enviamos “slot taken”
+    if (campaign.filled) {
+      await this.sendSlotTakenReplyEmail(
+        fromEmail,
+        fromName,
+        campaign.slotTime
+      );
+      return;
+    }
+
+    // 4) Solo procesar si contiene "I will take it"
+    if (!bodyText.toLowerCase().includes('i will take it')) {
+      console.log(`Reply from ${fromEmail} ignored (no confirm phrase)`);
+      return;
+    }
+
+    // 5) Primer respondedor: marcar filled y hacer booking
+    campaign.filled = true;
+    this.activeCampaigns.set(campaignId, campaign);
+
+    // 6) Buscar el recipient original o fallback
+    const rec = campaign.recipients.find(r =>
+      r.email?.toLowerCase() === normalizedFrom
     );
-    return;
+    const winnerInfo: Recipient = rec
+      ? ({ ...rec, email: fromEmail })
+      : { email: fromEmail, name: fromName, phone: null, customerId: null };
+
+    try {
+      await this.createAppointmentAndNotify(
+        campaign,
+        winnerInfo,
+        {
+          gapletSlotId: slotId,
+          startAt: campaign.slotTime,
+          locationId: campaign.locationId,
+          durationMinutes: campaign.duration || 0,
+          serviceVariationId: campaign.serviceVariationId,
+          teamMemberId: campaign.teamMemberId,
+        }
+      );
+      // 7) Enviar confirmación en hilo
+      await this.sendConfirmationReplyEmail(
+        winnerInfo.email!,
+        winnerInfo.name,
+        { gapletSlotId: slotId, startAt: campaign.slotTime }
+      );
+      console.log(`✅ Confirm sent to ${winnerInfo.email}`);
+    } catch (err) {
+      console.error('Booking failed:', err);
+      // 8) Si falla el booking, avisamos “slot taken”
+      await this.sendSlotTakenReplyEmail(
+        fromEmail,
+        winnerInfo.name,
+        campaign.slotTime
+      );
+    }
   }
 
-  // 4) Solo procesar si contiene “I will take it”
-  if (!bodyText.toLowerCase().includes('i will take it')) {
-    console.log(`Reply from ${fromEmail} ignored (no confirm phrase)`);
-    return;
-  }
+  async sendConfirmationReplyEmail(
+    winnerEmail: string,
+    winnerName: string,
+    slot: { gapletSlotId: string; startAt: Date },
+  ) {
+    const firstName = winnerName?.split(' ')[0] || '';
+    const msg = {
+      to: winnerEmail,
+      from: {
+        email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+        name: 'Gaplets',
+      },
+      replyTo: {
+        email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+        name: 'Gaplets',
+      },
+      subject: `Re: Appointment slot available`,
+      text:
+        `Hi${firstName ? ' ' + firstName : ''},\n\n` +
+        `✅ Your appointment on ${slot.startAt.toLocaleString()} has been successfully booked.\n\n` +
+        `Thank you for confirming so quickly.\n\n` +
+        `— The Gaplet Team`,
+    };
 
-  // 5) Primer respondedor: marcar filled y hacer booking
-  campaign.filled = true;
-  this.activeCampaigns.set(campaignId, campaign);
-
-  // 6) Buscar el recipient original o fallback
-  const rec = campaign.recipients.find(r =>
-    r.email?.toLowerCase() === normalizedFrom
-  );
-  const winnerInfo: Recipient = rec
-    ? ({ ...rec, email: fromEmail })
-    : { email: fromEmail, name: fromName, phone: null, customerId: null };
-
-  try {
-    await this.createAppointmentAndNotify(
-      campaign,
-      winnerInfo,
-      {
-        gapletSlotId: slotId,
-        startAt: campaign.slotTime,
-        locationId: campaign.locationId,
-        durationMinutes: campaign.duration || 0,
-        serviceVariationId: campaign.serviceVariationId,
-        teamMemberId: campaign.teamMemberId,
+    try {
+      await sgMail.send(msg);
+    } catch (err: any) {
+      if (err.response?.body?.errors) {
+        console.error('SendGrid errors (confirmation):', err.response.body.errors);
       }
-    );
-    // 7) Enviar confirmación en hilo
-    await this.sendConfirmationReplyEmail(
-      winnerInfo.email!,
-      winnerInfo.name,
-      { gapletSlotId: slotId, startAt: campaign.slotTime }
-    );
-    console.log(`✅ Confirm sent to ${winnerInfo.email}`);
-  } catch (err) {
-    console.error('Booking failed:', err);
-    // 8) Si falla el booking, avisamos “slot taken”
-    await this.sendSlotTakenReplyEmail(
-      fromEmail,
-      winnerInfo.name,
-      campaign.slotTime
-    );
+      throw err;
+    }
   }
-}
 
+  async sendSlotTakenReplyEmail(
+    recipientEmail: string,
+    recipientName: string,
+    slotDate: Date
+  ) {
+    const firstName = recipientName?.split(' ')[0] || '';
+    const msg = {
+      to: recipientEmail,
+      from: {
+        email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+        name: 'Gaplets',
+      },
+      replyTo: {
+        email: `reply+info@${process.env.SENDGRID_REPLY_DOMAIN}`,
+        name: 'Gaplets',
+      },
+      subject: `Re: Appointment slot available`,
+      text:
+        `Hi${firstName ? ' ' + firstName : ''},\n\n` +
+        `⚠️ Unfortunately, the slot on ${slotDate.toLocaleString()} is no longer available.\n\n` +
+        `— The Gaplet Team`,
+    };
 
-
-
-
-async sendConfirmationReplyEmail(
-  winnerEmail: string,
-  winnerName: string | null,
-  slot: { gapletSlotId: string; startAt: Date },
-) {
-  const firstName = winnerName?.split(' ')[0] || '';
-
-  await sgMail.send({
-    to: winnerEmail,
-    from: {
-      // Este dominio ya lo tienes autenticado en SendGrid
-      email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
-      name: 'Gaplets',
-    },
-    // La respuesta irá a tu subdominio reply, pero no lo usas como remitente
-    replyTo: {
-      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name: 'Gaplets',
-    },
-    subject: `Re: Appointment slot available`,
-    text:
-      `Hi${firstName ? ' ' + firstName : ''},\n\n` +
-      `✅ Your appointment on ${slot.startAt.toLocaleString()} has been successfully booked.\n\n` +
-      `Thank you for confirming your interest so quickly. We’ve reserved this time just for you.\n\n` +
-      `— The Gaplet Team`,
-  });
-}
-
-async sendSlotTakenReplyEmail(
-  recipientEmail: string,
-  recipientName?: string,
-  slotDate?: Date,
-  fallbackText?: string
-) {
-  const firstName = recipientName?.split(' ')[0] || '';
-  const readableSlot = slotDate?.toLocaleString() || fallbackText || 'that time';
-
-  await sgMail.send({
-    to: recipientEmail,
-    from: {
-      email: `reply+info@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name: 'Gaplets',
-    },
-    subject: `Re: Appointment slot available`,
-    text: `Hi${firstName ? ' ' + firstName : ''},\n\n` +
-      `Thanks for your interest in the available appointment.\n\n` +
-      `⚠️ Unfortunately, the slot on ${readableSlot} has already been taken by another client who responded first.\n\n` +
-      `If you already have an upcoming appointment, it remains confirmed. If not, feel free to contact us or visit your client portal to book another time.\n\n` +
-      `We appreciate your quick response and hope to assist you soon.\n\n` +
-      `— The Gaplet Team`,
-    headers: {
-      'Reply-To': `no-reply@${process.env.SENDGRID_DOMAIN}`,
-    },
-  });
-}
+    try {
+      await sgMail.send(msg);
+    } catch (err: any) {
+      if (err.response?.body?.errors) {
+        console.error('SendGrid errors (slot-taken):', err.response.body.errors);
+      }
+      throw err;
+    }
+  }
 
 
   async createAppointmentAndNotify(
