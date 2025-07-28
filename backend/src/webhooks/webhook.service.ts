@@ -822,18 +822,24 @@ async sendSlotTakenReplyEmail(
   ) {
     // ... provider-specific booking logic (Square/Acuity) omitted for brevity
     // upon success you must:
-    await this.prisma.replacementLog.create({
-      data: {
-        userId: campaign.userId,
-        clientEmail: winner.email!,
-        clientPhone: winner.phone || null,
-        clientName: winner.name || null,
-        appointmentTime: slot.startAt,
-        provider: campaign.provider,
-        providerBookingId: /* id returned from provider */ '',
-        respondedAt: new Date(),
-      },
-    });
+    const bookingPayload = {
+  booking: {
+    start_at: slot.startAt.toISOString(),
+    location_id: slot.locationId,
+    customer_id: winner.customerId,
+    customer_note: 'Booked via Gaplet auto-replacement',
+    appointment_segments: [{
+      duration_minutes: slot.durationMinutes,
+      service_variation_id: slot.serviceVariationId,
+      team_member_id: slot.teamMemberId,
+    }],
+  }
+};
+console.log('⚙️ POST /v2/bookings payload:', JSON.stringify(bookingPayload, null,2));
+const resp = await fetch('https://connect.squareup.com/v2/bookings', { /* ... */ });
+const result = await resp.json();
+console.log('⚙️ Square booking response:', result);
+if (!result.booking?.id) throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
     await this.prisma.openSlot.update({
       where: { gapletSlotId: slot.gapletSlotId },
       data: { isTaken: true, takenAt: new Date() },
