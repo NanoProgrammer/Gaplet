@@ -734,18 +734,21 @@ async sendConfirmationReplyEmail(
   await sgMail.send({
     to: winnerEmail,
     from: {
+      // Este dominio ya lo tienes autenticado en SendGrid
+      email: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+      name: 'Gaplets',
+    },
+    // La respuesta irá a tu subdominio reply, pero no lo usas como remitente
+    replyTo: {
       email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
       name: 'Gaplets',
     },
     subject: `Re: Appointment slot available`,
-    text: `Hi${firstName ? ' ' + firstName : ''},\n\n` +
+    text:
+      `Hi${firstName ? ' ' + firstName : ''},\n\n` +
       `✅ Your appointment on ${slot.startAt.toLocaleString()} has been successfully booked.\n\n` +
       `Thank you for confirming your interest so quickly. We’ve reserved this time just for you.\n\n` +
-      `See you then!\n\n` +
       `— The Gaplet Team`,
-    headers: {
-      'Reply-To': `no-reply@${process.env.SENDGRID_DOMAIN}`,
-    },
   });
 }
 
