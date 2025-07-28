@@ -150,7 +150,7 @@ export class WebhooksController {
     return { received: true };
   }
 
-  @Post('email-response')
+ @Post('email-response')
 @HttpCode(200)
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
 async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
@@ -158,114 +158,74 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
   const fromEmail: string = body.from || body['envelope[from]'];
   const toEmail: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
   const emailText: string = body.text || body.plain || body.html || '';
-  
+
   console.log('📩 Webhook from email-response', { fromEmail, toEmail });
-  
-  if (fromEmail && toEmail) {
-    // Normalize the email text and check for acceptance phrases
-    const textLower = emailText.toLowerCase();
-    const accepted = textLower.includes('i will take it') || textLower.includes('yes') || textLower.includes('sí');
-    console.log('📝 Incoming email text (lowercased):', textLower);
-    console.log('✅ Contains confirmation phrase?', accepted);
-    
-    // Extract the slot (campaign) ID from the reply-to address.
-    // The local part of the email (before @) is expected to be the unique gapletSlotId or campaignId.
-    let gapletSlotId: string | null = null;
-    if (toEmail) {
-      const localPart = toEmail.split('@')[0];
-      gapletSlotId = localPart.startsWith('reply+') ? localPart.slice('reply+'.length) : localPart;
+
+  if (!fromEmail || !toEmail) {
+    return res.status(400).send({ error: 'Missing email headers' });
+  }
+
+  const textLower = emailText.toLowerCase();
+  const accepted = textLower.includes('i will take it') || textLower.includes('yes') || textLower.includes('sí');
+  console.log('📝 Incoming email text (lowercased):', textLower);
+  console.log('✅ Contains confirmation phrase?', accepted);
+
+  let gapletSlotId: string | null = null;
+  const localPart = toEmail.split('@')[0];
+  gapletSlotId = localPart.startsWith('reply+') ? localPart.slice('reply+'.length) : localPart;
+  console.log('🔍 Extracted gapletSlotId from reply email:', gapletSlotId);
+
+  if (accepted && gapletSlotId) {
+    const slot = await this.prisma.openSlot.findUnique({ where: { gapletSlotId } });
+    if (!slot) {
+      console.warn(`❌ Slot with ID ${gapletSlotId} not found in database.`);
+      return res.status(404).send({ error: 'Slot not found' });
     }
-    console.log('🔍 Extracted gapletSlotId from reply email:', gapletSlotId);
-    
-    if (accepted && gapletSlotId) {
-      // This is a positive confirmation for a specific slot
-      const slot = await this.prisma.openSlot.findUnique({ where: { gapletSlotId } });
-      if (!slot) {
-        console.warn(`❌ Slot with ID ${gapletSlotId} not found in database.`);
-        return res.status(404).send({ error: 'Slot not found' });
-      }
-      
-      if (slot.isTaken) {
-        // Slot has already been claimed by someone else
-        console.log(`⚠️ Slot ${gapletSlotId} already taken by another responder.`);
-        // Prepare recipient info (if available in active campaign data) for a personalized apology
-        let recipientInfo: any = null;
-        const campaignId = this.notificationService.getCampaignIdBySlotId(gapletSlotId);
-        if (campaignId) {
-          const campaign = this.notificationService.getCampaign(campaignId);
-          if (campaign) {
-            recipientInfo = campaign.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
-          }
-        }
-        // Send "slot already filled" notification to this responder
-        await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, recipientInfo);
-        console.log(`📧 Sent slot-unavailable email to ${fromEmail}.`);
-        return res.status(200).send({ message: 'Slot already taken' });
-      }
-      
-      // Slot is available — this is the first responder. Proceed to book the appointment.
-      console.log(`✅ Slot ${gapletSlotId} is available. Booking appointment for responder ${fromEmail}...`);
-      const user = await this.prisma.user.findUnique({ where: { id: slot.userId } });
-      if (!user) {
-        console.error('❌ Associated user (business owner) not found for slot:', slot);
-        return res.status(404).send({ error: 'User not found' });
-      }
-      const integration = await this.prisma.connectedIntegration.findFirst({
-        where: { userId: user.id, provider: slot.provider },
-      });
-      if (!integration) {
-        console.error(`❌ No integration found for provider '${slot.provider}' and user ${user.id}.`);
-        return res.status(404).send({ error: 'Integration not found' });
-      }
-      
-      // Build winner information (email, name, phone, customerId) from campaign data if available
-      let winnerInfo: any = { email: fromEmail, name: '', phone: null, customerId: null };
+
+    if (slot.isTaken) {
+      console.log(`⚠️ Slot ${gapletSlotId} already taken.`);
       const campaignId = this.notificationService.getCampaignIdBySlotId(gapletSlotId);
-      if (campaignId) {
-        const campaign = this.notificationService.getCampaign(campaignId);
-        if (campaign) {
-          const foundRecipient = campaign.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
-          if (foundRecipient) {
-            winnerInfo = { ...foundRecipient, email: fromEmail };
-          }
-        }
-      }
-      console.log('👤 Winner info for booking:', winnerInfo);
-      
-      try {
-        console.log(`🔔 Creating appointment in ${slot.provider.toUpperCase()} for slot ${gapletSlotId}...`);
-        // This will create the appointment, update DB (ReplacementLog, OpenSlot, user metrics), and send confirmation notification
-        await this.notificationService.createAppointmentAndNotify(integration, winnerInfo, slot);
-        console.log(`🎉 Appointment booked in ${slot.provider} for ${winnerInfo.email}. Confirmation sent.`);
-      } catch (error) {
-        console.error('❌ Error creating appointment or sending notifications:', error);
-        console.warn(`⚠️ Slot ${gapletSlotId} booking failed or already filled by another.`);
-        // If booking fails (e.g., race condition or API error), notify the client that the slot is not available
-        await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, winnerInfo);
-        console.log(`📧 Sent apology email to ${fromEmail} due to booking failure.`);
-        // Mark the campaign as filled to prevent any further notifications for this slot
-        if (campaignId) {
-          this.notificationService.markCampaignFilled(campaignId);
-        }
-        return res.status(200).send({ message: 'Slot taken or booking failed' });
-      }
-      
-      // Mark the notification campaign as filled to stop other notifications, if applicable
+      const campaign = campaignId ? this.notificationService.getCampaign(campaignId) : null;
+      const recipientInfo = campaign?.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
+      await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, recipientInfo);
+      return res.status(200).send({ message: 'Slot already taken' });
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: slot.userId } });
+    if (!user) return res.status(404).send({ error: 'User not found' });
+
+    const integration = await this.prisma.connectedIntegration.findFirst({
+      where: { userId: user.id, provider: slot.provider },
+    });
+    if (!integration) return res.status(404).send({ error: 'Integration not found' });
+
+    let winnerInfo: any = { email: fromEmail, name: '', phone: null, customerId: null };
+    const campaignId = this.notificationService.getCampaignIdBySlotId(gapletSlotId);
+    const campaign = campaignId ? this.notificationService.getCampaign(campaignId) : null;
+    const foundRecipient = campaign?.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase());
+    if (foundRecipient) {
+      winnerInfo = { ...foundRecipient, email: fromEmail };
+    }
+
+    try {
+      await this.notificationService.createAppointmentAndNotify(integration, winnerInfo, slot);
       if (campaignId) {
         this.notificationService.markCampaignFilled(campaignId);
       }
-      console.log(`✅ Slot ${gapletSlotId} marked as filled and campaign closed.`);
-    } else {
-      // The email either did not contain a confirmation phrase or no slot ID was found.
-      console.log('ℹ️ No valid confirmation phrase or slot ID. Forwarding to generic reply handler.');
-      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+      return res.status(200).send({ message: 'Appointment booked and confirmed' });
+    } catch (error) {
+      console.error('❌ Error creating appointment or notifying:', error);
+      await this.notificationService.sendSlotAlreadyTakenEmail(fromEmail, winnerInfo);
+      if (campaignId) {
+        this.notificationService.markCampaignFilled(campaignId);
+      }
+      return res.status(200).send({ message: 'Slot taken or booking failed' });
     }
-    
-    console.log('📧 Email response handling completed.');
+  } else {
+    console.log('ℹ️ No valid confirmation phrase or slot ID. Forwarding to generic reply handler.');
+    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+    return res.status(200).send({ message: 'Generic reply processed' });
   }
-  
-  // Respond with 200 OK to acknowledge receipt of the webhook
-  return res.status(200).send({ received: true });
 }
 
 
