@@ -21,7 +21,74 @@ export class WebhooksController {
     private readonly prisma: PrismaManagerService,
   ) {}
 
-  @Post(':provider')
+ 
+ @Post('email-response')
+@HttpCode(200)
+@UseInterceptors(AnyFilesInterceptor(multerOptions))
+async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
+  const body: any = req.body;
+
+  const fromEmail: string = body.from || body['envelope[from]'];
+  const toEmailRaw: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
+  const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
+  const emailText: string = body.text || body.plain || body.html || '';
+
+  console.log('📩 Webhook from email-response', { fromEmail, toEmail });
+
+  if (!fromEmail || !toEmail) {
+    return res.status(400).send({ error: 'Missing email headers' });
+  }
+
+  try {
+    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+    return res.status(200).send({ message: 'Reply processed successfully' });
+  } catch (err) {
+    console.error('❌ Error handling email reply:', err);
+    return res.status(500).send({ error: 'Internal server error' });
+  }
+}
+
+
+
+  @Post('sms-response')
+  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
+    const body: any = req.body;
+    const fromPhone: string = body.From;
+    const smsText: string = body.Body || '';
+    console.log('📱 SMS response received', { fromPhone, smsText });
+    if (fromPhone && smsText) {
+      // Procesar la respuesta SMS entrante
+      await this.notificationService.handleSmsReply(fromPhone, smsText);
+      // Si la respuesta SMS es afirmativa (ej. "Sí" o "yes"), actualizar métricas (el NotificationService se encarga del resto)
+      const text = smsText.toLowerCase();
+      const positiveReply =
+        text.includes('yes') || text.includes('sí') || text.includes('si');
+      if (positiveReply) {
+        // Buscar alguna integración activa (priorizar Square, luego Acuity)
+        let integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'square' },
+        });
+        if (!integration) {
+          integration = await this.prisma.connectedIntegration.findFirst({
+            where: { provider: 'acuity' },
+          });
+        }
+        if (integration) {
+          const userId = integration.userId;
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              totalReplacements: { increment: 1 },
+              lastReplacementAt: new Date(),
+            },
+          });
+        }
+      }
+    }
+    // Respuesta vacía XML para confirmar recepción al servicio SMS (Twilio)
+    res.type('text/xml').send('<Response></Response>');
+  }
+   @Post(':provider')
   @HttpCode(200)
   async handleWebhook(
     @Param('provider') provider: 'calendly' | 'acuity' | 'square',
@@ -150,70 +217,4 @@ export class WebhooksController {
     return { received: true };
   }
 
- @Post('email-response')
-@HttpCode(200)
-@UseInterceptors(AnyFilesInterceptor(multerOptions))
-async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
-  const body: any = req.body;
-
-  const fromEmail: string = body.from || body['envelope[from]'];
-  const toEmailRaw: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
-  const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
-  const emailText: string = body.text || body.plain || body.html || '';
-
-  console.log('📩 Webhook from email-response', { fromEmail, toEmail });
-
-  if (!fromEmail || !toEmail) {
-    return res.status(400).send({ error: 'Missing email headers' });
-  }
-
-  try {
-    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
-    return res.status(200).send({ message: 'Reply processed successfully' });
-  } catch (err) {
-    console.error('❌ Error handling email reply:', err);
-    return res.status(500).send({ error: 'Internal server error' });
-  }
-}
-
-
-
-  @Post('sms-response')
-  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
-    const body: any = req.body;
-    const fromPhone: string = body.From;
-    const smsText: string = body.Body || '';
-    console.log('📱 SMS response received', { fromPhone, smsText });
-    if (fromPhone && smsText) {
-      // Procesar la respuesta SMS entrante
-      await this.notificationService.handleSmsReply(fromPhone, smsText);
-      // Si la respuesta SMS es afirmativa (ej. "Sí" o "yes"), actualizar métricas (el NotificationService se encarga del resto)
-      const text = smsText.toLowerCase();
-      const positiveReply =
-        text.includes('yes') || text.includes('sí') || text.includes('si');
-      if (positiveReply) {
-        // Buscar alguna integración activa (priorizar Square, luego Acuity)
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
-        });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-        if (integration) {
-          const userId = integration.userId;
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
-      }
-    }
-    // Respuesta vacía XML para confirmar recepción al servicio SMS (Twilio)
-    res.type('text/xml').send('<Response></Response>');
-  }
 }
