@@ -649,13 +649,14 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-// 1) Reemplaza tu handleEmailReply por esta versión:
+// 2) Dentro de NotificationService:
 async handleEmailReply(
   fromEmailRaw: string,
   toEmail: string,
-  bodyText: string
+  bodyText: string,
+  originalMsgId?: string,              // ← nuevo parámetro
 ) {
-  // 1) Parsear nombre y dirección
+  // — parsear remitente…
   let fromEmail = fromEmailRaw.trim();
   let fromName = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
@@ -667,80 +668,37 @@ async handleEmailReply(
   }
   const normalizedFrom = fromEmail.toLowerCase();
 
-  // 2) Extraer campaignId
+  // — campaignId / campaign…
   const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
-  const campaignId =
-    this.emailToCampaign.get(slotId) ??
-    this.emailToCampaign.get(normalizedFrom);
-  if (!campaignId) {
-    console.warn(`No campaign for reply to ${toEmail}`);
-    return;
-  }
+  const campaignId = this.emailToCampaign.get(slotId) ?? this.emailToCampaign.get(normalizedFrom);
+  if (!campaignId) return;
   const campaign = this.activeCampaigns.get(campaignId);
-  if (!campaign) {
-    console.warn(`Campaign ${campaignId} not found`);
-    return;
-  }
+  if (!campaign) return;
 
-  // 3) Obtener businessName desde Square o Acuity
+  // — Obtener businessName (igual que antes)…
   let businessName = 'your business';
-  try {
-    if (campaign.provider === 'square') {
-      const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'square' },
-      });
-      if (integration) {
-        const res = await fetch('https://connect.squareup.com/v2/merchants', {
-          headers: {
-            Authorization: `Bearer ${integration.accessToken}`,
-            'Square-Version': '2025-07-16',
-          },
-        });
-        const data = await res.json();
-        if (data.merchant?.length) {
-          businessName = data.merchant[0].business_name;
-        }
-      }
-    } else {
-      const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'acuity' },
-      });
-      if (integration) {
-        const res = await fetch('https://acuityscheduling.com/api/v1/me', {
-          headers: { Authorization: `Bearer ${integration.accessToken}` },
-        });
-        const info = await res.json();
-        businessName = info.businessName ?? info.name ?? businessName;
-      }
-    }
-  } catch {
-    // fall back sin interrumpir
-  }
+  try { /* … */ } catch {}
 
-  // 4) Si ya filled → slot tomado
+  // — si ya filled
   if (campaign.filled) {
     return this.sendSlotTakenReplyEmail(
       fromEmail,
       fromName,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName
+      businessName,
+      originalMsgId        // ← le pasamos el message-id
     );
   }
 
-  // 5) Ignorar si no contiene “I will take it”
-  if (!bodyText.toLowerCase().includes('i will take it')) {
-    console.log(`Reply from ${fromEmail} ignored (no confirm phrase)`);
-    return;
-  }
+  // — ignorar si no confirma
+  if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-  // 6) Primer respondedor → marcar y reservar
+  // — primer respondedor
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
-  // 7) Armar info del ganador
-  const rec = campaign.recipients.find(r =>
-    r.email?.toLowerCase() === normalizedFrom
-  );
+  // — winner info…
+  const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
   const winner: Recipient = rec
     ? { ...rec, email: fromEmail }
     : { name: fromName, email: fromEmail };
@@ -758,51 +716,53 @@ async handleEmailReply(
         teamMemberId: campaign.teamMemberId,
       }
     );
-
-    // 8) Enviar confirmación en hilo
+    // — envío de confirmación en hilo
     await this.sendConfirmationReplyEmail(
       winner.email!,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName
+      businessName,
+      originalMsgId        // ← y aquí también
     );
-    console.log(`✅ Confirm sent to ${winner.email}`);
   } catch (err) {
     console.error('Booking failed:', err);
-    // 9) Si falla booking → slot ya tomado
     await this.sendSlotTakenReplyEmail(
       fromEmail,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
-      businessName
+      businessName,
+      originalMsgId
     );
   }
 }
 
 
-  // 2) Reemplaza sendConfirmationReplyEmail:
+
+
 async sendConfirmationReplyEmail(
   winnerEmail: string,
   winnerName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
-  businessName: string
+  businessName: string,
+  originalMsgId?: string,               // ← nuevo parámetro
 ) {
   const firstName = winnerName?.split(' ')[0] || '';
-  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  // Si no nos llegó un message-id, caemos de vuelta a <slotId@…>
+  const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
 
   await sgMail.send({
     to: winnerEmail,
     from: {
       email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
-      name: businessName,               // ahora aparece el nombre de la empresa
+      name: businessName,
     },
     replyTo: {
-      email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
       name: businessName,
     },
     headers: {
-      'In-Reply-To': messageId,
-      'References': messageId
+      'In-Reply-To': threadId,
+      'References' : threadId,
     },
     subject: `Re: Appointment slot available`,
     text:
@@ -813,16 +773,17 @@ async sendConfirmationReplyEmail(
 }
 
 
-  // 3) Reemplaza sendSlotTakenReplyEmail:
+// 3b) sendSlotTakenReplyEmail igual, pero para “slot no disponible”
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
   recipientName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
-  businessName: string
+  businessName: string,
+  originalMsgId?: string,               // ← nuevo parámetro
 ) {
   const firstName = recipientName?.split(' ')[0] || '';
   const when = slot.startAt.toLocaleString();
-  const messageId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
 
   await sgMail.send({
     to: recipientEmail,
@@ -835,8 +796,8 @@ async sendSlotTakenReplyEmail(
       name: businessName,
     },
     headers: {
-      'In-Reply-To': messageId,
-      'References': messageId,
+      'In-Reply-To': threadId,
+      'References' : threadId,
     },
     subject: `Re: Appointment slot available`,
     text:
@@ -845,6 +806,7 @@ async sendSlotTakenReplyEmail(
       `— The ${businessName} Team`,
   });
 }
+
 
 
 

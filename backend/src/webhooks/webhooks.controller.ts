@@ -27,6 +27,7 @@ export class WebhooksController {
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
 async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
   const body: any = req.body;
+  const msgId: string = req.headers['message-id'] as string; 
 
   const fromEmail: string = body.from || body['envelope[from]'];
   const toEmailRaw: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
@@ -40,7 +41,7 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
   }
 
   try {
-    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText, msgId);
     return res.status(200).send({ message: 'Reply processed successfully' });
   } catch (err) {
     console.error('❌ Error handling email reply:', err);
