@@ -22,26 +22,29 @@ export class WebhooksController {
   ) {}
 
  
- @Post('email-response')
+// 1) Controller: pasamos además el Message‑ID como cuarto parámetro
+@Post('email-response')
 @HttpCode(200)
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
 async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
-  const body: any = req.body;
-  const msgId: string = req.headers['message-id'] as string; 
-
-  const fromEmail: string = body.from || body['envelope[from]'];
-  const toEmailRaw: string = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
-  const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
-  const emailText: string = body.text || body.plain || body.html || '';
-
-  console.log('📩 Webhook from email-response', { fromEmail, toEmail });
+  const body: any    = req.body;
+  const msgId        = req.headers['message‑id'] as string | undefined;
+  const fromEmail    = body.from || body['envelope[from]'];
+  const toEmailRaw   = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
+  const toEmail      = typeof toEmailRaw === 'string' ? toEmailRaw : '';
+  const emailText    = body.text || body.plain || body.html || '';
 
   if (!fromEmail || !toEmail) {
     return res.status(400).send({ error: 'Missing email headers' });
   }
 
   try {
-    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText, msgId);
+    await this.notificationService.handleEmailReply(
+      fromEmail,
+      toEmail,
+      emailText,
+      msgId
+    );
     return res.status(200).send({ message: 'Reply processed successfully' });
   } catch (err) {
     console.error('❌ Error handling email reply:', err);

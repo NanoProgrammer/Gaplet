@@ -649,55 +649,79 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-// 2) Dentro de NotificationService:
+// 2) handleEmailReply: recibimos originalMsgId y lo propagamos
 async handleEmailReply(
   fromEmailRaw: string,
   toEmail: string,
   bodyText: string,
-  originalMsgId?: string,              // ← nuevo parámetro
+  originalMsgId?: string
 ) {
-  // — parsear remitente…
+  // — parsear “from”
   let fromEmail = fromEmailRaw.trim();
-  let fromName = '';
+  let fromName  = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
   if (m) {
-    fromName = m[1].trim();
+    fromName  = m[1].trim();
     fromEmail = m[2].trim();
   } else {
     fromName = fromEmail.split('@')[0];
   }
   const normalizedFrom = fromEmail.toLowerCase();
 
-  // — campaignId / campaign…
-  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  // — campaignId
+  const slotId     = toEmail.split('@')[0].replace(/^reply\+/, '');
   const campaignId = this.emailToCampaign.get(slotId) ?? this.emailToCampaign.get(normalizedFrom);
   if (!campaignId) return;
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) return;
 
-  // — Obtener businessName (igual que antes)…
+  // — obtener businessName…
   let businessName = 'your business';
-  try { /* … */ } catch {}
+  try {
+    if (campaign.provider === 'square') {
+      const integ = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'square' },
+      });
+      if (integ) {
+        const res = await fetch('https://connect.squareup.com/v2/merchants', {
+          headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' },
+        });
+        const js  = await res.json();
+        if (js.merchant?.length) businessName = js.merchant[0].business_name;
+      }
+    } else {
+      const integ = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' },
+      });
+      if (integ) {
+        const res  = await fetch('https://acuityscheduling.com/api/v1/me', {
+          headers: { Authorization: `Bearer ${integ.accessToken}` },
+        });
+        const info = await res.json();
+        businessName = info.businessName ?? info.name ?? businessName;
+      }
+    }
+  } catch {/* silent */}
 
-  // — si ya filled
+  // — si ya tomado…
   if (campaign.filled) {
     return this.sendSlotTakenReplyEmail(
       fromEmail,
       fromName,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
       businessName,
-      originalMsgId        // ← le pasamos el message-id
+      originalMsgId
     );
   }
 
-  // — ignorar si no confirma
+  // — solo “I will take it”
   if (!bodyText.toLowerCase().includes('i will take it')) return;
 
   // — primer respondedor
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
-  // — winner info…
+  // — armar ganador
   const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalizedFrom);
   const winner: Recipient = rec
     ? { ...rec, email: fromEmail }
@@ -709,20 +733,21 @@ async handleEmailReply(
       winner,
       {
         gapletSlotId: slotId,
-        startAt: campaign.slotTime,
-        locationId: campaign.locationId,
+        startAt:       campaign.slotTime,
+        locationId:    campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
-        teamMemberId: campaign.teamMemberId,
+        teamMemberId:  campaign.teamMemberId,
       }
     );
+
     // — envío de confirmación en hilo
     await this.sendConfirmationReplyEmail(
       winner.email!,
       winner.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime },
       businessName,
-      originalMsgId        // ← y aquí también
+      originalMsgId
     );
   } catch (err) {
     console.error('Booking failed:', err);
@@ -739,26 +764,27 @@ async handleEmailReply(
 
 
 
+// 3a) sendConfirmationReplyEmail (responde en el mismo hilo)
 async sendConfirmationReplyEmail(
   winnerEmail: string,
   winnerName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
   businessName: string,
-  originalMsgId?: string,               // ← nuevo parámetro
+  originalMsgId?: string
 ) {
   const firstName = winnerName?.split(' ')[0] || '';
-  // Si no nos llegó un message-id, caemos de vuelta a <slotId@…>
-  const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const threadId  = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const localpart = this.formatSenderEmail(businessName);
 
   await sgMail.send({
     to: winnerEmail,
     from: {
-      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
-      name: businessName,
+      email: `${localpart}@${process.env.SENDGRID_DOMAIN}`,
+      name:  businessName,
     },
     replyTo: {
       email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name: businessName,
+      name:  businessName,
     },
     headers: {
       'In-Reply-To': threadId,
@@ -772,28 +798,28 @@ async sendConfirmationReplyEmail(
   });
 }
 
-
-// 3b) sendSlotTakenReplyEmail igual, pero para “slot no disponible”
+// 3b) sendSlotTakenReplyEmail (idem, mismo hilo)
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
   recipientName: string | null,
   slot: { gapletSlotId: string; startAt: Date },
   businessName: string,
-  originalMsgId?: string,               // ← nuevo parámetro
+  originalMsgId?: string
 ) {
   const firstName = recipientName?.split(' ')[0] || '';
-  const when = slot.startAt.toLocaleString();
-  const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const when      = slot.startAt.toLocaleString();
+  const threadId  = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const localpart = this.formatSenderEmail(businessName);
 
   await sgMail.send({
     to: recipientEmail,
     from: {
-      email: `${businessName}@${process.env.SENDGRID_DOMAIN}`,
-      name: businessName,
+      email: `${localpart}@${process.env.SENDGRID_DOMAIN}`,
+      name:  businessName,
     },
     replyTo: {
       email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name: businessName,
+      name:  businessName,
     },
     headers: {
       'In-Reply-To': threadId,
@@ -806,6 +832,7 @@ async sendSlotTakenReplyEmail(
       `— The ${businessName} Team`,
   });
 }
+
 
 
 
