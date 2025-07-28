@@ -647,59 +647,98 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-async handleEmailReply(fromEmail: string, toEmail: string, bodyText: string) {
-  const slotId    = toEmail.split('@')[0].replace(/^reply\+/, '');
-  const campaignId= this.emailToCampaign.get(slotId);
-  if (!campaignId) return;
-  const campaign  = this.activeCampaigns.get(campaignId);
-  if (!campaign) return;
+async handleEmailReply(
+  fromEmailRaw: string,
+  toEmail: string,
+  bodyText: string
+) {
+  // 1) Parsear nombre y email
+  let fromEmail = fromEmailRaw.trim();
+  let fromName = '';
+  const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
+  if (m) {
+    fromName = m[1].trim();
+    fromEmail = m[2].trim();
+  } else {
+    // si no hay "<>", tomamos la parte antes de "@"
+    fromName = fromEmail.split('@')[0];
+  }
+  const normalizedFrom = fromEmail.toLowerCase();
 
-  // 1) Si ya se llenó, disculpa con sendSlotTakenReplyEmail
+  // 2) Extraer campaignId del reply-to
+  const slotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId =
+    this.emailToCampaign.get(slotId) ??
+    this.emailToCampaign.get(normalizedFrom);
+  if (!campaignId) {
+    console.warn(`No campaign for reply to ${toEmail}`);
+    return;
+  }
+  const campaign = this.activeCampaigns.get(campaignId);
+  if (!campaign) {
+    console.warn(`Campaign ${campaignId} not found`);
+    return;
+  }
+
+  // 3) Si ya está filled, enviamos “slot taken”
   if (campaign.filled) {
     await this.sendSlotTakenReplyEmail(
       fromEmail,
-      undefined,                // no sabemos su nombre si no viene en recipients
+      fromName,
       campaign.slotTime
     );
     return;
   }
 
-  // 2) Falta frase de confirmación
+  // 4) Solo procesar si contiene “I will take it”
   if (!bodyText.toLowerCase().includes('i will take it')) {
+    console.log(`Reply from ${fromEmail} ignored (no confirm phrase)`);
     return;
   }
 
-  // 3) Primer respondedor: marcamos y hacemos el booking
+  // 5) Primer respondedor: marcar filled y hacer booking
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
-  const winner = campaign.recipients.find(r => r.email?.toLowerCase() === fromEmail.toLowerCase())!;
+
+  // 6) Buscar el recipient original o fallback
+  const rec = campaign.recipients.find(r =>
+    r.email?.toLowerCase() === normalizedFrom
+  );
+  const winnerInfo: Recipient = rec
+    ? ({ ...rec, email: fromEmail })
+    : { email: fromEmail, name: fromName, phone: null, customerId: null };
 
   try {
-    await this.createAppointmentAndNotify(campaign, winner, {
-      gapletSlotId: slotId,
-      startAt:       campaign.slotTime,
-      locationId:    campaign.locationId,
-      durationMinutes: campaign.duration || 0,
-      serviceVariationId: campaign.serviceVariationId,
-      teamMemberId:  campaign.teamMemberId,
-    });
-
-    // 4) Enviar confirmación en hilo
+    await this.createAppointmentAndNotify(
+      campaign,
+      winnerInfo,
+      {
+        gapletSlotId: slotId,
+        startAt: campaign.slotTime,
+        locationId: campaign.locationId,
+        durationMinutes: campaign.duration || 0,
+        serviceVariationId: campaign.serviceVariationId,
+        teamMemberId: campaign.teamMemberId,
+      }
+    );
+    // 7) Enviar confirmación en hilo
     await this.sendConfirmationReplyEmail(
-      winner.email!,
-      winner.name,
+      winnerInfo.email!,
+      winnerInfo.name,
       { gapletSlotId: slotId, startAt: campaign.slotTime }
     );
+    console.log(`✅ Confirm sent to ${winnerInfo.email}`);
   } catch (err) {
     console.error('Booking failed:', err);
-    // 5) Si falla el booking, avisamos como “slot ya tomado”
+    // 8) Si falla el booking, avisamos “slot taken”
     await this.sendSlotTakenReplyEmail(
       fromEmail,
-      winner.name,
+      winnerInfo.name,
       campaign.slotTime
     );
   }
 }
+
 
 
 
