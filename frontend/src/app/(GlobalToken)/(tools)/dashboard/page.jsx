@@ -240,7 +240,7 @@ export default function DashboardPage() {
         recent.map(evt => (
           <ActivityRow
             key={evt.id}
-            time={evt.date.toISOString()}
+            time={evt.date}
             description={`${evt.type} by ${evt.name} (${evt.email})`}
           />
         ))
