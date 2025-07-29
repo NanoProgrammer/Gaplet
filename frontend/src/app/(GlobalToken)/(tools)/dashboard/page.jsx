@@ -145,53 +145,61 @@ export default function DashboardPage() {
       </header>
 
       {userInfo && (
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Your Activation Checklist
-          </h2>
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
-  <li className="flex items-start gap-3">
-    {/* Punto verde sólo si hay integración y no ha expirado */}
-    {(userInfo.connectedIntegration &&
-      userInfo.connectedIntegration.expiresAt > Date.now()) && (
-        <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-    )}
-    {/* Texto tachado si está conectado y válido, si no, link */}
-    {(userInfo.connectedIntegration &&
-    userInfo.connectedIntegration.expiresAt < Date.now()) ? (
-      <span className="text-sm text-gray-500 line-through">
-        Connect your client management system
-      </span>
-    ) : (
-      <a
-        href="/dashboard/integrations"
-        className="text-sm text-green-500 font-medium hover:underline transition"
-      >
-        Connect your client management system
-      </a>
-    )}
-  </li>
+        <section className="mt-12">
+  <h2 className="text-xl font-semibold text-gray-800 mb-4">
+    Your Activation Checklist
+  </h2>
+  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
+    <li className="flex items-start gap-3">
+      {userInfo.connectedIntegration && (
+        (() => {
+          const expiresMs = new Date(userInfo.connectedIntegration.expiresAt).getTime();
+          const isValid   = expiresMs > Date.now();
+          return (
+            <>
+              {/* 1. Punto verde sólo si está conectado Y no ha expirado */}
+              {isValid && (
+                <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              )}
+              {/* 2. Si es válido → texto tachado; si no → link */}
+              {isValid ? (
+                <span className="text-sm text-gray-500 line-through">
+                  Connect your client management system
+                </span>
+              ) : (
+                <a
+                  href="/dashboard/integrations"
+                  className="text-sm text-green-500 font-medium hover:underline transition"
+                >
+                  Connect your client management system
+                </a>
+              )}
+            </>
+          );
+        })()
+      )}
+    </li>
 
-  <li className="flex items-start gap-3">
-    {/* Punto verde sólo si las preferencias ya están configuradas */}
-    {preferences && (
-      <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-    )}
-    {preferences ? (
-      <span className="text-sm text-gray-500 line-through">
-        Configure notification rules
-      </span>
-    ) : (
-      <a
-        href="/dashboard/settings"
-        className="text-sm text-green-500 font-medium hover:underline transition"
-      >
-        Configure notification rules
-      </a>
-    )}
-  </li>
-</ul>
-        </section>
+    <li className="flex items-start gap-3">
+      {preferences && (
+        <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+      )}
+      {preferences ? (
+        <span className="text-sm text-gray-500 line-through">
+          Configure notification rules
+        </span>
+      ) : (
+        <a
+          href="/dashboard/settings"
+          className="text-sm text-green-500 font-medium hover:underline transition"
+        >
+          Configure notification rules
+        </a>
+      )}
+    </li>
+  </ul>
+</section>
+
       )}
 
       {userInfo?.role && (
