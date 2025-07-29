@@ -216,27 +216,27 @@ export default function DashboardPage() {
   </h2>
   <div className="bg-white rounded-xl shadow-sm p-6 space-y-4 transition hover:shadow-lg hover:scale-[1.01] duration-200">
     {(() => {
-      // 1. Mapea cancelaciones
-      const cancels = (userInfo.cancelationLogs || []).map(log => ({
+      // 1. Normalizo cancelaciones (protejo contra userInfo nulo)
+      const cancels = (userInfo?.cancelationLogs || []).map(log => ({
         id: log.id,
         date: new Date(log.canceledAt),
         type: 'Cancellation',
         name: log.clientName || log.clientEmail,
         email: log.clientEmail,
       }));
-      // 2. Mapea reemplazos
-      const replaces = (userInfo.ReplacementLogs || []).map(log => ({
+      // 2. Normalizo reemplazos
+      const replaces = (userInfo?.ReplacementLogs || []).map(log => ({
         id: log.id,
         date: new Date(log.respondedAt),
         type: 'Replacement',
         name: log.clientName || log.clientEmail,
         email: log.clientEmail,
       }));
-      // 3. Une, ordena y limita a 10
+      // 3. Uno, ordeno desc y limito a 10
       const recent = [...cancels, ...replaces]
         .sort((a, b) => b.date - a.date)
         .slice(0, 10);
-      // 4. Renderiza
+      // 4. Renderizo
       return recent.length > 0 ? (
         recent.map(evt => (
           <ActivityRow
@@ -251,6 +251,7 @@ export default function DashboardPage() {
     })()}
   </div>
 </section>
+
     </div>
   );
 }
