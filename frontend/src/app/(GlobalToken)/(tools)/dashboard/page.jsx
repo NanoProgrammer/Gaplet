@@ -153,12 +153,12 @@ export default function DashboardPage() {
   <li className="flex items-start gap-3">
     {/* Punto verde sólo si hay integración y no ha expirado */}
     {userInfo.connectedIntegration &&
-      userInfo.connectedIntegration.expiresAt > Date.now() && (
+      userInfo.connectedIntegration.expiresAt < Date.now() && (
         <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
     )}
     {/* Texto tachado si está conectado y válido, si no, link */}
     {userInfo.connectedIntegration &&
-    userInfo.connectedIntegration.expiresAt > Date.now() ? (
+    userInfo.connectedIntegration.expiresAt < Date.now() ? (
       <span className="text-sm text-gray-500 line-through">
         Connect your client management system
       </span>
