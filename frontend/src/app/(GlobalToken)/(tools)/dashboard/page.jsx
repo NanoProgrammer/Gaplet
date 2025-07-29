@@ -213,35 +213,41 @@ export default function DashboardPage() {
   <h2 className="text-xl font-semibold text-gray-800 mb-4">
     Recent Activity
   </h2>
-  <div className="bg-white rounded-xl shadow-sm p-6 space-y-4 transition hover:shadow-lg hover:scale-[1.01] duration-200">
+  <div
+    className="bg-white rounded-xl shadow-sm p-6 space-y-4
+               transition hover:shadow-lg hover:scale-[1.01] duration-200"
+  >
     {(() => {
-      // 1. Normalizo cancelaciones (protejo contra userInfo nulo)
+      // 1. Mapea cancelaciones desde OpenSlot (cancelationLogs)
       const cancels = (userInfo?.cancelationLogs || []).map(log => ({
         id: log.id,
-        date: new Date(log.canceledAt),
-        type: 'Cancellation',
-        name: log.clientName || log.clientEmail,
-        email: log.clientEmail,
+        date: new Date(log.startAt),                        // momento de la cancelación
+        description: `Cancellation on ${new Date(
+          log.startAt
+        ).toLocaleString()}`,                                // sin datos sensibles
       }));
-      // 2. Normalizo reemplazos
+
+      // 2. Mapea reemplazos (ReplacementLogs)
       const replaces = (userInfo?.ReplacementLogs || []).map(log => ({
         id: log.id,
-        date: new Date(log.respondedAt),
-        type: 'Replacement',
-        name: log.clientName || log.clientEmail,
-        email: log.clientEmail,
+        date: new Date(log.respondedAt),                     // cuando respondió el cliente
+        description: `${log.clientName || log.clientEmail} (${log.clientEmail}) responded on ${new Date(
+          log.respondedAt
+        ).toLocaleString()}`,                                // sólo nombre/email y fecha
       }));
-      // 3. Uno, ordeno desc y limito a 10
+
+      // 3. Une ambos, ordena por fecha descendente, y limita a 10
       const recent = [...cancels, ...replaces]
         .sort((a, b) => b.date - a.date)
         .slice(0, 10);
-      // 4. Renderizo
+
+      // 4. Renderiza o mensaje si no hay nada
       return recent.length > 0 ? (
         recent.map(evt => (
           <ActivityRow
             key={evt.id}
             time={evt.date.toLocaleString()}
-            description={`${evt.type} by ${evt.name} (${evt.email})`}
+            description={evt.description}
           />
         ))
       ) : (
@@ -250,7 +256,6 @@ export default function DashboardPage() {
     })()}
   </div>
 </section>
-
     </div>
   );
 }
