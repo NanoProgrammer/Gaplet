@@ -24,6 +24,8 @@ async getMe(userId: string) {
     include: {
       connectedIntegration: true,
       preferences: true,
+      ReplacementLogs: true,
+      cancelationLogs: true, 
     },
   });
 }
