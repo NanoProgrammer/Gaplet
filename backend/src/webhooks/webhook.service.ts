@@ -830,99 +830,117 @@ async sendSlotTakenReplyEmail(
 
 
 
- async createAppointmentAndNotify(
-    campaign: CampaignState,
-    winner: Recipient,
-    slot: {
-      gapletSlotId: string;
-      startAt: Date;
-      locationId?: string | null;
-      durationMinutes: number;
-      serviceVariationId?: string | null;
-      serviceVariationVersion?: number | null;
-      teamMemberId?: string | null;
-    },
-  ) {
-    // 1) Carga integración
-    const integration = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: campaign.userId, provider: campaign.provider },
-    });
-    if (!integration) throw new Error(`No integration for user ${campaign.userId}`);
-
-    // 2) Verifica version
-    const version = slot.serviceVariationVersion;
-    if (!version) throw new Error(`Missing serviceVariationVersion for slot ${slot.gapletSlotId}`);
-
-    // 3) Payload
-    const bookingPayload = {
-      booking: {
-        start_at: slot.startAt.toISOString(),
-        location_id: slot.locationId,
-        customer_id: winner.customerId,
-        customer_note: 'Booked via Gaplet auto-replacement',
-        appointment_segments: [
-          {
-            duration_minutes: slot.durationMinutes,
-            service_variation_id: slot.serviceVariationId,
-            service_variation_version: version,
-            team_member_id: slot.teamMemberId,
-          },
-        ],
-      },
-    };
-    console.log('⚙️ POST /v2/bookings payload:', JSON.stringify(bookingPayload, null, 2));
-
-    const resp = await fetch('https://connect.squareup.com/v2/bookings', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${integration.accessToken}`,
-        'Content-Type': 'application/json',
-        'Square-Version': '2025-06-18',
-      },
-      body: JSON.stringify(bookingPayload),
-    });
-    const result = await resp.json();
-    console.log('⚙️ Square booking response:', result);
-
-    // 4) Captura “slot no disponible”
-    if (result.errors?.[0]?.code === 'BAD_REQUEST' &&
-        /no longer available/i.test(result.errors[0].detail)
-    ) {
-      throw new SlotUnavailableError(slot.gapletSlotId);
-    }
-    if (!result.booking?.id) {
-      throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
-    }
-
-    // 5) Marcar slot
-    await this.prisma.openSlot.update({
-      where: { gapletSlotId: slot.gapletSlotId },
-      data: { isTaken: true, takenAt: new Date() },
-    });
-
-    // 6) Log de replacement
-    await this.prisma.replacementLog.create({
-      data: {
-        userId: campaign.userId,
-        clientEmail: winner.email!,
-        clientPhone: winner.phone ?? null,
-        clientName: winner.name ?? null,
-        appointmentTime: slot.startAt,
-        provider: campaign.provider,
-        providerBookingId: result.booking.id,
-        respondedAt: new Date(),
-      },
-    });
-
-    // 7) Métricas
-    await this.prisma.user.update({
-      where: { id: campaign.userId },
-      data: {
-        totalReplacements: { increment: 1 },
-        lastReplacementAt: new Date(),
-      },
-    });
+async createAppointmentAndNotify(
+  campaign: CampaignState,
+  winner: Recipient,
+  slot: {
+    gapletSlotId: string;
+    startAt: Date;
+    locationId?: string | null;
+    durationMinutes: number;
+    serviceVariationId?: string | null;
+    serviceVariationVersion?: number | null;
+    teamMemberId?: string | null;
   }
+) {
+  // 1) Cargamos la integración
+  const integration = await this.prisma.connectedIntegration.findFirst({
+    where: {
+      userId: campaign.userId,
+      provider: campaign.provider,
+    },
+  });
+  if (!integration) {
+    throw new Error(
+      `No ${campaign.provider} integration found for user ${campaign.userId}`
+    );
+  }
+
+  // 2) Verificamos que tengamos service_variation_version
+  const version = slot.serviceVariationVersion;
+  if (!version) {
+    throw new Error(
+      `Cannot create booking: missing serviceVariationVersion for slot ${slot.gapletSlotId}`
+    );
+  }
+
+  // 3) Construimos el payload de Square
+  const bookingPayload = {
+    booking: {
+      start_at: slot.startAt,
+      location_id: slot.locationId,
+      customer_id: winner.customerId,
+      customer_note: 'Booked via Gaplet auto-replacement',
+      appointment_segments: [
+        {
+          duration_minutes: slot.durationMinutes,
+          service_variation_id: slot.serviceVariationId,
+          service_variation_version: version,
+          team_member_id: slot.teamMemberId,
+        },
+      ],
+    },
+  };
+  console.log(
+    '⚙️ POST /v2/bookings payload:',
+    JSON.stringify(bookingPayload, null, 2)
+  );
+
+  const resp = await fetch('https://connect.squareup.com/v2/bookings', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json',
+      'Square-Version': '2025-06-18',
+    },
+    body: JSON.stringify(bookingPayload),
+  });
+  const result = await resp.json();
+  console.log('⚙️ Square booking response:', result);
+
+  // 4) Si recibimos BAD_REQUEST “no longer available”, lanzamos SlotUnavailableError
+  if (
+    result.errors?.[0]?.code === 'BAD_REQUEST' &&
+    result.errors[0].detail?.includes('no longer available')
+  ) {
+    throw new SlotUnavailableError(slot.gapletSlotId);
+  }
+
+  if (!result.booking?.id) {
+    throw new Error(
+      `Square booking failed: ${JSON.stringify(result)}`
+    );
+  }
+
+  // 5) Marcamos el slot como tomado en la base de datos
+  await this.prisma.openSlot.update({
+    where: { gapletSlotId: slot.gapletSlotId },
+    data: { isTaken: true, takenAt: new Date() },
+  });
+
+  // 6) Registramos el ReplacementLog
+  await this.prisma.replacementLog.create({
+    data: {
+      userId: campaign.userId,
+      clientEmail: winner.email!,
+      clientPhone: winner.phone ?? null,
+      clientName: winner.name ?? null,
+      appointmentTime: slot.startAt,
+      provider: campaign.provider,
+      providerBookingId: result.booking.id,
+      respondedAt: new Date(),
+    },
+  });
+
+  // 7) Actualizamos métricas del usuario
+  await this.prisma.user.update({
+    where: { id: campaign.userId },
+    data: {
+      totalReplacements: { increment: 1 },
+      lastReplacementAt: new Date(),
+    },
+  });
+}
 
 
 async sendSlotAlreadyTakenEmail(
@@ -1045,7 +1063,7 @@ async sendSlotAlreadyTakenEmail(
             lastName,
             email: winner.email || null,
             phone: winner.phone || fromPhone,
-            datetime: campaign.slotTime.toISOString().slice(0, 16),
+            datetime: campaign.slotTime,
             appointmentTypeID: campaign.appointmentTypeId,
           }),
         });
