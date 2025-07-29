@@ -158,7 +158,7 @@ export default function DashboardPage() {
     )}
     {/* Texto tachado si está conectado y válido, si no, link */}
     {(userInfo.connectedIntegration &&
-    userInfo.connectedIntegration.expiresAt > Date.now()) ? (
+    userInfo.connectedIntegration.expiresAt < Date.now()) ? (
       <span className="text-sm text-gray-500 line-through">
         Connect your client management system
       </span>
