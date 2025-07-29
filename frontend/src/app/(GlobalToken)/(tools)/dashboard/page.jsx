@@ -145,7 +145,7 @@ export default function DashboardPage() {
       </header>
 
       {userInfo && (
-        <section className="mt-12">
+        <section className="mt-12 mb-8">
   <h2 className="text-xl font-semibold text-gray-800 mb-4">
     Your Activation Checklist
   </h2>
@@ -157,10 +157,6 @@ export default function DashboardPage() {
           const isValid   = expiresMs > Date.now();
           return (
             <>
-              {/* 1. Punto verde sólo si está conectado Y no ha expirado */}
-              {isValid && (
-                <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-              )}
               {/* 2. Si es válido → texto tachado; si no → link */}
               {isValid ? (
                 <span className="text-sm text-gray-500 line-through">
