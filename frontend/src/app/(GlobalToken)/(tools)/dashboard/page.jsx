@@ -145,7 +145,7 @@ export default function DashboardPage() {
       </header>
 
       {userInfo && (
-        <section className="mx-12">
+        <section className="my-12">
   <h2 className="text-xl font-semibold text-gray-800 mb-4">
     Your Activation Checklist
   </h2>
