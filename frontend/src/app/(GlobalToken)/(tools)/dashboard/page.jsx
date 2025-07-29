@@ -145,7 +145,7 @@ export default function DashboardPage() {
       </header>
 
       {userInfo && (
-        <section className="mt-12 mb-8">
+        <section className="mx-12">
   <h2 className="text-xl font-semibold text-gray-800 mb-4">
     Your Activation Checklist
   </h2>
@@ -177,9 +177,6 @@ export default function DashboardPage() {
     </li>
 
     <li className="flex items-start gap-3">
-      {preferences && (
-        <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-      )}
       {preferences ? (
         <span className="text-sm text-gray-500 line-through">
           Configure notification rules
