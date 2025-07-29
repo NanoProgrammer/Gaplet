@@ -823,25 +823,32 @@ async createAppointmentAndNotify(
     locationId?: string | null;
     durationMinutes: number;
     serviceVariationId?: string | null;
+    serviceVariationVersion?: number | null;   // <— asegúrate de que venga en el slot
     teamMemberId?: string | null;
   },
 ) {
-  // 0) Carga la integración antes de usarla
+  // 1) Carga integración (igual que antes)
   const integration = await this.prisma.connectedIntegration.findFirst({
-  where: {
-    userId: campaign.userId,
-    provider: campaign.provider,
+    where: {
+      userId: campaign.userId,
+      provider: campaign.provider,
+    },
+  });
+  if (!integration) {
+    throw new Error(
+      `No ${campaign.provider} integration found for user ${campaign.userId}`
+    );
   }
-});
 
-if (!integration) {
-  throw new Error(
-    `No ${campaign.provider} integration found for user ${campaign.userId}`
-  );
-}
+  // 2) Asegúrate de tener serviceVariationVersion
+  const version = slot.serviceVariationVersion;
+  if (!version) {
+    throw new Error(
+      `Cannot create booking: missing serviceVariationVersion for slot ${slot.gapletSlotId}`
+    );
+  }
 
-
-  // 1) Construye el payload
+  // 3) Construye el payload incluyendo service_variation_version
   const bookingPayload = {
     booking: {
       start_at: slot.startAt.toISOString(),
@@ -852,18 +859,22 @@ if (!integration) {
         {
           duration_minutes: slot.durationMinutes,
           service_variation_id: slot.serviceVariationId,
+          service_variation_version: version,          // <— aquí
           team_member_id: slot.teamMemberId,
-        }
+        },
       ],
-    }
+    },
   };
-  console.log('⚙️ POST /v2/bookings payload:', JSON.stringify(bookingPayload, null, 2));
 
-  // 2) Llama al endpoint de Square
+  console.log(
+    '⚙️ POST /v2/bookings payload:',
+    JSON.stringify(bookingPayload, null, 2)
+  );
+
   const response = await fetch('https://connect.squareup.com/v2/bookings', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${integration.accessToken}`,      // ← aquí integration ya existe
+      Authorization: `Bearer ${integration.accessToken}`,
       'Content-Type': 'application/json',
       'Square-Version': '2025-06-18',
     },
@@ -872,17 +883,34 @@ if (!integration) {
 
   const result = await response.json();
   console.log('⚙️ Square booking response:', result);
+
   if (!result.booking?.id) {
-    throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
+    throw new Error(
+      `Square booking failed: ${JSON.stringify(result)}`
+    );
   }
 
-  // 3) Marca el slot como tomado en tu BD
+  // 4) Marca el slot como tomado en tu base
   await this.prisma.openSlot.update({
     where: { gapletSlotId: slot.gapletSlotId },
     data: { isTaken: true, takenAt: new Date() },
   });
 
-  // 4) Actualiza las métricas del usuario
+  // 5) Registra el log de reemplazo
+  await this.prisma.replacementLog.create({
+    data: {
+      userId: campaign.userId,
+      clientEmail: winner.email!,
+      clientPhone: winner.phone ?? null,
+      clientName: winner.name ?? null,
+      appointmentTime: slot.startAt,
+      provider: campaign.provider,
+      providerBookingId: result.booking.id,
+      respondedAt: new Date(),
+    },
+  });
+
+  // 6) Actualiza métricas de usuario
   await this.prisma.user.update({
     where: { id: campaign.userId },
     data: {
@@ -890,10 +918,8 @@ if (!integration) {
       lastReplacementAt: new Date(),
     },
   });
-
-  // Si necesitas devolver algo:
-  return { bookingId: result.booking.id };
 }
+
 
 async sendSlotAlreadyTakenEmail(
     to: string,
