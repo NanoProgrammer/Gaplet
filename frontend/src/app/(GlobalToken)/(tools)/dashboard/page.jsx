@@ -223,7 +223,7 @@ export default function DashboardPage() {
         id: log.id,
         date: new Date(log.startAt),                        // momento de la cancelación
         description: `Cancellation on ${new Date(
-          log.startAt
+          log.createdAt
         ).toLocaleString()}`,                                // sin datos sensibles
       }));
 
