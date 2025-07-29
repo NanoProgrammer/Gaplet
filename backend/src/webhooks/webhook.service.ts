@@ -655,7 +655,7 @@ async handleEmailReply(
   toEmail: string,
   bodyText: string,
 ) {
-  // — 1) Parse sender
+  // — 1) Parsear remitente
   let fromEmail = fromEmailRaw.trim();
   let fromName = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
@@ -667,7 +667,7 @@ async handleEmailReply(
   }
   const normalized = fromEmail.toLowerCase();
 
-  // — 2) Extract campaignId
+  // — 2) Extraer campaignId
   const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
   const campaignId =
     this.emailToCampaign.get(gapletSlotId) ||
@@ -676,7 +676,7 @@ async handleEmailReply(
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) return;
 
-  // — 3) Load business name (Square or Acuity)
+  // — 3) Cargar nombre de la empresa (Square o Acuity)
   let businessName = 'Your Business';
   try {
     const integ = await this.prisma.connectedIntegration.findFirst({
@@ -698,10 +698,10 @@ async handleEmailReply(
       }
     }
   } catch {
-    /* silent fallback */
+    /* fallback silencioso */
   }
 
-  // — 4) If slot was filled already *before* this email
+  // — 4) Si el slot ya estaba ocupado *antes* de este email…
   const wasFilled = this.isCampaignFilled(campaignId);
   const isOriginalRecipient = campaign.recipients
     .some(r => r.email?.toLowerCase() === normalized);
@@ -721,10 +721,10 @@ async handleEmailReply(
     }
   }
 
-  // — 5) Require the confirmation phrase
+  // — 5) Solo seguimos si contiene “I will take it”
   if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-  // — 6) First responder → mark filled
+  // — 6) Primer respondedor: marcamos como filled
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
@@ -735,7 +735,7 @@ async handleEmailReply(
     : { name: fromName, email: fromEmail };
 
   try {
-    // — 7) Book + log
+    // — 7) Creamos la cita y registramos el log
     await this.createAppointmentAndNotify(
       campaign,
       winner,
@@ -745,19 +745,22 @@ async handleEmailReply(
         locationId: campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
-        serviceVariationVersion: campaign.serviceVariationVersion!, // now required
+        serviceVariationVersion: campaign.serviceVariationVersion!, // obligatorio
         teamMemberId: campaign.teamMemberId,
       }
     );
-    // — 8) Send confirmation in‐thread
+
+    // — 8) Enviamos confirmación en‑hilo
     await this.sendConfirmationReplyEmail(
       winner.email!, winner.name,
       { gapletSlotId, startAt: campaign.slotTime },
       businessName
     );
+
   } catch (err) {
     console.error('Booking failed:', err);
-    // — 9) Fallback: slot already taken
+
+    // — 9) Fallback “slot ya ocupado”
     if (isOriginalRecipient) {
       await this.sendSlotTakenReplyEmail(
         fromEmail, winner.name,
@@ -848,7 +851,7 @@ async createAppointmentAndNotify(
     teamMemberId?: string | null;
   }
 ) {
-  // 1) Load the integration record
+  // 1) Cargamos la integración
   const integration = await this.prisma.connectedIntegration.findFirst({
     where: {
       userId: campaign.userId,
@@ -861,7 +864,7 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 2) Make sure we have a service_variation_version
+  // 2) Verificamos que tengamos service_variation_version
   const version = slot.serviceVariationVersion;
   if (!version) {
     throw new Error(
@@ -869,7 +872,7 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 3) Build the Square booking payload
+  // 3) Construimos el payload de Square
   const bookingPayload = {
     booking: {
       start_at: slot.startAt.toISOString(),
@@ -903,9 +906,10 @@ async createAppointmentAndNotify(
   const result = await resp.json();
   console.log('⚙️ Square booking response:', result);
 
-  // 4) Handle the “slot no longer available” case specially
-  if (result.errors?.[0]?.code === 'BAD_REQUEST' &&
-      result.errors[0].detail?.includes('no longer available')
+  // 4) Si recibimos BAD_REQUEST “no longer available”, lanzamos SlotUnavailableError
+  if (
+    result.errors?.[0]?.code === 'BAD_REQUEST' &&
+    result.errors[0].detail?.includes('no longer available')
   ) {
     throw new SlotUnavailableError(slot.gapletSlotId);
   }
@@ -916,13 +920,13 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 5) Mark the OpenSlot taken
+  // 5) Marcamos el slot como tomado en la base de datos
   await this.prisma.openSlot.update({
     where: { gapletSlotId: slot.gapletSlotId },
     data: { isTaken: true, takenAt: new Date() },
   });
 
-  // 6) Log the replacement
+  // 6) Registramos el ReplacementLog
   await this.prisma.replacementLog.create({
     data: {
       userId: campaign.userId,
@@ -936,7 +940,7 @@ async createAppointmentAndNotify(
     },
   });
 
-  // 7) Update user metrics
+  // 7) Actualizamos métricas del usuario
   await this.prisma.user.update({
     where: { id: campaign.userId },
     data: {
