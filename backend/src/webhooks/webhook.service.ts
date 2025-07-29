@@ -649,14 +649,13 @@ export class NotificationService {
     console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
   }
 
-
-// 1) Manejador de la respuesta por email
+  
 async handleEmailReply(
   fromEmailRaw: string,
   toEmail: string,
   bodyText: string,
 ) {
-  // — 1) Parsear remitente
+  // — 1) Parse sender
   let fromEmail = fromEmailRaw.trim();
   let fromName = '';
   const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
@@ -668,7 +667,7 @@ async handleEmailReply(
   }
   const normalized = fromEmail.toLowerCase();
 
-  // — 2) Extraer campaignId
+  // — 2) Extract campaignId
   const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
   const campaignId =
     this.emailToCampaign.get(gapletSlotId) ||
@@ -677,7 +676,7 @@ async handleEmailReply(
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) return;
 
-  // — 3) Cargar nombre de la empresa
+  // — 3) Load business name (Square or Acuity)
   let businessName = 'Your Business';
   try {
     const integ = await this.prisma.connectedIntegration.findFirst({
@@ -699,34 +698,33 @@ async handleEmailReply(
       }
     }
   } catch {
-    /* fallback silencioso */
+    /* silent fallback */
   }
 
-  // — ¿Slot ya ocupado antes de este email?
+  // — 4) If slot was filled already *before* this email
   const wasFilled = this.isCampaignFilled(campaignId);
   const isOriginalRecipient = campaign.recipients
     .some(r => r.email?.toLowerCase() === normalized);
   if (wasFilled) {
-    // — si era uno de los avisados → in‐thread apology
     if (isOriginalRecipient) {
       return this.sendSlotTakenReplyEmail(
         fromEmail, fromName,
         { gapletSlotId, startAt: campaign.slotTime },
         businessName
       );
+    } else {
+      return this.sendSlotAlreadyTakenEmail(
+        fromEmail, fromName,
+        { gapletSlotId, startAt: campaign.slotTime },
+        businessName
+      );
     }
-    // — si no → email genérico de “ya no disponible”
-    return this.sendSlotAlreadyTakenEmail(
-      fromEmail, fromName,
-      { gapletSlotId, startAt: campaign.slotTime },
-      businessName
-    );
   }
 
-  // — Sólo seguimos si confirma
+  // — 5) Require the confirmation phrase
   if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-  // — Primer respondedor
+  // — 6) First responder → mark filled
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
@@ -737,7 +735,7 @@ async handleEmailReply(
     : { name: fromName, email: fromEmail };
 
   try {
-    // — Crear booking + guardar logs
+    // — 7) Book + log
     await this.createAppointmentAndNotify(
       campaign,
       winner,
@@ -747,12 +745,11 @@ async handleEmailReply(
         locationId: campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
-        serviceVariationVersion: campaign.serviceVariationVersion!, // ← obligatorio
+        serviceVariationVersion: campaign.serviceVariationVersion!, // now required
         teamMemberId: campaign.teamMemberId,
       }
     );
-
-    // — Confirmación en‐hilo
+    // — 8) Send confirmation in‐thread
     await this.sendConfirmationReplyEmail(
       winner.email!, winner.name,
       { gapletSlotId, startAt: campaign.slotTime },
@@ -760,7 +757,7 @@ async handleEmailReply(
     );
   } catch (err) {
     console.error('Booking failed:', err);
-    // — Fallback “slot ya ocupado”
+    // — 9) Fallback: slot already taken
     if (isOriginalRecipient) {
       await this.sendSlotTakenReplyEmail(
         fromEmail, winner.name,
@@ -776,7 +773,6 @@ async handleEmailReply(
     }
   }
 }
-
 
 
 
@@ -839,7 +835,6 @@ async sendSlotTakenReplyEmail(
 
 
 
-// 2) Crear la cita en Square y guardar el log
 async createAppointmentAndNotify(
   campaign: CampaignState,
   winner: Recipient,
@@ -853,7 +848,7 @@ async createAppointmentAndNotify(
     teamMemberId?: string | null;
   }
 ) {
-  // 1) Cargamos la integración
+  // 1) Load the integration record
   const integration = await this.prisma.connectedIntegration.findFirst({
     where: {
       userId: campaign.userId,
@@ -866,7 +861,7 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 2) Verificamos que tengamos version
+  // 2) Make sure we have a service_variation_version
   const version = slot.serviceVariationVersion;
   if (!version) {
     throw new Error(
@@ -874,7 +869,7 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 3) Construir payload
+  // 3) Build the Square booking payload
   const bookingPayload = {
     booking: {
       start_at: slot.startAt.toISOString(),
@@ -891,7 +886,6 @@ async createAppointmentAndNotify(
       ],
     },
   };
-
   console.log(
     '⚙️ POST /v2/bookings payload:',
     JSON.stringify(bookingPayload, null, 2)
@@ -906,9 +900,15 @@ async createAppointmentAndNotify(
     },
     body: JSON.stringify(bookingPayload),
   });
-
   const result = await resp.json();
   console.log('⚙️ Square booking response:', result);
+
+  // 4) Handle the “slot no longer available” case specially
+  if (result.errors?.[0]?.code === 'BAD_REQUEST' &&
+      result.errors[0].detail?.includes('no longer available')
+  ) {
+    throw new SlotUnavailableError(slot.gapletSlotId);
+  }
 
   if (!result.booking?.id) {
     throw new Error(
@@ -916,13 +916,13 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 4) Marcar slot como tomado
+  // 5) Mark the OpenSlot taken
   await this.prisma.openSlot.update({
     where: { gapletSlotId: slot.gapletSlotId },
     data: { isTaken: true, takenAt: new Date() },
   });
 
-  // 5) Guardar ReplacementLog
+  // 6) Log the replacement
   await this.prisma.replacementLog.create({
     data: {
       userId: campaign.userId,
@@ -936,7 +936,7 @@ async createAppointmentAndNotify(
     },
   });
 
-  // 6) Actualizar métricas de usuario
+  // 7) Update user metrics
   await this.prisma.user.update({
     where: { id: campaign.userId },
     data: {
@@ -1210,5 +1210,11 @@ async sendSlotAlreadyTakenEmail(
       campaign.filled = true;
       this.activeCampaigns.set(campaignId, campaign);
     }
+  }
+}
+
+class SlotUnavailableError extends Error {
+  constructor(slotId: string) {
+    super(`Slot ${slotId} no longer available`);
   }
 }
