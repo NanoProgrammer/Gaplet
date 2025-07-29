@@ -113,7 +113,13 @@ export default function DashboardPage() {
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
   };
 
   const recentActivity = [];

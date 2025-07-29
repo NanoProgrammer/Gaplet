@@ -772,26 +772,50 @@ export class NotificationService {
 
 
 async sendConfirmationReplyEmail(
-    to: string,
-    name: string | null,
-    slot: { gapletSlotId: string; startAt: Date },
-    businessName: string,
-  ) {
-    const first = name?.split(' ')[0] || '';
-    const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
-    const from   = this.buildFrom(businessName);
-    await sgMail.send({
-      to,
-      from,
-      replyTo: { email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`, name: businessName },
-      headers: { 'In-Reply-To': threadId, References: threadId },
-      subject: `Re: Appointment slot available`,
-      text: `Hi${first ? ' ' + first : ''},\n\n✅ Your appointment on ${slot.startAt.toLocaleString()} has been booked!\n\n— The ${businessName} Team`,
-    });
-  }
+  to: string,
+  name: string | null,
+  slot: { gapletSlotId: string; startAt: Date },
+  businessName: string,
+) {
+  const first = name?.split(' ')[0] || 'Guest';
+  const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const from = this.buildFrom(businessName);
+
+  const appointmentTime = slot.startAt.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const body = `
+Hello ${first},
+
+Thank you for choosing ${businessName}. We’re pleased to confirm your appointment:
+
+    • Date & Time: ${appointmentTime}
+
+If you need to reschedule or cancel, simply reply to this email and we’ll be happy to assist.
+
+We look forward to seeing you.
+
+Kind regards,
+The ${businessName} Team
+`.trim();
+
+  await sgMail.send({
+    to,
+    from,
+    replyTo: { email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`, name: businessName },
+    headers: { 'In-Reply-To': threadId, References: threadId },
+    subject: `Re: Appointment Confirmation – ${businessName}`,
+    text: body,
+  });
+}
 
 
-// 3b) sendSlotTakenReplyEmail (idem, mismo hilo)
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
   recipientName: string | null,
@@ -799,30 +823,46 @@ async sendSlotTakenReplyEmail(
   businessName: string,
   originalMsgId?: string
 ) {
-  const firstName = recipientName?.split(' ')[0] || '';
-  const when      = slot.startAt.toLocaleString();
-  const threadId  = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const firstName = recipientName?.split(' ')[0] || 'Guest';
+  const when = slot.startAt.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
   const localpart = this.formatSenderEmail(businessName);
+
+  const body = `
+Hello ${firstName},
+
+We regret to inform you that the appointment slot on ${when} is no longer available.
+
+Please reply with a few alternative dates and times, and we will do our best to accommodate your schedule.
+
+We apologize for any inconvenience and appreciate your understanding.
+
+Sincerely,
+The ${businessName} Team
+`.trim();
 
   await sgMail.send({
     to: recipientEmail,
     from: {
       email: `${localpart}@${process.env.SENDGRID_DOMAIN}`,
-      name:  businessName,
+      name: businessName,
     },
     replyTo: {
       email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
-      name:  businessName,
+      name: businessName,
     },
     headers: {
       'In-Reply-To': threadId,
-      'References' : threadId,
+      'References': threadId,
     },
-    subject: `Re: Appointment slot available`,
-    text:
-      `Hi${firstName ? ' ' + firstName : ''},\n\n` +
-      `⚠️ Unfortunately, the slot on ${when} is no longer available.\n\n` +
-      `— The ${businessName} Team`,
+    subject: `Re: Appointment Update – ${businessName}`,
+    text: body,
   });
 }
 
@@ -944,24 +984,52 @@ async createAppointmentAndNotify(
 
 
 async sendSlotAlreadyTakenEmail(
-    to: string,
-    name: string | null,
-    slot: { gapletSlotId: string; startAt: Date },
-    businessName: string,
-  ) {
-    const first = name?.split(' ')[0] || '';
-    const when  = slot.startAt.toLocaleString();
-    const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
-    const from     = this.buildFrom(businessName);
-    await sgMail.send({
-      to,
-      from,
-      replyTo: { email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`, name: businessName },
-      headers: { 'In-Reply-To': threadId, References: threadId },
-      subject: `Re: Appointment slot available`,
-      text: `Hi${first ? ' ' + first : ''},\n\n⚠️ Unfortunately, the slot on ${when} is no longer available.\n\n— The ${businessName} Team`,
-    });
-  }
+  to: string,
+  name: string | null,
+  slot: { gapletSlotId: string; startAt: Date },
+  businessName: string,
+) {
+  const firstName = name?.split(' ')[0] || 'Guest';
+  const appointmentTime = slot.startAt.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const from     = this.buildFrom(businessName);
+
+  const body = `
+Hello ${firstName},
+
+We regret to inform you that the appointment slot on ${appointmentTime} was confirmed by another client before we received your response. As a result, we are unable to honor your request for that time.
+
+Please reply with a few alternative dates and times, and we will make every effort to accommodate your schedule.
+
+Thank you for your understanding.
+
+Sincerely,  
+The ${businessName} Team
+`.trim();
+
+  await sgMail.send({
+    to,
+    from,
+    replyTo: {
+      email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
+      name: businessName
+    },
+    headers: {
+      'In-Reply-To': threadId,
+      References: threadId
+    },
+    subject: `Re: Appointment Already Booked – ${businessName}`,
+    text: body,
+  });
+}
+
 
   async handleSmsReply(fromPhone: string, messageText: string) {
     const campaignId = this.phoneToCampaign.get(fromPhone);
