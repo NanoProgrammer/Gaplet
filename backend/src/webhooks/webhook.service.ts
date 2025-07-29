@@ -839,7 +839,7 @@ async sendSlotTakenReplyEmail(
 
 
 
-// 2) Creación de la cita y logging
+// 2) Crear la cita en Square y guardar el log
 async createAppointmentAndNotify(
   campaign: CampaignState,
   winner: Recipient,
@@ -936,7 +936,7 @@ async createAppointmentAndNotify(
     },
   });
 
-  // 6) Actualizar métricas del usuario
+  // 6) Actualizar métricas de usuario
   await this.prisma.user.update({
     where: { id: campaign.userId },
     data: {
@@ -945,7 +945,6 @@ async createAppointmentAndNotify(
     },
   });
 }
-
 
 
 async sendSlotAlreadyTakenEmail(
