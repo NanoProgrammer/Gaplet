@@ -650,6 +650,7 @@ export class NotificationService {
   }
 
 
+// 1) Manejador de la respuesta por email
 async handleEmailReply(
   fromEmailRaw: string,
   toEmail: string,
@@ -706,7 +707,7 @@ async handleEmailReply(
   const isOriginalRecipient = campaign.recipients
     .some(r => r.email?.toLowerCase() === normalized);
   if (wasFilled) {
-    // si era uno de los avisados → in‐thread apology
+    // — si era uno de los avisados → in‐thread apology
     if (isOriginalRecipient) {
       return this.sendSlotTakenReplyEmail(
         fromEmail, fromName,
@@ -714,7 +715,7 @@ async handleEmailReply(
         businessName
       );
     }
-    // si no → email genérico
+    // — si no → email genérico de “ya no disponible”
     return this.sendSlotAlreadyTakenEmail(
       fromEmail, fromName,
       { gapletSlotId, startAt: campaign.slotTime },
@@ -736,7 +737,7 @@ async handleEmailReply(
     : { name: fromName, email: fromEmail };
 
   try {
-    // — 7) Crear booking + guardar logs
+    // — Crear booking + guardar logs
     await this.createAppointmentAndNotify(
       campaign,
       winner,
@@ -746,12 +747,12 @@ async handleEmailReply(
         locationId: campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
-        serviceVariationVersion: campaign.serviceVariationVersion!, // <— obligatorio
+        serviceVariationVersion: campaign.serviceVariationVersion!, // ← obligatorio
         teamMemberId: campaign.teamMemberId,
       }
     );
 
-    // — 8) Confirmación en‐hilo
+    // — Confirmación en‐hilo
     await this.sendConfirmationReplyEmail(
       winner.email!, winner.name,
       { gapletSlotId, startAt: campaign.slotTime },
@@ -759,7 +760,7 @@ async handleEmailReply(
     );
   } catch (err) {
     console.error('Booking failed:', err);
-    // — 9) Fallback “slot already taken”
+    // — Fallback “slot ya ocupado”
     if (isOriginalRecipient) {
       await this.sendSlotTakenReplyEmail(
         fromEmail, winner.name,
@@ -775,6 +776,7 @@ async handleEmailReply(
     }
   }
 }
+
 
 
 
