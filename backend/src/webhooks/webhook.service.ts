@@ -651,108 +651,117 @@ export class NotificationService {
 
 // 1) Manejador de la respuesta por e‑mail
 async handleEmailReply(
-    fromEmailRaw: string,
-    toEmail: string,
-    bodyText: string,
-  ) {
-    // 1) parse sender
-    let fromEmail = fromEmailRaw.trim();
-    let fromName = '';
-    const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
-    if (m) {
-      fromName = m[1].trim();
-      fromEmail = m[2].trim();
-    } else {
-      fromName = fromEmail.split('@')[0];
-    }
-    const normalized = fromEmail.toLowerCase();
+  fromEmailRaw: string,
+  toEmail: string,
+  bodyText: string,
+) {
+  // 1) parse sender
+  let fromEmail = fromEmailRaw.trim();
+  let fromName = '';
+  const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
+  if (m) {
+    fromName = m[1].trim();
+    fromEmail = m[2].trim();
+  } else {
+    fromName = fromEmail.split('@')[0];
+  }
+  const normalized = fromEmail.toLowerCase();
 
-    // 2) extract campaignId
-    const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
-    const campaignId = this.emailToCampaign.get(gapletSlotId) || this.emailToCampaign.get(normalized);
-    if (!campaignId) return;
-    const campaign = this.activeCampaigns.get(campaignId);
-    if (!campaign) return;
+  // 2) extract campaignId
+  const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId =
+    this.emailToCampaign.get(gapletSlotId) ||
+    this.emailToCampaign.get(normalized);
+  if (!campaignId) return;
+  const campaign = this.activeCampaigns.get(campaignId);
+  if (!campaign) return;
 
-    // 3) load business name
-    let businessName = 'Your Business';
-    try {
-      if (campaign.provider === 'square') {
-        const integ = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'square' },
+  // 3) load business name
+  let businessName = 'Your Business';
+  try {
+    if (campaign.provider === 'square') {
+      const integ = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'square' },
+      });
+      if (integ) {
+        const res = await fetch('https://connect.squareup.com/v2/merchants', {
+          headers: { Authorization: `Bearer ${integ.accessToken}` },
         });
-        if (integ) {
-          const res = await fetch('https://connect.squareup.com/v2/merchants', {
-            headers: { Authorization: `Bearer ${integ.accessToken}` },
-          });
-          const js = await res.json();
-          if (js.merchant?.length) businessName = js.merchant[0].business_name;
-        }
-      } else {
-        const integ = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'acuity' },
-        });
-        if (integ) {
-          const res = await fetch('https://acuityscheduling.com/api/v1/me', {
-            headers: { Authorization: `Bearer ${integ.accessToken}` },
-          });
-          const js = await res.json();
-          businessName = js.businessName || js.name || businessName;
-        }
+        const js = await res.json();
+        if (js.merchant?.length) businessName = js.merchant[0].business_name;
       }
-    } catch {
-      // silent fallback
+    } else {
+      const integ = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' },
+      });
+      if (integ) {
+        const res = await fetch('https://acuityscheduling.com/api/v1/me', {
+          headers: { Authorization: `Bearer ${integ.accessToken}` },
+        });
+        const js = await res.json();
+        businessName = js.businessName || js.name || businessName;
+      }
     }
+  } catch {
+    // silent fallback
+  }
 
-    // 4) if already filled before this email
-    if (this.isCampaignFilled(campaignId)) {
-      return this.sendSlotAlreadyTakenEmail(
-        fromEmail,
-        fromName,
-        { gapletSlotId, startAt: campaign.slotTime },
-        businessName,
-      );
-    }
+  // 4) if already filled before this email
+  if (this.isCampaignFilled(campaignId)) {
+    return this.sendSlotAlreadyTakenEmail(
+      fromEmail,
+      fromName,
+      { gapletSlotId, startAt: campaign.slotTime },
+      businessName,
+    );
+  }
 
-    // 5) must contain confirmation phrase
-    if (!bodyText.toLowerCase().includes('i will take it')) return;
+  // 5) must contain confirmation phrase
+  if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-    // 6) first responder
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
+  // 6) first responder
+  campaign.filled = true;
+  this.activeCampaigns.set(campaignId, campaign);
 
-    const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalized);
-    const winner: Recipient = rec ? { ...rec, email: fromEmail } : { name: fromName, email: fromEmail };
+  const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalized);
+  const winner: Recipient = rec
+    ? { ...rec, email: fromEmail }
+    : { name: fromName, email: fromEmail };
 
-    try {
-      // create booking + log
-      await this.createAppointmentAndNotify(campaign, winner, {
+  try {
+    // create booking + log
+    await this.createAppointmentAndNotify(
+      campaign,
+      winner,
+      {
         gapletSlotId,
         startAt: campaign.slotTime,
         locationId: campaign.locationId,
         durationMinutes: campaign.duration || 0,
         serviceVariationId: campaign.serviceVariationId,
+        serviceVariationVersion: campaign.serviceVariationVersion!, // ← ahora obligatorio
         teamMemberId: campaign.teamMemberId,
-      });
+      }
+    );
 
-      // send confirmation in-thread
-      await this.sendConfirmationReplyEmail(
-        winner.email!,
-        winner.name,
-        { gapletSlotId, startAt: campaign.slotTime },
-        businessName,
-      );
-    } catch (err) {
-      console.error('Booking failed:', err);
-      await this.sendSlotAlreadyTakenEmail(
-        fromEmail,
-        winner.name,
-        { gapletSlotId, startAt: campaign.slotTime },
-        businessName,
-      );
-    }
+    // send confirmation in-thread
+    await this.sendConfirmationReplyEmail(
+      winner.email!,
+      winner.name,
+      { gapletSlotId, startAt: campaign.slotTime },
+      businessName,
+    );
+  } catch (err) {
+    console.error('Booking failed:', err);
+    // slot already taken fallback
+    await this.sendSlotAlreadyTakenEmail(
+      fromEmail,
+      winner.name,
+      { gapletSlotId, startAt: campaign.slotTime },
+      businessName,
+    );
   }
-
+}
 
 
 async sendConfirmationReplyEmail(
@@ -823,11 +832,11 @@ async createAppointmentAndNotify(
     locationId?: string | null;
     durationMinutes: number;
     serviceVariationId?: string | null;
-    serviceVariationVersion?: number | null;   // <— asegúrate de que venga en el slot
+    serviceVariationVersion?: number | null;  // ← ahora obligatorio
     teamMemberId?: string | null;
   },
 ) {
-  // 1) Carga integración (igual que antes)
+  // 1) Carga la integración del usuario
   const integration = await this.prisma.connectedIntegration.findFirst({
     where: {
       userId: campaign.userId,
@@ -840,15 +849,15 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 2) Asegúrate de tener serviceVariationVersion
+  // 2) Verifica que venga la versión de la variación de servicio
   const version = slot.serviceVariationVersion;
-  if (!version) {
+  if (version == null) {
     throw new Error(
       `Cannot create booking: missing serviceVariationVersion for slot ${slot.gapletSlotId}`
     );
   }
 
-  // 3) Construye el payload incluyendo service_variation_version
+  // 3) Construye y loggea el payload
   const bookingPayload = {
     booking: {
       start_at: slot.startAt.toISOString(),
@@ -859,18 +868,18 @@ async createAppointmentAndNotify(
         {
           duration_minutes: slot.durationMinutes,
           service_variation_id: slot.serviceVariationId,
-          service_variation_version: version,          // <— aquí
+          service_variation_version: version,      // ← aquí
           team_member_id: slot.teamMemberId,
         },
       ],
     },
   };
-
   console.log(
     '⚙️ POST /v2/bookings payload:',
     JSON.stringify(bookingPayload, null, 2)
   );
 
+  // 4) Llama a la API de Square
   const response = await fetch('https://connect.squareup.com/v2/bookings', {
     method: 'POST',
     headers: {
@@ -880,7 +889,6 @@ async createAppointmentAndNotify(
     },
     body: JSON.stringify(bookingPayload),
   });
-
   const result = await response.json();
   console.log('⚙️ Square booking response:', result);
 
@@ -890,13 +898,13 @@ async createAppointmentAndNotify(
     );
   }
 
-  // 4) Marca el slot como tomado en tu base
+  // 5) Marca el slot como tomado en la base de datos
   await this.prisma.openSlot.update({
     where: { gapletSlotId: slot.gapletSlotId },
     data: { isTaken: true, takenAt: new Date() },
   });
 
-  // 5) Registra el log de reemplazo
+  // 6) Graba el log de reemplazo
   await this.prisma.replacementLog.create({
     data: {
       userId: campaign.userId,
@@ -910,7 +918,7 @@ async createAppointmentAndNotify(
     },
   });
 
-  // 6) Actualiza métricas de usuario
+  // 7) Actualiza las métricas del usuario
   await this.prisma.user.update({
     where: { id: campaign.userId },
     data: {
