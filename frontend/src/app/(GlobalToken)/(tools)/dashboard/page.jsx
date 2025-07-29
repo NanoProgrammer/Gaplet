@@ -236,7 +236,6 @@ export default function DashboardPage() {
         ).toLocaleString()}`,                                // sólo nombre/email y fecha
       }));
 
-      // 3. Une ambos, ordena por fecha descendente, y limita a 10
       const recent = [...cancels, ...replaces]
         .sort((a, b) => b.date - a.date)
         .slice(0, 10);
