@@ -152,13 +152,13 @@ export default function DashboardPage() {
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
   <li className="flex items-start gap-3">
     {/* Punto verde sólo si hay integración y no ha expirado */}
-    {userInfo.connectedIntegration &&
-      userInfo.connectedIntegration.expiresAt < Date.now() && (
+    {(userInfo.connectedIntegration &&
+      userInfo.connectedIntegration.expiresAt > Date.now()) && (
         <div className="mt-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
     )}
     {/* Texto tachado si está conectado y válido, si no, link */}
-    {userInfo.connectedIntegration &&
-    userInfo.connectedIntegration.expiresAt < Date.now() ? (
+    {(userInfo.connectedIntegration &&
+    userInfo.connectedIntegration.expiresAt > Date.now()) ? (
       <span className="text-sm text-gray-500 line-through">
         Connect your client management system
       </span>
@@ -218,29 +218,32 @@ export default function DashboardPage() {
                transition hover:shadow-lg hover:scale-[1.01] duration-200"
   >
     {(() => {
-      // 1. Mapea cancelaciones desde OpenSlot (cancelationLogs)
-      const cancels = (userInfo?.cancelationLogs || []).map(log => ({
-        id: log.id,
-        date: new Date(log.startAt),                        // momento de la cancelación
-        description: `Cancellation on ${new Date(
-          log.createdAt
-        ).toLocaleString()}`,                                // sin datos sensibles
-      }));
+      // 1. Mapeo cancelaciones usando createdAt
+      const cancels = (userInfo?.cancelationLogs || []).map(log => {
+        const date = new Date(log.createdAt);
+        return {
+          id: log.id,
+          date,
+          description: `Cancellation on ${date.toLocaleString()}`,
+        };
+      });
 
-      // 2. Mapea reemplazos (ReplacementLogs)
-      const replaces = (userInfo?.ReplacementLogs || []).map(log => ({
-        id: log.id,
-        date: new Date(log.respondedAt),                     // cuando respondió el cliente
-        description: `${log.clientName || log.clientEmail} (${log.clientEmail}) responded on ${new Date(
-          log.respondedAt
-        ).toLocaleString()}`,                                // sólo nombre/email y fecha
-      }));
+      // 2. Mapeo reemplazos usando respondedAt
+      const replaces = (userInfo?.ReplacementLogs || []).map(log => {
+        const date = new Date(log.respondedAt);
+        return {
+          id: log.id,
+          date,
+          description: `${log.clientName || log.clientEmail} responded on ${date.toLocaleString()}`,
+        };
+      });
 
+      // 3. Uno ambos arrays, ordeno por fecha descendente y limito a 10
       const recent = [...cancels, ...replaces]
         .sort((a, b) => b.date - a.date)
         .slice(0, 10);
 
-      // 4. Renderiza o mensaje si no hay nada
+      // 4. Renderizo o mensaje vacío
       return recent.length > 0 ? (
         recent.map(evt => (
           <ActivityRow
@@ -255,6 +258,7 @@ export default function DashboardPage() {
     })()}
   </div>
 </section>
+
     </div>
   );
 }
