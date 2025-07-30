@@ -61,7 +61,7 @@ export class NotificationService {
   }
 
   private buildSubject(businessName: string): string {
-    return `📅 New appointment slot available at ${businessName}`;
+    return `New appointment slot available at ${businessName}`;
   }
 
   constructor(private readonly prisma: PrismaManagerService) {
@@ -426,14 +426,32 @@ export class NotificationService {
     }
 
     // Preparar contenido de notificación
-    const slotTimeStr = slotTime.toLocaleString();
-    const emailSubject = this.buildSubject(businessName);
-    const emailBodyTemplate =
-      `We hope you're doing well. An appointment on ${slotTimeStr} has just become available at ${businessName}. ` +
-      `If you are interested in taking this slot, please reply to this email with "I will take it".\n` +
-      `Please note that the appointment will be offered to the first client who responds, so if you'd like to claim it, please reply as soon as possible.\n\n` +
-      `Thank you,\n${businessName}`;
-    const smsText = `${businessName}: An appointment on ${slotTimeStr} just opened up. Reply "I will take it" to claim it.`;
+    const slotTimeStr = slotTime.toLocaleString('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true
+});
+
+const emailSubject = `Appointment Slot Now Available at ${businessName}`;
+
+const emailBodyTemplate = `
+Hello,
+
+We wanted to let you know that an appointment slot has just opened up on ${slotTimeStr} at ${businessName}.  
+If you’d like to claim this time, simply reply to this email with “I will take it.”  
+Please note that we’ll confirm the slot with the first reply we receive.
+
+Thank you for choosing ${businessName}. We look forward to seeing you.
+
+Sincerely,  
+The ${businessName} Team
+`.trim();
+
+const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will take it” to secure this appointment.`;
+
 
     /* Enviar notificaciones según el plan del usuario */
     if (plan === 'STARTER') {
