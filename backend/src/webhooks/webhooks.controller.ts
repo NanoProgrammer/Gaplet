@@ -190,6 +190,7 @@ async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
         if (!integration) return { received: true };
         const userId = integration.userId;
         // Registrar cancelación y crear OpenSlot en base de datos
+        
         const appointmentTime = new Date(booking.start_at);
         const [updatedUser, openSlot] = await this.prisma.$transaction([
           this.prisma.user.update({

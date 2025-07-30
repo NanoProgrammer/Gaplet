@@ -424,16 +424,26 @@ export class NotificationService {
         console.warn('No se pudo obtener el nombre del negocio de Acuity:', err);
       }
     }
+    const locRes = await fetch(
+  `https://connect.squareup.com/v2/locations/${locationId}`,
+  { headers: { Authorization: `Bearer ${integration.accessToken}` } }
+);
+const { location } = await locRes.json();
+const locationTimeZone = location.time_zone; // ej. "America/Edmonton"
+
 
     // Preparar contenido de notificación
-    const slotTimeStr = slotTime.toLocaleString('en-US', {
+   const opts: Intl.DateTimeFormatOptions = {
   month: 'long',
   day: 'numeric',
   year: 'numeric',
   hour: 'numeric',
   minute: '2-digit',
-  hour12: true
-});
+  hour12: true,
+  timeZone: locationTimeZone
+};
+const slotTimeStr = new Intl.DateTimeFormat('en-US', opts).format(slotTime);
+
 
 const emailSubject = `Appointment Slot Now Available at ${businessName}`;
 
@@ -716,7 +726,31 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
         }
       }
     } catch { /* silent */ }
-
+    let slotTimeZone = 'UTC';
+  try {
+    const integ = await this.prisma.connectedIntegration.findFirst({
+      where: { userId: campaign.userId, provider: campaign.provider },
+    });
+    if (integ) {
+      if (campaign.provider === 'square') {
+        const locRes = await fetch(
+          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const { location } = await locRes.json();
+        slotTimeZone = location.time_zone;
+      } else { // acuity
+        const meRes = await fetch(
+          'https://acuityscheduling.com/api/v1/me',
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const meJson = await meRes.json();
+        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
+      }
+    }
+  } catch (err) {
+    console.warn('No pude obtener timezone dinámico, uso UTC', err);
+  }
     // — 4) Si ya estaba filled antes de este email
     const wasFilled = this.isCampaignFilled(campaignId);
     const isOriginal = campaign.recipients.some(r => r.email?.toLowerCase() === normalized);
@@ -724,13 +758,13 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
       if (isOriginal) {
         return this.sendSlotTakenReplyEmail(
           fromEmail, fromName,
-          { gapletSlotId, startAt: campaign.slotTime },
+          { gapletSlotId, startAt: campaign.slotTime , timeZone: slotTimeZone }, // Timezone is not critical here
           businessName,
         );
       }
       return this.sendSlotAlreadyTakenEmail(
         fromEmail, fromName,
-        { gapletSlotId, startAt: campaign.slotTime },
+        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone},
         businessName,
       );
     }
@@ -761,25 +795,76 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
           teamMemberId: campaign.teamMemberId,
         },
       );
+ let slotTimeZone = 'UTC';
+  try {
+    const integ = await this.prisma.connectedIntegration.findFirst({
+      where: { userId: campaign.userId, provider: campaign.provider },
+    });
+    if (integ) {
+      if (campaign.provider === 'square') {
+        const locRes = await fetch(
+          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const { location } = await locRes.json();
+        slotTimeZone = location.time_zone;
+      } else { // acuity
+        const meRes = await fetch(
+          'https://acuityscheduling.com/api/v1/me',
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const meJson = await meRes.json();
+        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
+      }
+    }
+  } catch (err) {
+    console.warn('No pude obtener timezone dinámico, uso UTC', err);
+  }
+      
       // — 8) Confirmación en hilo
       await this.sendConfirmationReplyEmail(
         winner.email!, winner.name,
-        { gapletSlotId, startAt: campaign.slotTime },
+        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
         businessName,
       );
     } catch (err) {
+       let slotTimeZone = 'UTC';
+  try {
+    const integ = await this.prisma.connectedIntegration.findFirst({
+      where: { userId: campaign.userId, provider: campaign.provider },
+    });
+    if (integ) {
+      if (campaign.provider === 'square') {
+        const locRes = await fetch(
+          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const { location } = await locRes.json();
+        slotTimeZone = location.time_zone;
+      } else { // acuity
+        const meRes = await fetch(
+          'https://acuityscheduling.com/api/v1/me',
+          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+        );
+        const meJson = await meRes.json();
+        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
+      }
+    }
+  } catch (err) {
+    console.warn('No pude obtener timezone dinámico, uso UTC', err);
+  }
       console.error('Booking failed:', err);
       // — 9) Fallback “slot ya ocupado”
       if (isOriginal) {
         await this.sendSlotTakenReplyEmail(
           fromEmail, winner.name,
-          { gapletSlotId, startAt: campaign.slotTime },
+          { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
           businessName,
         );
       } else {
         await this.sendSlotAlreadyTakenEmail(
           fromEmail, winner.name,
-          { gapletSlotId, startAt: campaign.slotTime },
+          { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
           businessName,
         );
       }
@@ -792,21 +877,23 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
 async sendConfirmationReplyEmail(
   to: string,
   name: string | null,
-  slot: { gapletSlotId: string; startAt: Date },
+  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
   businessName: string,
 ) {
   const first = name?.split(' ')[0] || 'Guest';
   const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
   const from = this.buildFrom(businessName);
 
-  const appointmentTime = slot.startAt.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
+  
+  const appointmentTime = new Intl.DateTimeFormat('en-US', {
+    month:  'long',
+    day:    'numeric',
+    year:   'numeric',
+    hour:   'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+    timeZone: slot.timeZone,
+  }).format(slot.startAt);
 
   const body = `
 Hello ${first},
@@ -837,18 +924,21 @@ The ${businessName} Team
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
   recipientName: string | null,
-  slot: { gapletSlotId: string; startAt: Date },
+  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
   businessName: string,
   originalMsgId?: string
 ) {
   const firstName = recipientName?.split(' ')[0] || 'Guest';
-  const when = slot.startAt.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
+  const when = new Intl.DateTimeFormat('en-US', {
+    month:  'long',
+    day:    'numeric',
+    year:   'numeric',
+    hour:   'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+    timeZone: slot.timeZone,
+  }).format(slot.startAt);
+
   const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
   const localpart = this.formatSenderEmail(businessName);
 
@@ -1004,18 +1094,20 @@ async createAppointmentAndNotify(
 async sendSlotAlreadyTakenEmail(
   to: string,
   name: string | null,
-  slot: { gapletSlotId: string; startAt: Date },
+  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
   businessName: string,
 ) {
   const firstName = name?.split(' ')[0] || 'Guest';
-  const appointmentTime = slot.startAt.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
+  const appointmentTime = new Intl.DateTimeFormat('en-US', {
+    month:  'long',
+    day:    'numeric',
+    year:   'numeric',
+    hour:   'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+    timeZone: slot.timeZone,
+  }).format(slot.startAt);
+
   const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
   const from     = this.buildFrom(businessName);
 
