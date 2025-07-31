@@ -536,12 +536,7 @@ const emailBodyTemplate = `
       We’ll confirm it with the <strong>first response</strong> we receive.
     </p>
 
-    <p>
-  If you have any questions or need to reschedule, please call us at
-  <a href="tel:${businessPhone}" style="color:#0052cc; text-decoration:none;">
-    ${businessPhone}
-  </a>.
-</p>
+
     <hr style="border:none; border-top:1px solid #eee; margin:40px 0;">
 
     <p style="font-size:12px; color:#999;">
