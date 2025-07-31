@@ -23,45 +23,61 @@ export class WebhooksController {
 
  
 // 1) Controller: pasamos además el Message‑ID como cuarto parámetro
-@Post('email-response')
-@HttpCode(200)
-@UseInterceptors(AnyFilesInterceptor(multerOptions))
-async handleEmailResponse(
-    @Req() req: Request,
-    @Res() res: Response
-  ) {
+
+  @Post('email-response')
+  @HttpCode(200)
+  @UseInterceptors(AnyFilesInterceptor(multerOptions))
+  async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
     const body: any = req.body;
     console.log('🔥 [email-response] hit!', JSON.stringify(body));
 
+    // Cabeceras obligatorias
     const fromEmail: string = body.from || body['envelope[from]'];
     const toEmailRaw = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
     const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
-    const emailText: string = body.text || body.plain || body.html || '';
-
-    console.log('📩 Webhook from email-response', { fromEmail, toEmail });
-
     if (!fromEmail || !toEmail) {
       return res.status(400).send({ error: 'Missing email headers' });
     }
 
-    // --- Validation block: only proceed if reply contains a fuzzy "I will take it" or "Yes" ---
-    const normalized = emailText.replace(/\s+/g, '').toLowerCase();
-    const isTakeIt = normalized.includes('iwilltakeit');
-    const isYes = normalized.includes('yes');
-
-    if (!isTakeIt && !isYes) {
-      console.log('⚠️ Reply does not match expected keywords, no action taken');
-      return res.status(200).send({ message: 'No valid reply detected, skipping.' });
+    // 1) Extraer sólo texto plano del usuario
+    let rawText = body.text || body.plain || '';
+    if (!rawText && body.html) {
+      rawText = body.html.replace(/<[^>]+>/g, '');
     }
 
+    // 2) Quitar citas (> y On ... wrote:)
+    const lines = rawText.split(/\r?\n/);
+    const replyLines: string[] = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (t.startsWith('>') || /^On .* wrote:/.test(t)) {
+        break;
+      }
+      if (t) replyLines.push(t);
+    }
+    const replyContent = replyLines.join(' ');
+
+    // 3) Normalizar y validar
+    const normalized = replyContent.replace(/\s+/g, '').toLowerCase();
+    const isTakeIt = normalized.includes('iwilltakeit');
+    const isYes    = normalized.includes('yes');
+
+    if (!isTakeIt && !isYes) {
+      console.log('⚠️ No valid reply detected, skipping any action.');
+      // No enviar nada si no cumple validación
+      return res.status(200).end();
+    }
+
+    // 4) Procesar respuesta válida
     try {
-      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+      await this.notificationService.handleEmailReply(fromEmail, toEmail, replyContent);
       return res.status(200).send({ message: 'Reply processed successfully' });
     } catch (err) {
       console.error('❌ Error handling email reply:', err);
       return res.status(500).send({ error: 'Internal server error' });
     }
   }
+
 
 
   @Post('sms-response')
