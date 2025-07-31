@@ -424,28 +424,46 @@ export class NotificationService {
         console.warn('No se pudo obtener el nombre del negocio de Acuity:', err);
       }
     }
-    const locRes = await fetch(
-  `https://connect.squareup.com/v2/locations/${locationId}`,
-  { headers: { Authorization: `Bearer ${integration.accessToken}` } }
-);
-const { location } = await locRes.json();
-const locationTimeZone = location.time_zone; // ej. "America/Edmonton"
+   // … tras haber obtenido slotTime: Date y locationId …
+let locationTimeZone = 'UTC';
 
+try {
+  const locRes = await fetch(
+    `https://connect.squareup.com/v2/locations/${locationId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${integration.accessToken}`,
+        'Square-Version': '2025-07-16',      // 🔑 obligatorio
+      },
+    }
+  );
+  const locJson = await locRes.json();
+  console.log('Square Location payload:', locJson);
+  // ojo: la propiedad se llama "timezone", no "time_zone"
+  if (locJson.location?.timezone) {
+    locationTimeZone = locJson.location.timezone;
+  } else {
+    console.warn('No se encontró location.timezone en la respuesta de Square');
+  }
+} catch (err) {
+  console.warn('Error obteniendo timezone de Square, usando UTC:', err);
+}
 
-    // Preparar contenido de notificación
-   const opts: Intl.DateTimeFormatOptions = {
-  month: 'long',
-  day: 'numeric',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  hour12: true,
-  timeZone: locationTimeZone
+// Verifica en consola:
+console.log('Usando timezone para formateo:', locationTimeZone,
+            'slotTime (UTC):', slotTime.toISOString());
+
+// Ahora formatea usando la zona correcta
+const opts: Intl.DateTimeFormatOptions = {
+  month:   'long',
+  day:     'numeric',
+  year:    'numeric',
+  hour:    'numeric',
+  minute:  '2-digit',
+  hour12:  true,
+  timeZone: locationTimeZone,
 };
 const slotTimeStr = new Intl.DateTimeFormat('en-US', opts).format(slotTime);
-
-
-const emailSubject = `Appointment Slot Now Available at ${businessName}`;
 
 const emailBodyTemplate = `
 Hello,
@@ -459,6 +477,9 @@ Thank you for choosing ${businessName}. We look forward to seeing you.
 Sincerely,  
 The ${businessName} Team
 `.trim();
+
+
+const emailSubject = `Appointment Slot Now Available at ${businessName}`;
 
 const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will take it” to secure this appointment.`;
 
