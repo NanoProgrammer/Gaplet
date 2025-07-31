@@ -507,7 +507,6 @@ const emailBodyTemplate = `
 <!DOCTYPE html>
 <html>
   <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-    <p>Hi <strong>\${firstName}</strong>,</p>
 
     <p style="font-size: 16px;">
       <strong>Great news!</strong> An appointment slot has just opened up at <strong>${businessName}</strong>:
