@@ -488,16 +488,13 @@ businessPhone =
   console.warn('Error obteniendo teléfono de Square, usando N/A:', err);
 }
 const textPlain =
-  `Hi \${firstName},
-
+  `
 Great news! An appointment slot has just opened up at \${businessName}:
 
 Date & Time: \${slotTimeStr}
 Location: \${businessName}
 
 To claim this slot, simply reply to this email with “I will take it”. We’ll confirm it with the first response we receive.
-
-If you have any questions or need to reschedule, please call us at \${businessPhone}.
 
 Thank you for choosing \${businessName}. We look forward to seeing you!
 
