@@ -26,29 +26,42 @@ export class WebhooksController {
 @Post('email-response')
 @HttpCode(200)
 @UseInterceptors(AnyFilesInterceptor(multerOptions))
-async handleEmailResponse(@Req() req: Request, @Res() res: Response) {
-  const body: any = req.body;
-  console.log('🔥 [email-response] hit!', JSON.stringify(body));   // <<< nueva línea
-  const fromEmail: string = body.from || body['envelope[from]'];
-  const toEmailRaw   = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
-  const toEmail: string= typeof toEmailRaw === 'string' ? toEmailRaw : '';
-  const emailText: string = body.text || body.plain || body.html || '';
+async handleEmailResponse(
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const body: any = req.body;
+    console.log('🔥 [email-response] hit!', JSON.stringify(body));
 
-  console.log('📩 Webhook from email-response', { fromEmail, toEmail });
+    const fromEmail: string = body.from || body['envelope[from]'];
+    const toEmailRaw = Array.isArray(body.to) ? body.to[0] : body.to || body['envelope[to]'];
+    const toEmail: string = typeof toEmailRaw === 'string' ? toEmailRaw : '';
+    const emailText: string = body.text || body.plain || body.html || '';
 
-  if (!fromEmail || !toEmail) {
-    return res.status(400).send({ error: 'Missing email headers' });
+    console.log('📩 Webhook from email-response', { fromEmail, toEmail });
+
+    if (!fromEmail || !toEmail) {
+      return res.status(400).send({ error: 'Missing email headers' });
+    }
+
+    // --- Validation block: only proceed if reply contains a fuzzy "I will take it" or "Yes" ---
+    const normalized = emailText.replace(/\s+/g, '').toLowerCase();
+    const isTakeIt = normalized.includes('iwilltakeit');
+    const isYes = normalized.includes('yes');
+
+    if (!isTakeIt && !isYes) {
+      console.log('⚠️ Reply does not match expected keywords, no action taken');
+      return res.status(200).send({ message: 'No valid reply detected, skipping.' });
+    }
+
+    try {
+      await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
+      return res.status(200).send({ message: 'Reply processed successfully' });
+    } catch (err) {
+      console.error('❌ Error handling email reply:', err);
+      return res.status(500).send({ error: 'Internal server error' });
+    }
   }
-
-  try {
-    await this.notificationService.handleEmailReply(fromEmail, toEmail, emailText);
-    return res.status(200).send({ message: 'Reply processed successfully' });
-  } catch (err) {
-    console.error('❌ Error handling email reply:', err);
-    return res.status(500).send({ error: 'Internal server error' });
-  }
-}
-
 
 
   @Post('sms-response')
