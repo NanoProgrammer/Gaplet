@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as sgMail from '@sendgrid/mail';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
+import { text } from 'stream/consumers';
 const twilio = require('twilio');
 
 interface Recipient {
@@ -486,6 +487,25 @@ businessPhone =
 } catch (err) {
   console.warn('Error obteniendo teléfono de Square, usando N/A:', err);
 }
+const textPlain =
+  `Hi \${firstName},
+
+Great news! An appointment slot has just opened up at \${businessName}:
+
+Date & Time: \${slotTimeStr}
+Location: \${businessName}
+
+To claim this slot, simply reply to this email with “I will take it”. We’ll confirm it with the first response we receive.
+
+If you have any questions or need to reschedule, please call us at \${businessPhone}.
+
+Thank you for choosing \${businessName}. We look forward to seeing you!
+
+The \${businessName} Team
+
+You’re receiving this email because you requested notifications from \${businessName}. If you’d rather not receive these alerts, just let us know.
+`;
+
 const emailBodyTemplate = `
 <!DOCTYPE html>
 <html>
@@ -562,7 +582,7 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
         const batchRecipients = emailList.slice(i, i + batchSize);
         const delayMs = (i / batchSize) * 60_000;
         setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
+          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
         }, delayMs);
       }
     }
@@ -576,7 +596,7 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
         if (batchRecipients.length === 0) break;
         const delayMs = wave * emailIntervalMs;
         setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
+          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
         }, delayMs);
         batchStart += batchRecipients.length;
       }
@@ -601,7 +621,7 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
           if (batchRecipients.length === 0) break;
           const delayMs = 60 * 60_000 + wave * emailIntervalMs;
           setTimeout(() => {
-            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
+            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
           }, delayMs);
           batchStart += batchRecipients.length;
         }
@@ -639,7 +659,7 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
         if (batchRecipients.length === 0) break;
         const delayMs = wave * emailIntervalMs;
         setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
+          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
         }, delayMs);
         batchStart += batchRecipients.length;
       }
@@ -664,7 +684,7 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
           if (batchRecipients.length === 0) break;
           const delayMs = 60 * 60_000 + wave * emailIntervalMs;
           setTimeout(() => {
-            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, emailBodyTemplate, userId, businessName);
+            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
           }, delayMs);
           batchStart += batchRecipients.length;
         }
@@ -702,40 +722,63 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
   }
 
   private async sendEmailBatch(
-    campaignId: string,
-    recipients: Recipient[],
-    subject: string,
-    bodyTemplate: string,
-    userId: string,
-    businessName: string,
-  ) {
-    if (this.isCampaignFilled(campaignId) || recipients.length === 0) return;
-    const messages = recipients.map(rec => {
-      let greeting = 'Hello,';
-      if (rec.name && rec.name !== 'Client') {
-        const firstName = rec.name.split(' ')[0];
-        greeting = `Hello ${firstName},`;
-      }
-      const textContent = `${greeting}\n\n${bodyTemplate}`;
-      return {
-        to: rec.email!,
-        from: this.buildFrom(businessName),
-        subject: subject,
-        replyTo: this.buildReplyTo(campaignId),
-        text: textContent,
-      };
-    });
-    try {
-      await sgMail.send(messages);
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { emailSent: { increment: messages.length } },
-      });
-      console.log(`✅ Sent ${messages.length} emails for campaign ${campaignId}`);
-    } catch (error) {
-      console.error(`❌ Error sending email batch for campaign ${campaignId}:`, error);
+  campaignId: string,
+  recipients: Recipient[],
+  subject: string,
+  textTemplate: string,
+  htmlTemplate: string,
+  userId: string,
+  businessName: string,
+) {
+  if (this.isCampaignFilled(campaignId) || recipients.length === 0) return;
+
+  const messages = recipients.map(rec => {
+    // 1) Construir saludo personalizado
+    let greetingText = 'Hello,';
+    let greetingHtml = '<p>Hello,</p>';
+    if (rec.name && rec.name !== 'Client') {
+      const firstName = rec.name.split(' ')[0];
+      greetingText = `Hello ${firstName},`;
+      greetingHtml = `<p>Hello <strong>${firstName}</strong>,</p>`;
     }
+
+    // 2) Texto plano
+    const textContent = `${greetingText}\n\n${textTemplate}`;
+
+    // 3) HTML (añadiendo el saludo al template)
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+        ${greetingHtml}
+        ${htmlTemplate}
+        <p style="margin-top:30px;">
+          Thank you for choosing <strong>${businessName}</strong>!<br>
+          The ${businessName} Team
+        </p>
+      </div>
+    `.trim();
+
+    return {
+      to: rec.email!,
+      from: this.buildFrom(businessName),
+      replyTo: this.buildReplyTo(campaignId),
+      subject,
+      text: textContent,
+      html: htmlContent,
+    };
+  });
+
+  try {
+    await sgMail.send(messages);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailSent: { increment: messages.length } },
+    });
+    console.log(`✅ Sent ${messages.length} emails for campaign ${campaignId}`);
+  } catch (error) {
+    console.error(`❌ Error sending email batch for campaign ${campaignId}:`, error);
   }
+}
+
 
   private async sendSmsBatch(
     campaignId: string,
