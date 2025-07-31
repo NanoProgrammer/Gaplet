@@ -60,9 +60,6 @@ export class NotificationService {
     };
   }
 
-  private buildSubject(businessName: string): string {
-    return `New appointment slot available at ${businessName}`;
-  }
 
   constructor(private readonly prisma: PrismaManagerService) {
     if (process.env.SENDGRID_API_KEY) {
@@ -438,10 +435,14 @@ try {
     }
   );
   const locJson = await locRes.json();
+  // … después de obtener locJson.location …
+
+
   console.log('Square Location payload:', locJson);
   // ojo: la propiedad se llama "timezone", no "time_zone"
   if (locJson.location?.timezone) {
     locationTimeZone = locJson.location.timezone;
+    
   } else {
     console.warn('No se encontró location.timezone en la respuesta de Square');
   }
@@ -465,23 +466,93 @@ const opts: Intl.DateTimeFormatOptions = {
 };
 const slotTimeStr = new Intl.DateTimeFormat('en-US', opts).format(slotTime);
 
+const emailSubject = `New Appointment Slot Available at ${businessName} – ${slotTimeStr}`;
+let businessPhone = 'N/A';
+try {
+  const locRes = await fetch(
+    `https://connect.squareup.com/v2/locations/${locationId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${integration.accessToken}`,
+        'Square-Version': '2025-07-16',      // 🔑 obligatorio
+      },
+    }
+  );
+  const locJson = await locRes.json();
+  // … después de obtener locJson.location …
+businessPhone =
+  locJson.location?.phone_number?.trim();
+
+} catch (err) {
+  console.warn('Error obteniendo teléfono de Square, usando N/A:', err);
+}
 const emailBodyTemplate = `
-Hello,
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+    <p>Hi <strong>\${firstName}</strong>,</p>
 
-We wanted to let you know that an appointment slot has just opened up on ${slotTimeStr} at ${businessName}.  
-If you’d like to claim this time, simply reply to this email with “I will take it.”  
-Please note that we’ll confirm the slot with the first reply we receive.
+    <p style="font-size: 16px;">
+      <strong>Great news!</strong> An appointment slot has just opened up at <strong>${businessName}</strong>:
+    </p>
 
-Thank you for choosing ${businessName}. We look forward to seeing you.
+    <table
+      style="width:100%; max-width:400px; border-collapse:collapse; margin:20px 0;"
+      cellpadding="0" cellspacing="0"
+    >
+      <tr>
+        <td style="padding:10px; background:#f4f4f4; border:1px solid #ddd;">
+          <strong>Date & Time:</strong>
+        </td>
+        <td style="padding:10px; background:#f4f4f4; border:1px solid #ddd;">
+          ${slotTimeStr}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:10px; border:1px solid #ddd;">
+          <strong>Location:</strong>
+        </td>
+        <td style="padding:10px; border:1px solid #ddd;">
+          ${businessName}
+        </td>
+      </tr>
+    </table>
 
-Sincerely,  
-The ${businessName} Team
+    <p>
+      To claim this slot, simply reply to this email with 
+      <em style="color:#0052cc;">“I will take it”</em>. 
+      We’ll confirm it with the <strong>first response</strong> we receive.
+    </p>
+
+    <p>
+  If you have any questions or need to reschedule, please call us at
+  <a href="tel:${businessPhone}" style="color:#0052cc; text-decoration:none;">
+    ${businessPhone}
+  </a>.
+</p>
+
+
+    <p style="margin-top:30px;">
+      Thank you for choosing <strong>${businessName}</strong>.<br>
+      We look forward to seeing you!
+    </p>
+
+    <p style="margin:40px 0 0 0;">
+      <strong>The ${businessName} Team</strong>
+    </p>
+
+    <hr style="border:none; border-top:1px solid #eee; margin:40px 0;">
+
+    <p style="font-size:12px; color:#999;">
+      You’re receiving this email because you requested notifications from ${businessName}. 
+      If you’d rather not receive these alerts, just let us know.
+    </p>
+  </body>
+</html>
 `.trim();
 
 
-const emailSubject = `Appointment Slot Now Available at ${businessName}`;
-
-const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will take it” to secure this appointment.`;
+const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Reply “I will take it” to book now.`;
 
 
     /* Enviar notificaciones según el plan del usuario */
@@ -734,13 +805,15 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
       if (integ) {
         if (campaign.provider === 'square') {
           const res = await fetch('https://connect.squareup.com/v2/merchants', {
-            headers: { Authorization: `Bearer ${integ.accessToken}` },
+            headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16'  // 🔑 obligatorio
+            },
           });
           const js = await res.json();
           if (js.merchant?.length) businessName = js.merchant[0].business_name;
         } else {
           const res = await fetch('https://acuityscheduling.com/api/v1/me', {
-            headers: { Authorization: `Bearer ${integ.accessToken}` },
+            headers: { Authorization: `Bearer ${integ.accessToken}`,
+          'Square-Version': '2025-07-16' },
           });
           const js = await res.json();
           businessName = js.businessName || js.name || businessName;
@@ -756,14 +829,14 @@ const smsText = `New slot at ${businessName}: ${slotTimeStr}. Reply “I will ta
       if (campaign.provider === 'square') {
         const locRes = await fetch(
           `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
         );
         const { location } = await locRes.json();
         slotTimeZone = location.time_zone;
       } else { // acuity
         const meRes = await fetch(
           'https://acuityscheduling.com/api/v1/me',
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
         );
         const meJson = await meRes.json();
         slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
