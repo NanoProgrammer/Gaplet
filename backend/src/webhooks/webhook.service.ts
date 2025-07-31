@@ -917,7 +917,7 @@ const firstName = rec.name.split(' ')[0];
       if (campaign.provider === 'square') {
         const locRes = await fetch(
           `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
         );
         const { location } = await locRes.json();
         slotTimeZone = location.time_zone;
@@ -950,7 +950,7 @@ const firstName = rec.name.split(' ')[0];
       if (campaign.provider === 'square') {
         const locRes = await fetch(
           `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
         );
         const { location } = await locRes.json();
         slotTimeZone = location.time_zone;
