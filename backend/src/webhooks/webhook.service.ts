@@ -744,11 +744,11 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
 
     // 2) Texto plano
     const textContent = `${greetingText}\n\n${textTemplate}`;
-
+const firstName = rec.name.split(' ')[0];
     // 3) HTML (añadiendo el saludo al template)
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-        ${greetingHtml}
+      <p>Hello <strong>${firstName}</strong>,</p>
         ${htmlTemplate}
         <p style="margin-top:30px;">
           Thank you for choosing <strong>${businessName}</strong>!<br>
