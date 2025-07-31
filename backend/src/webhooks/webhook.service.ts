@@ -726,6 +726,10 @@ const firstName = rec.name.split(' ')[0];
       <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
       <p>Hello <strong>${firstName}</strong>,</p>
         ${htmlTemplate}
+      <p>Thank you for choosing <strong>${businessName}</strong>.</p>
+      <p style="font-size: 12px; color: #999;">
+          The ${businessName} Team.
+      </p>
       </div>
     `.trim();
 
