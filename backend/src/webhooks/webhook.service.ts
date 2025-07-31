@@ -789,215 +789,79 @@ const firstName = rec.name.split(' ')[0];
   }
 
   
-  async handleEmailReply(
-    fromEmailRaw: string,
-    toEmail: string,
-    bodyText: string,
-  ) {
-    // — 1) Parsear remitente
-    let fromEmail = fromEmailRaw.trim();
-    let fromName = '';
-    const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
-    if (m) {
-      fromName = m[1].trim();
-      fromEmail = m[2].trim();
-    } else {
-      fromName = fromEmail.split('@')[0];
-    }
-    const normalized = fromEmail.toLowerCase();
-
-    // — 2) Extraer campaignId
-    const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
-    const campaignId =
-      this.emailToCampaign.get(gapletSlotId) ||
-      this.emailToCampaign.get(normalized);
-    if (!campaignId) return;
-    const campaign = this.activeCampaigns.get(campaignId);
-    if (!campaign) return;
-
-    // — 3) Load businessName
-    let businessName = 'Your Business';
-    try {
-      const integ = await this.prisma.connectedIntegration.findFirst({
-        where: { userId: campaign.userId, provider: campaign.provider },
-      });
-      if (integ) {
-        if (campaign.provider === 'square') {
-          const res = await fetch('https://connect.squareup.com/v2/merchants', {
-            headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16'  // 🔑 obligatorio
-            },
-          });
-          const js = await res.json();
-          if (js.merchant?.length) businessName = js.merchant[0].business_name;
-        } else {
-          const res = await fetch('https://acuityscheduling.com/api/v1/me', {
-            headers: { Authorization: `Bearer ${integ.accessToken}`,
-          'Square-Version': '2025-07-16' },
-          });
-          const js = await res.json();
-          businessName = js.businessName || js.name || businessName;
-        }
-      }
-    } catch { /* silent */ }
-    let slotTimeZone = 'UTC';
+  private async resolveTimeZone(
+  provider: 'square' | 'acuity',
+  accessToken: string,
+  locationId?: string
+): Promise<string> {
+  let tz = 'UTC';
   try {
-    const integ = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: campaign.userId, provider: campaign.provider },
-    });
-    if (integ) {
-      if (campaign.provider === 'square') {
-        const locRes = await fetch(
-          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
-        );
-        const { location } = await locRes.json();
-        slotTimeZone = location.time_zone;
-      } else { // acuity
-        const meRes = await fetch(
-          'https://acuityscheduling.com/api/v1/me',
-          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
-        );
-        const meJson = await meRes.json();
-        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
-      }
-    }
-  } catch (err) {
-    console.warn('No pude obtener timezone dinámico, uso UTC', err);
-  }
-    // — 4) Si ya estaba filled antes de este email
-    const wasFilled = this.isCampaignFilled(campaignId);
-    const isOriginal = campaign.recipients.some(r => r.email?.toLowerCase() === normalized);
-    if (wasFilled) {
-      if (isOriginal) {
-        return this.sendSlotTakenReplyEmail(
-          fromEmail, fromName,
-          { gapletSlotId, startAt: campaign.slotTime , timeZone: slotTimeZone }, // Timezone is not critical here
-          businessName,
-        );
-      }
-      return this.sendSlotAlreadyTakenEmail(
-        fromEmail, fromName,
-        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone},
-        businessName,
-      );
-    }
-
-    // — 5) Confirmación textual
-    if (!bodyText.toLowerCase().includes('i will take it')) return;
-
-    // — 6) Primer respondedor
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
-    const rec = campaign.recipients.find(r => r.email?.toLowerCase() === normalized);
-    const winner: Recipient = rec
-      ? { ...rec, email: fromEmail }
-      : { name: fromName, email: fromEmail };
-
-    try {
-      // — 7) Crear booking + logs
-      await this.createAppointmentAndNotify(
-        campaign,
-        winner,
+    if (provider === 'square' && locationId) {
+      const res = await fetch(
+        `https://connect.squareup.com/v2/locations/${locationId}`,
         {
-          gapletSlotId,
-          startAt: campaign.slotTime,
-          locationId: campaign.locationId,
-          durationMinutes: campaign.duration ?? 0,
-          serviceVariationId: campaign.serviceVariationId,
-          serviceVariationVersion: campaign.serviceVariationVersion!, // obligatorio
-          teamMemberId: campaign.teamMemberId,
-        },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Square-Version': '2025-07-16'
+          }
+        }
       );
- let slotTimeZone = 'UTC';
-  try {
-    const integ = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: campaign.userId, provider: campaign.provider },
-    });
-    if (integ) {
-      if (campaign.provider === 'square') {
-        const locRes = await fetch(
-          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
-        );
-        const { location } = await locRes.json();
-        slotTimeZone = location.time_zone;
-      } else { // acuity
-        const meRes = await fetch(
-          'https://acuityscheduling.com/api/v1/me',
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
-        );
-        const meJson = await meRes.json();
-        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
-      }
+      const js = await res.json();
+      tz = js.location?.timezone ?? tz;
+    } else if (provider === 'acuity') {
+      const res = await fetch(
+        'https://acuityscheduling.com/api/v1/me',
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const js = await res.json();
+      tz = js.timezone ?? js.timeZone ?? tz;
     }
   } catch (err) {
-    console.warn('No pude obtener timezone dinámico, uso UTC', err);
+    console.warn('Unable to resolve timezone, defaulting to UTC', err);
   }
-      
-      // — 8) Confirmación en hilo
-      await this.sendConfirmationReplyEmail(
-        winner.email!, winner.name,
-        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-        businessName,
-      );
-    } catch (err) {
-       let slotTimeZone = 'UTC';
-  try {
-    const integ = await this.prisma.connectedIntegration.findFirst({
-      where: { userId: campaign.userId, provider: campaign.provider },
-    });
-    if (integ) {
-      if (campaign.provider === 'square') {
-        const locRes = await fetch(
-          `https://connect.squareup.com/v2/locations/${campaign.locationId}`,
-          { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
-        );
-        const { location } = await locRes.json();
-        slotTimeZone = location.time_zone;
-      } else { // acuity
-        const meRes = await fetch(
-          'https://acuityscheduling.com/api/v1/me',
-          { headers: { Authorization: `Bearer ${integ.accessToken}` } }
-        );
-        const meJson = await meRes.json();
-        slotTimeZone = meJson.timezone || meJson.timeZone || slotTimeZone;
-      }
-    }
-  } catch (err) {
-    console.warn('No pude obtener timezone dinámico, uso UTC', err);
-  }
-      console.error('Booking failed:', err);
-      // — 9) Fallback “slot ya ocupado”
-      if (isOriginal) {
-        await this.sendSlotTakenReplyEmail(
-          fromEmail, winner.name,
-          { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-          businessName,
-        );
-      } else {
-        await this.sendSlotAlreadyTakenEmail(
-          fromEmail, winner.name,
-          { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-          businessName,
-        );
-      }
-    }
-  }
+  return tz;
+}
 
-
-
-
-async sendConfirmationReplyEmail(
-  to: string,
-  name: string | null,
-  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
-  businessName: string,
+async handleEmailReply(
+  fromEmailRaw: string,
+  toEmail: string,
+  bodyText: string,
 ) {
-  const first = name?.split(' ')[0] || 'Guest';
-  const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
-  const from = this.buildFrom(businessName);
+  // 1) Parse sender
+  let fromEmail = fromEmailRaw.trim();
+  let fromName = '';
+  const m = fromEmailRaw.match(/^(.+?)\s*<(.+)>$/);
+  if (m) {
+    fromName = m[1].trim();
+    fromEmail = m[2].trim();
+  } else {
+    fromName = fromEmail.split('@')[0];
+  }
+  const normalized = fromEmail.toLowerCase();
 
-  
+  // 2) Extract campaignId
+  const gapletSlotId = toEmail.split('@')[0].replace(/^reply\+/, '');
+  const campaignId =
+    this.emailToCampaign.get(gapletSlotId) ||
+    this.emailToCampaign.get(normalized);
+  if (!campaignId) return;
+  const campaign = this.activeCampaigns.get(campaignId);
+  if (!campaign) return;
+
+  // 3) Load integration once
+  const integ = await this.prisma.connectedIntegration.findFirst({
+    where: { userId: campaign.userId, provider: campaign.provider },
+  });
+  if (!integ) return;
+
+  // 4) Resolve timezone dynamically
+  const slotTimeZone = await this.resolveTimeZone(
+    campaign.provider as 'square' | 'acuity',
+    integ.accessToken,
+    campaign.locationId
+  );
+
+  // 5) Format appointment time
   const appointmentTime = new Intl.DateTimeFormat('en-US', {
     month:  'long',
     day:    'numeric',
@@ -1005,15 +869,140 @@ async sendConfirmationReplyEmail(
     hour:   'numeric',
     minute: '2-digit',
     hour12: true,
-    timeZone: slot.timeZone,
-  }).format(slot.startAt);
+    timeZone: slotTimeZone,
+  }).format(campaign.slotTime);
 
-  const body = `
+  // 6) Determine businessName
+  let businessName = 'Your Business';
+  try {
+    if (campaign.provider === 'square') {
+      const res = await fetch(
+        'https://connect.squareup.com/v2/merchants',
+        { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
+      );
+      const js = await res.json();
+      if (js.merchant?.length) businessName = js.merchant[0].business_name;
+    } else {
+      const res = await fetch(
+        'https://acuityscheduling.com/api/v1/me',
+        { headers: { Authorization: `Bearer ${integ.accessToken}` } }
+      );
+      const js = await res.json();
+      businessName = js.businessName || js.name || businessName;
+    }
+  } catch {}
+
+  // 7) Check if already filled
+  const wasFilled = this.isCampaignFilled(campaignId);
+  const isOriginal = campaign.recipients.some(
+    r => r.email?.toLowerCase() === normalized
+  );
+
+  if (wasFilled) {
+    if (isOriginal) {
+      return this.sendSlotTakenReplyEmail(
+        fromEmail, fromName,
+        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
+        businessName,
+        appointmentTime
+      );
+    }
+    return this.sendSlotAlreadyTakenEmail(
+      fromEmail, fromName,
+      { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
+      businessName,
+      appointmentTime
+    );
+  }
+
+  // 8) Confirm text
+  if (!bodyText.toLowerCase().includes('i will take it')) return;
+
+  // 9) First responder wins
+  campaign.filled = true;
+  this.activeCampaigns.set(campaignId, campaign);
+  const rec = campaign.recipients.find(
+    r => r.email?.toLowerCase() === normalized
+  );
+  const winner = rec ? { ...rec, email: fromEmail } : { name: fromName, email: fromEmail };
+
+  try {
+    await this.createAppointmentAndNotify(
+      campaign,
+      winner,
+      {
+        gapletSlotId,
+        startAt: campaign.slotTime,
+        locationId: campaign.locationId,
+        durationMinutes: campaign.duration ?? 0,
+        serviceVariationId: campaign.serviceVariationId,
+        serviceVariationVersion: campaign.serviceVariationVersion!,
+        teamMemberId: campaign.teamMemberId,
+      }
+    );
+
+    // 10) Send confirmation
+    await this.sendConfirmationReplyEmail(
+      winner.email!, winner.name,
+      { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
+      businessName,
+      appointmentTime
+    );
+  } catch (err) {
+    console.error('Booking failed:', err);
+    // Fallback slot taken
+    if (isOriginal) {
+      await this.sendSlotTakenReplyEmail(
+        fromEmail, winner.name,
+        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
+        businessName,
+        appointmentTime
+      );
+    } else {
+      await this.sendSlotAlreadyTakenEmail(
+        fromEmail, winner.name,
+        { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
+        businessName,
+        appointmentTime
+      );
+    }
+  }
+}
+
+
+
+
+
+async sendConfirmationReplyEmail(
+  to: string,
+  name: string | null,
+  slot: { gapletSlotId: string; startAt: Date; timeZone: string },
+  businessName: string,
+  appointmentTime: string
+) {
+  const first = name?.split(' ')[0] || 'Guest';
+  const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
+  const from = this.buildFrom(businessName);
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+      <p>Hello <strong>${first}</strong>,</p>
+      <p>Thank you for choosing <strong>${businessName}</strong>. We’re pleased to confirm your appointment:</p>
+      <ul style="padding-left: 20px;">
+        <li><strong>Date & Time:</strong> ${appointmentTime}</li>
+      </ul>
+      <p>If you need to reschedule or cancel, simply reply to this email and we’ll be happy to assist.</p>
+      <p>We look forward to seeing you.</p>
+      <p>Kind regards,<br>The ${businessName} Team</p>
+    </div>
+  `.trim();
+
+  const textBody = `
 Hello ${first},
 
 Thank you for choosing ${businessName}. We’re pleased to confirm your appointment:
 
-    • Date & Time: ${appointmentTime}
+  • Date & Time: ${appointmentTime}
 
 If you need to reschedule or cancel, simply reply to this email and we’ll be happy to assist.
 
@@ -1029,40 +1018,39 @@ The ${businessName} Team
     replyTo: { email: `${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`, name: businessName },
     headers: { 'In-Reply-To': threadId, References: threadId },
     subject: `Re: Appointment Confirmation – ${businessName}`,
-    text: body,
+    text: textBody,
+    html: htmlBody,
   });
 }
 
-
+// Slot taken fallback responder
 async sendSlotTakenReplyEmail(
   recipientEmail: string,
   recipientName: string | null,
-  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
+  slot: { gapletSlotId: string; startAt: Date; timeZone: string },
   businessName: string,
+  appointmentTime: string,
   originalMsgId?: string
 ) {
   const firstName = recipientName?.split(' ')[0] || 'Guest';
-  const when = new Intl.DateTimeFormat('en-US', {
-    month:  'long',
-    day:    'numeric',
-    year:   'numeric',
-    hour:   'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: slot.timeZone,
-  }).format(slot.startAt);
-
   const threadId = originalMsgId ?? `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
   const localpart = this.formatSenderEmail(businessName);
 
-  const body = `
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+      <p>Hello <strong>${firstName}</strong>,</p>
+      <p>We’re sorry, but the appointment slot on <strong>${appointmentTime}</strong> is no longer available.</p>
+      <p>Please reply with a few alternative dates and times, and we’ll do our best to accommodate you.</p>
+      <p>Sincerely,<br>The ${businessName} Team</p>
+    </div>
+  `.trim();
+
+  const textBody = `
 Hello ${firstName},
 
-We regret to inform you that the appointment slot on ${when} is no longer available.
+We’re sorry, but the appointment slot on ${appointmentTime} is no longer available.
 
-Please reply with a few alternative dates and times, and we will do our best to accommodate your schedule.
-
-We apologize for any inconvenience and appreciate your understanding.
+Please reply with a few alternative dates and times, and we’ll do our best to accommodate you.
 
 Sincerely,
 The ${businessName} Team
@@ -1083,7 +1071,8 @@ The ${businessName} Team
       'References': threadId,
     },
     subject: `Re: Appointment Update – ${businessName}`,
-    text: body,
+    text: textBody,
+    html: htmlBody,
   });
 }
 
@@ -1207,24 +1196,35 @@ async createAppointmentAndNotify(
 async sendSlotAlreadyTakenEmail(
   to: string,
   name: string | null,
-  slot: { gapletSlotId: string; startAt: Date, timeZone: string },
+  slot: { gapletSlotId: string; startAt: Date; timeZone: string },
   businessName: string,
+  appointmentTime: string
 ) {
   const firstName = name?.split(' ')[0] || 'Guest';
-  const appointmentTime = new Intl.DateTimeFormat('en-US', {
-    month:  'long',
-    day:    'numeric',
-    year:   'numeric',
-    hour:   'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: slot.timeZone,
-  }).format(slot.startAt);
-
   const threadId = `<${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}>`;
-  const from     = this.buildFrom(businessName);
+  const localpart = this.formatSenderEmail(businessName);
 
-  const body = `
+  // HTML version
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+      <p>Hello <strong>${firstName}</strong>,</p>
+      <p>
+        We regret to inform you that the appointment slot on
+        <strong>${appointmentTime}</strong> was confirmed by another client
+        before we received your response. As a result, we are unable to honor
+        your request for that time.
+      </p>
+      <p>
+        Please reply with a few alternative dates and times, and we will make
+        every effort to accommodate your schedule.
+      </p>
+      <p>Thank you for your understanding.</p>
+      <p>Sincerely,<br>The ${businessName} Team</p>
+    </div>
+  `.trim();
+
+  // Plain-text fallback
+  const textBody = `
 Hello ${firstName},
 
 We regret to inform you that the appointment slot on ${appointmentTime} was confirmed by another client before we received your response. As a result, we are unable to honor your request for that time.
@@ -1233,25 +1233,30 @@ Please reply with a few alternative dates and times, and we will make every effo
 
 Thank you for your understanding.
 
-Sincerely,  
+Sincerely,
 The ${businessName} Team
-`.trim();
+  `.trim();
 
   await sgMail.send({
     to,
-    from,
+    from: {
+      email: `${localpart}@${process.env.SENDGRID_DOMAIN}`,
+      name: businessName
+    },
     replyTo: {
       email: `reply+${slot.gapletSlotId}@${process.env.SENDGRID_REPLY_DOMAIN}`,
       name: businessName
     },
     headers: {
       'In-Reply-To': threadId,
-      References: threadId
+      'References': threadId
     },
     subject: `Re: Appointment Already Booked – ${businessName}`,
-    text: body,
+    text: textBody,
+    html: htmlBody
   });
 }
+
 
 
   async handleSmsReply(fromPhone: string, messageText: string) {
