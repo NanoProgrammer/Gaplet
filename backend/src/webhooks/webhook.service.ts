@@ -496,11 +496,7 @@ Location: \${businessName}
 
 To claim this slot, simply reply to this email with “I will take it”. We’ll confirm it with the first response we receive.
 
-Thank you for choosing \${businessName}. We look forward to seeing you!
-
-The \${businessName} Team
-
-You’re receiving this email because you requested notifications from \${businessName}. If you’d rather not receive these alerts, just let us know.
+You’re receiving this email because you requested notifications from ${businessName}. If you’d rather not receive these alerts, just let us know.
 `;
 
 const emailBodyTemplate = `
@@ -546,17 +542,6 @@ const emailBodyTemplate = `
     ${businessPhone}
   </a>.
 </p>
-
-
-    <p style="margin-top:30px;">
-      Thank you for choosing <strong>${businessName}</strong>.<br>
-      We look forward to seeing you!
-    </p>
-
-    <p style="margin:40px 0 0 0;">
-      <strong>The ${businessName} Team</strong>
-    </p>
-
     <hr style="border:none; border-top:1px solid #eee; margin:40px 0;">
 
     <p style="font-size:12px; color:#999;">
