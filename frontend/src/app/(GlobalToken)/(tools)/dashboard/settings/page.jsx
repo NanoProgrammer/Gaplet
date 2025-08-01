@@ -151,14 +151,6 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleSimpleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
   const handleSubmit = async () => {
     const notifyBeforeMinutes = Number(form.notifyBefore.value) * form.notifyBefore.unit;
     const notifyAfterMinutes = Number(form.notifyAfter.value) * form.notifyAfter.unit;
