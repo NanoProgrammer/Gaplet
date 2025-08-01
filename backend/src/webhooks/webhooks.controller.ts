@@ -92,7 +92,7 @@ export class WebhooksController {
       // Si la respuesta SMS es afirmativa (ej. "Sí" o "yes"), actualizar métricas (el NotificationService se encarga del resto)
       const text = smsText.toLowerCase();
       const positiveReply =
-        text.includes('yes') || text.includes('sí') || text.includes('si');
+        text.includes('yes') ;
       if (positiveReply) {
         // Buscar alguna integración activa (priorizar Square, luego Acuity)
         let integration = await this.prisma.connectedIntegration.findFirst({

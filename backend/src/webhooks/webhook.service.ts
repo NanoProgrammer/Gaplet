@@ -149,6 +149,16 @@ export class NotificationService {
         }
       }
     }
+    const now = new Date();
+const msUntilSlot = slotTime.getTime() - now.getTime();
+const minWindow = 2  * 60 * 60 * 1000;        //  2 horas en ms
+const maxWindow = 3  * 24 * 60 * 60 * 1000;   //  3 días en ms
+if (msUntilSlot < minWindow || msUntilSlot > maxWindow) {
+  console.log(
+    `Cancelación fuera de rango para notificación: faltan ${Math.round(msUntilSlot/1000/60)} minutos`
+  );
+  return;
+}
 
     // Obtener todos los clientes y su historial de citas del proveedor
     const clients: Recipient[] = [];
@@ -279,63 +289,82 @@ export class NotificationService {
     }
 
     // Filtrar clientes según preferencias, excluyendo al cliente que canceló
-    const now = new Date();
-    const eligibleRecipients: Recipient[] = [];
-    for (const client of clients) {
-      const idKey = client.customerId || (client.email ? client.email.toLowerCase() : client.phone!);
-      if (provider === 'acuity' && canceledCustomerEmail && client.email && client.email.toLowerCase() === canceledCustomerEmail.toLowerCase()) {
-        continue;
-      }
-      if (provider === 'square' && canceledCustomerId && client.customerId === canceledCustomerId) {
-        continue;
-      }
-      if (matchType) {
-        if (provider === 'acuity') {
-          if (appointmentTypeId && (!clientServiceTypes.get(idKey) || !clientServiceTypes.get(idKey)!.has(appointmentTypeId))) {
-            continue;
-          }
-        } else if (provider === 'square') {
-          if (serviceVariationId && (!clientServiceTypes.get(idKey) || !clientServiceTypes.get(idKey)!.has(serviceVariationId))) {
-            continue;
-          }
-        }
-      }
-      const lastAppt = lastApptMap.get(idKey);
-      if (notifyAfter && lastAppt) {
-        const minutesSinceLast = (now.getTime() - lastAppt.getTime()) / 60000;
-        if (minutesSinceLast < notifyAfter) {
-          continue;
-        }
-      }
-      const nextAppt = nextApptMap.get(idKey);
-      if (notifyBefore && nextAppt) {
-        const minutesUntilNext = (nextAppt.getTime() - now.getTime()) / 60000;
-        if (minutesUntilNext < notifyBefore) {
-          continue;
-        }
-      }
-      if (!client.email && !client.phone) {
-        continue;
-      }
-      if (plan === 'STARTER' && !client.email) {
-        continue;
-      }
-      client.lastAppt = lastAppt || null;
-      client.nextAppt = nextAppt || null;
-      eligibleRecipients.push(client);
-    }
+    // … código anterior hasta haber llenado clients, lastApptMap, nextApptMap y clientServiceTypes …
 
-    if (eligibleRecipients.length === 0) {
-      console.log(`No hay clientes elegibles para notificación (usuario ${userId}).`);
-      return;
-    }
+// -------------- FILTRADO REFACTORIZADO --------------
+const eligibleRecipients: Recipient[] = clients.filter(client => {
+  // 1) clave unívoca para el cliente
+  const idKey = client.customerId
+    || client.email?.toLowerCase()
+    || client.phone!;
 
-    eligibleRecipients.sort((a, b) => {
-      const aNext = a.nextAppt?.getTime() || Infinity;
-      const bNext = b.nextAppt?.getTime() || Infinity;
-      return aNext - bNext;
-    });
-    const notifyList = eligibleRecipients.slice(0, maxNotifications);
+  // 2) excluir al que canceló
+  if (provider === 'acuity'
+      && canceledCustomerEmail
+      && client.email?.toLowerCase() === canceledCustomerEmail.toLowerCase()) {
+    return false;
+  }
+  if (provider === 'square'
+      && canceledCustomerId
+      && client.customerId === canceledCustomerId) {
+    return false;
+  }
+
+  // 3) filtrar por tipo de cita si el usuario lo desea
+  if (matchType) {
+    const services = clientServiceTypes.get(idKey) ?? new Set();
+    const requiredId = provider === 'acuity'
+      ? appointmentTypeId
+      : serviceVariationId;
+    if (requiredId && !services.has(requiredId)) {
+      return false;
+    }
+  }
+
+  // 4) respetar “notifyAfterMinutes”
+  const last = lastApptMap.get(idKey);
+  if (notifyAfter > 0 && last) {
+    const minsSince = (now.getTime() - last.getTime()) / 60000;
+    if (minsSince < notifyAfter) {
+      return false;
+    }
+  }
+
+  // 5) respetar “notifyBeforeMinutes”
+  const next = nextApptMap.get(idKey);
+  if (notifyBefore > 0 && next) {
+    const minsUntil = (next.getTime() - now.getTime()) / 60000;
+    if (minsUntil < notifyBefore) {
+      return false;
+    }
+  }
+
+  // 6) debe tener canal válido; Starter solo email
+  if (!client.email && !client.phone) {
+    return false;
+  }
+  if (plan === 'STARTER' && !client.email) {
+    return false;
+  }
+
+  // 7) anotar para orden y envío posterior
+  client.lastAppt = last || null;
+  client.nextAppt = next || null;
+  return true;
+});
+
+if (eligibleRecipients.length === 0) {
+  console.log(`No hay clientes elegibles para notificación (usuario ${userId}).`);
+  return;
+}
+
+// -------------- ORDEN Y CORTE FINAL --------------
+eligibleRecipients.sort((a, b) => {
+  const aNext = a.nextAppt?.getTime() ?? Infinity;
+  const bNext = b.nextAppt?.getTime() ?? Infinity;
+  return aNext - bNext;
+});
+const notifyList = eligibleRecipients.slice(0, maxNotifications);
 
     let emailList: Recipient[] = [];
     let smsList: Recipient[] = [];
