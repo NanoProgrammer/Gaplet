@@ -157,26 +157,30 @@ export default function DashboardPage() {
   </h2>
   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 pl-1">
     <li className="flex items-start gap-3">
-    {(
-      // ¿Existe integración y sigue válida?
-      userInfo.connectedIntegration &&
-      new Date(userInfo.connectedIntegration.expiresAt).getTime() > Date.now()
-    ) ? (
-      // 2. Si es válido → texto tachado
-      <span className="text-sm text-gray-500 line-through">
-        Connect your client management system
-      </span>
-    ) : (
-      // 1. En cualquier otro caso → link
-      <a
-        href="/dashboard/integrations"
-        className="text-sm text-green-500 font-medium hover:underline transition"
-      >
-        Connect your client management system
-      </a>
-    )}
-  </li>
-
+      {userInfo.connectedIntegration && (
+        (() => {
+          const expiresMs = new Date(userInfo.connectedIntegration.expiresAt).getTime();
+          const isValid   = expiresMs > Date.now();
+          return (
+            <>
+              {/* 2. Si es válido → texto tachado; si no → link */}
+              {isValid ? (
+                <span className="text-sm text-gray-500 line-through">
+                  Connect your client management system
+                </span>
+              ) : (
+                <a
+                  href="/dashboard/integrations"
+                  className="text-sm text-green-500 font-medium hover:underline transition"
+                >
+                  Connect your client management system
+                </a>
+              )}
+            </>
+          );
+        })()
+      )}
+    </li>
 
     <li className="flex items-start gap-3">
       {preferences ? (
