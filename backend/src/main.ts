@@ -7,20 +7,22 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Raw body para webhooks de Stripe y Square
-  app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
-  app.use('/webhooks/square', express.raw({ type: 'application/json' }));
+  // 1) Stripe y Square siguen con raw JSON
+  app.use('/webhooks/stripe',  express.raw({ type: 'application/json' }));
+  app.use('/webhooks/square',  express.raw({ type: 'application/json' }));
 
-  // JSON parser para TODO lo demás (note que ya NO incluimos '/webhooks/email-response')
-  const rawNeededRoutes = [
-    '/webhooks/stripe',
-    '/webhooks/square',
-  ];
+  // 2) Solo Acuity necesita urlencoded
+  app.use(
+    '/webhooks/acuity',
+    bodyParser.urlencoded({ extended: true })
+  );
+
+  // 3) JSON parser para TODO lo demás
   app.use((req, res, next) => {
-    if (rawNeededRoutes.includes(req.originalUrl)) {
-      return next();
-    }
-    bodyParser.json()(req, res, next);
+    const isRaw = ['/webhooks/stripe', '/webhooks/square', '/webhooks/acuity']
+      .some(path => req.originalUrl.startsWith(path));
+    if (isRaw) return next();
+    return bodyParser.json()(req, res, next);
   });
 
   // CORS
