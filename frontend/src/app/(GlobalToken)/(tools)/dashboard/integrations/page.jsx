@@ -47,7 +47,7 @@ const fetchWithAuth = async (url, options = {}) => {
 const providers = [
   { name: 'Square', key: 'square', bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-300' },
   { name: 'Acuity', key: 'acuity', bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
-  { name: 'Semi-manual', key: 'google-semi', bg: 'bg-yellow-100/60', text: 'text-yellow-800', border: 'border-yellow-300' },
+  { name: 'Semi-manual', key: 'google-semi', bg: 'bg-white', text: 'text-yellow-800', border: 'border-yellow-300' },
 ];
 
 export default function IntegrationsPage() {
@@ -173,7 +173,7 @@ prov.border} ${prov.bg} hover:shadow-lg hover:scale-105 transition`}
         </div>
 
         {showManualSteps && (
-          <div className="mt-10 p-6 space-y-6 bg-yellow-100/60 border border-yellow-300/60 rounded-2xl shadow-lg">
+          <div className="mt-10 p-6 space-y-6 bg-white/80 border border-yellow-300/60 rounded-2xl shadow-lg">
             <div className="flex items-start gap-4">
               <Info className="w-6 h-6 text-yellow-700 mt-1" />
               <div>
