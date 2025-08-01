@@ -271,120 +271,130 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
 
 
   async exchangeTokenAndSave(
-    provider: 'acuity' | 'square' | 'google',
-    code: string,
-    userId: string,
-  ) {
-    const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
-    let tokenRes: any;
-    let externalUserId: string | null = null;
-    let externalOrgId: string | null = null;
+  provider: 'acuity' | 'square' | 'google',
+  code: string,
+  userId: string,
+) {
+  const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
+  let tokenRes: any;
+  let externalUserId: string | null = null;
+  let externalOrgId: string | null = null;
 
-    // 1) Exchange code for tokens
-    switch (provider) {
-      case 'acuity': {
-        const body = new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: process.env.ACUITY_CLIENT_ID!,
-          client_secret: process.env.ACUITY_CLIENT_SECRET!,
-          code,
-          redirect_uri: redirect,
-        });
-        tokenRes = await fetch('https://acuityscheduling.com/oauth2/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body,
-        }).then(r => r.json());
+  // 1) Exchange code for tokens
+  switch (provider) {
+    case 'acuity': {
+      const body = new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: process.env.ACUITY_CLIENT_ID!,
+        client_secret: process.env.ACUITY_CLIENT_SECRET!,
+        code,
+        redirect_uri: redirect,
+      });
+      tokenRes = await fetch('https://acuityscheduling.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      }).then(r => r.json());
 
-        if (!tokenRes.access_token) {
-          throw new Error(`Acuity token error: ${JSON.stringify(tokenRes)}`);
-        }
-        break;
+      if (!tokenRes.access_token) {
+        throw new Error(`Acuity token error: ${JSON.stringify(tokenRes)}`);
       }
-
-      case 'square': {
-        tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: process.env.SQUARE_CLIENT_ID,
-            client_secret: process.env.SQUARE_CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: redirect,
-          }),
-        }).then(r => r.json());
-
-        if (!tokenRes.access_token) {
-          throw new Error(`Square token error: ${JSON.stringify(tokenRes)}`);
-        }
-
-        const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
-          headers: { Authorization: `Bearer ${tokenRes.access_token}` },
-        }).then(r => r.json());
-        externalUserId = merchant.merchant?.id ?? null;
-        break;
-      }
-
-      case 'google': {
-        const params = new URLSearchParams({
-          code,
-          client_id: process.env.GOOGLE_CLIENT_ID!,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-          redirect_uri: redirect,
-          grant_type: 'authorization_code',
-        });
-        tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params,
-        }).then(r => r.json());
-
-        if (!tokenRes.access_token) {
-          throw new Error(`Google token error: ${JSON.stringify(tokenRes)}`);
-        }
-
-        const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${tokenRes.access_token}` },
-        }).then(r => r.json());
-
-        externalUserId = profile.id ?? null;
-        break;
-      }
+      break;
     }
 
-    // 2) Compute expiresAt
-    const { access_token, refresh_token, expires_in, expires_at, scope } = tokenRes;
-    const expires = expires_in
-      ? new Date(Date.now() + expires_in * 1000)
-      : expires_at
-      ? new Date(expires_at)
-      : null;
+    case 'square': {
+      tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: process.env.SQUARE_CLIENT_ID,
+          client_secret: process.env.SQUARE_CLIENT_SECRET,
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirect,
+        }),
+      }).then(r => r.json());
 
-    // 3) Upsert using composite unique key (userId+provider)
-    await this.prisma.connectedIntegration.upsert({
-    where: { userId },  // Único por usuario
+      if (!tokenRes.access_token) {
+        throw new Error(`Square token error: ${JSON.stringify(tokenRes)}`);
+      }
+
+      const merchant = await fetch('https://connect.squareup.com/v2/merchants/me', {
+        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
+      }).then(r => r.json());
+      externalUserId = merchant.merchant?.id ?? null;
+      break;
+    }
+
+    case 'google': {
+      const params = new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: redirect,
+        grant_type: 'authorization_code',
+      });
+      tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params,
+      }).then(r => r.json());
+
+      if (!tokenRes.access_token) {
+        throw new Error(`Google token error: ${JSON.stringify(tokenRes)}`);
+      }
+
+      const profile = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenRes.access_token}` },
+      }).then(r => r.json());
+
+      externalUserId = profile.id ?? null;
+      break;
+    }
+  }
+
+  // 2) Determine expiresAt and refreshToken
+  let expiresAt: Date | null;
+  let refreshToken: string | null = tokenRes.refresh_token ?? null;
+
+  if (provider === 'acuity') {
+    // Acuity does not return a refresh_token or expires_in, so we set a 30-day expiration
+    expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    refreshToken = null;
+  } else {
+    // Use real expires_in or expires_at
+    expiresAt = tokenRes.expires_in
+      ? new Date(Date.now() + tokenRes.expires_in * 1000)
+      : tokenRes.expires_at
+      ? new Date(tokenRes.expires_at)
+      : null;
+  }
+
+  // 3) Upsert into DB
+  await this.prisma.connectedIntegration.upsert({
+    where: { userId },
     update: {
       provider,
-      accessToken: access_token,
-      refreshToken: refresh_token || null,
-      expiresAt: expires,
-      scope,
+      accessToken: tokenRes.access_token,
+      refreshToken,
+      expiresAt,
+      scope: tokenRes.scope,
       externalUserId,
       externalOrgId,
     },
     create: {
       userId,
       provider,
-      accessToken: access_token,
-      refreshToken: refresh_token || null,
-      expiresAt: expires,
-      scope,
+      accessToken: tokenRes.access_token,
+      refreshToken,
+      expiresAt,
+      scope: tokenRes.scope,
       externalUserId,
       externalOrgId,
     },
   });
-  }
+}
+
 
   async ensureWebhook(provider: 'acuity' | 'google', userId: string) {
   const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({ where: { userId } });

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as sgMail from '@sendgrid/mail';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
-import { text } from 'stream/consumers';
 const twilio = require('twilio');
 
 interface Recipient {
@@ -71,21 +70,34 @@ export class NotificationService {
 
   async startCampaign(provider: 'acuity' | 'square', integration: any, payload: any, gapletSlotId?: string) {
     const userId: string = integration.userId;
-    // Cargar usuario y preferencias
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { preferences: true },
-    });
-    if (!user) {
-      console.error(`Usuario ${userId} no encontrado para campaña de notificación.`);
-      return;
-    }
-    const preferences = user.preferences;
+  // Cargar usuario y preferencias
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+    include: { preferences: true },
+  });
+  if (!user) {
+    console.error(`Usuario ${userId} no encontrado para campaña de notificación.`);
+    return;
+  }
+  const preferences = user.preferences;
+  const plan: string = user.role || '';
+
+  // Límite de reemplazos según plan
+  const replacementLimit =
+    plan === 'STARTER' ? 20 :
+    plan === 'PRO'     ? 50 :
+    plan === 'PREMIUM' ? 100 :
+    Infinity;
+  if ((user.totalReplacements ?? 0) >= replacementLimit) {
+    console.log(
+      `Usuario ${userId} ha alcanzado el límite de reemplazos (${user.totalReplacements}/${replacementLimit}), no se enviará nada más.`
+    );
+    return;
+  }
     const matchType = !!preferences?.matchAppointmentType;
     const notifyBefore = preferences?.notifyBeforeMinutes ?? 0;
     const notifyAfter = preferences?.notifyAfterMinutes ?? 0;
     const maxNotifications = preferences?.maxNotificationsPerGap ?? 10;
-    const plan: string = user.role || '';
 
     // Detalles del hueco de cita cancelada
     let slotTime: Date;
