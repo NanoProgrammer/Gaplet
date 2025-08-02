@@ -122,35 +122,36 @@ export class WebhooksController {
   
   @Post(':provider')
   @HttpCode(200)
+  @Post(':provider')
+  @HttpCode(200)
   async handleWebhook(
-    @Param('provider') provider: 'calendly' | 'acuity' | 'square',
+    @Param('provider') providerParam: string,
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
+    // Normalize provider to lowercase
+    const provider = providerParam.toLowerCase();
     const allowedProviders = ['square', 'acuity', 'calendly'];
     if (!allowedProviders.includes(provider)) {
-      console.warn(`❌ Ignoring unknown provider webhook: ${provider}`);
-      throw new BadRequestException('Unknown webhook provider');
+      console.warn(`⚠️ Webhook from unknown provider: ${providerParam}`);
+      return { received: true };
     }
 
     const isSquare = provider === 'square';
     const isAcuity = provider === 'acuity';
-    // preserve raw body for signature checks and manual parsing
     const rawBody = Buffer.isBuffer((req as any).body)
       ? (req as any).body.toString('utf8')
       : '';
 
-    // Square requires rawBody signature validation
     if (isSquare && !rawBody) {
       console.warn('⚠️ rawBody is missing for Square webhook');
       throw new BadRequestException('Missing rawBody');
     }
 
-    // Parse body: JSON for Square/Calendly, urlencoded for Acuity
     let body: any;
     try {
       if (isAcuity) {
-        // Acuity sends form-urlencoded payload
+        // Parse urlencoded form
         const params = new URLSearchParams(rawBody);
         body = {
           action: params.get('action') || params.get('status'),
@@ -165,9 +166,7 @@ export class WebhooksController {
       throw new BadRequestException('Invalid body format');
     }
 
-    // Common handling for cancellation events
-    if (isAcuity && body.action && body.action.includes('cancel')) {
-      // 1) Load integration
+    if (isAcuity && body.action?.includes('cancel')) {
       const integration = await this.prisma.connectedIntegration.findFirst({
         where: { provider: 'acuity' },
       });
@@ -176,7 +175,6 @@ export class WebhooksController {
         return { received: true };
       }
 
-      // 2) Fetch appointment details via v1 API with Basic Auth
       const appointmentId = body.id;
       const basicAuth = Buffer.from(`${integration.accessToken}:`).toString('base64');
       const url = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
@@ -198,7 +196,6 @@ export class WebhooksController {
         return { received: true };
       }
 
-      // 3) Create OpenSlot and update user
       const appt = details.appointment;
       const appointmentTime = new Date(appt.datetime);
       const duration = appt.duration;
@@ -226,7 +223,6 @@ export class WebhooksController {
         }),
       ]);
 
-      // 4) Trigger notification campaign
       await this.notificationService.startCampaign(
         'acuity',
         integration,
