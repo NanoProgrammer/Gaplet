@@ -122,102 +122,112 @@ export class WebhooksController {
   
   
  @Post(':provider')
-  @HttpCode(200)
-  async handleWebhook(
-    @Param('provider') providerParam: string,
-    @Headers() headers: Record<string, string>,
-    @Req() req: Request,
-  ) {
-    const provider = providerParam.trim().toLowerCase();
-    const allowed = ['acuity', 'square'];
-    if (!allowed.includes(provider)) {
-      console.warn(`⚠️ Unknown provider: ${providerParam}`);
-      return { received: true };
-    }
+@HttpCode(200)
+async handleWebhook(
+  @Param('provider') providerParam: string,
+  @Headers() headers: Record<string, string>,
+  @Req() req: Request,
+) {
+  const provider = providerParam.trim().toLowerCase();
+  const allowed = ['acuity', 'square'];
+  if (!allowed.includes(provider)) {
+    console.warn(`⚠️ Unknown provider: ${providerParam}`);
+    return { received: true };
+  }
 
-    // Use rawBody populated by bodyParser.verify
-    const rawBody = (req as any).rawBody?.toString('utf8') ?? '';
-    if (provider === 'acuity' && !rawBody) {
-      console.error('⚠️ Empty rawBody for Acuity');
-      return { received: true };
-    }
+  // rawBody ya viene de bodyParser.verify
+  const rawBody = (req as any).rawBody?.toString('utf8') ?? '';
+  if (provider === 'acuity' && !rawBody) {
+    console.error('⚠️ Empty rawBody for Acuity');
+    return { received: true };
+  }
 
-    let payload: any;
-    try {
-      if (provider === 'acuity') {
-        // Parse form-urlencoded rawBody
-        const params = new URLSearchParams(rawBody);
-        payload = {
-          action: params.get('action') || params.get('status'),
-          id: params.get('id'),
-        };
-      } else if (provider === 'square') {
-        // Square JSON via rawBody
-        if (!rawBody) {
-          console.warn('⚠️ Empty rawBody for Square');
-          throw new BadRequestException('Missing rawBody');
-        }
-        payload = JSON.parse(rawBody);
-      }
-    } catch (err) {
-      console.error('❌ Parsing webhook failed:', err);
-      throw new BadRequestException('Invalid body');
-    }
-
+  let payload: any;
+  try {
     if (provider === 'acuity') {
-      const action = payload.action?.toLowerCase() ?? '';
-      if (!action.includes('cancel')) {
-        console.log('ℹ️ Non-cancel action:', payload.action);
-        return { received: true };
-      }
+      const params = new URLSearchParams(rawBody);
+      payload = {
+        action: params.get('action') || params.get('status'),
+        id: params.get('id'),
+      };
+    } else {
+      payload = JSON.parse(rawBody);
+    }
+  } catch (err) {
+    console.error('❌ Parsing webhook failed:', err);
+    throw new BadRequestException('Invalid body');
+  }
 
-      const integration = await this.prisma.connectedIntegration.findFirst({ where: { provider: 'acuity' } });
-      if (!integration?.accessToken) {
-        console.error('⚠️ No Acuity token');
-        return { received: true };
-      }
+  if (provider === 'acuity') {
+    const action = payload.action?.toLowerCase() ?? '';
+    if (!action.includes('cancel')) {
+      console.log('ℹ️ Non-cancel action:', payload.action);
+      return { received: true };
+    }
 
-      // Fetch via v2 API
-      const appointmentId = payload.id;
-      const url = `https://acuityscheduling.com/api/v2/appointments/${appointmentId}`;
-      let details: any;
-      try {
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${integration.accessToken}` },
-        });
-        if (!res.ok) throw new Error(`Acuity v2 ${res.status}`);
-        details = await res.json();
-      } catch (err) {
-        console.error('❌ Acuity v2 error:', err);
-        return { received: true };
-      }
+    const integration = await this.prisma.connectedIntegration.findFirst({
+      where: { provider: 'acuity' },
+    });
+    if (!integration?.accessToken) {
+      console.error('⚠️ No Acuity token');
+      return { received: true };
+    }
 
-      const appt = details.appointment;
-      const startAt = new Date(appt.datetime);
-      const duration = appt.duration;
+    // → Aquí usamos la API v1 con Bearer token
+    const appointmentId = payload.id;
+    const url = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
+    let details: any;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Accept': 'application/json',
+        },
+      });
+      if (!res.ok) throw new Error(`Acuity v1 responded ${res.status}`);
+      details = await res.json();
+    } catch (err) {
+      console.error('❌ Error fetching Acuity appointment v1:', err);
+      return { received: true };
+    }
 
-      const [, slot] = await this.prisma.$transaction([
-        this.prisma.user.update({
-          where: { id: integration.userId },
-          data: { totalCancellations: { increment: 1 }, lastCancellationAt: new Date() },
-        }),
-        this.prisma.openSlot.create({ data: {
-            gapletSlotId: crypto.randomUUID(),
-            provider: 'acuity',
-            providerBookingId: appt.id,
-            userId: integration.userId,
-            startAt,
-            durationMinutes: duration,
-            teamMemberId: appt.staffID ?? 'unknown',
-            serviceVariationId: appt.appointmentTypeID ?? 'unknown',
-            locationId: appt.locationId ?? 'unknown',
-        }}),
-      ]);
+    // details.appointment contiene toda la info
+    const appt = details.appointment;
+    const startAt = new Date(appt.datetime);
+    const duration = appt.duration;
 
-      await this.notificationService.startCampaign('acuity', integration, appt, slot.gapletSlotId);
+    const [, slot] = await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: integration.userId },
+        data: {
+          totalCancellations: { increment: 1 },
+          lastCancellationAt: new Date(),
+        },
+      }),
+      this.prisma.openSlot.create({
+        data: {
+          gapletSlotId: crypto.randomUUID(),
+          provider: 'acuity',
+          providerBookingId: appt.id,
+          userId: integration.userId,
+          startAt,
+          durationMinutes: duration,
+          teamMemberId: appt.staffID ?? 'unknown',
+          serviceVariationId: appt.appointmentTypeID ?? 'unknown',
+          locationId: appt.locationId ?? 'unknown',
+        },
+      }),
+    ]);
 
-    } else if (provider === 'square') {
+    await this.notificationService.startCampaign(
+      'acuity',
+      integration,
+      appt,
+      slot.gapletSlotId,
+    );
+
+  } else if (provider === 'square') {
       // Square
       const signature = headers['x-square-hmacsha256-signature'];
       const expected = crypto.createHmac('sha256', process.env.WEBHOOK_SQUARE_KEY)
