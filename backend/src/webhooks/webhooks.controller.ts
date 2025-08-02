@@ -120,6 +120,7 @@ export class WebhooksController {
   }
    
   
+  
   @Post(':provider')
   @HttpCode(200)
   async handleWebhook(
@@ -127,70 +128,74 @@ export class WebhooksController {
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
-    // Normalize provider to lowercase
-    const provider = providerParam.toLowerCase();
-    const allowedProviders = ['square', 'acuity', 'calendly'];
+    // Normalize provider
+    const provider = decodeURIComponent(providerParam).trim().toLowerCase();
+    const allowedProviders = ['acuity', 'square']; // only support Acuity & Square
     if (!allowedProviders.includes(provider)) {
       console.warn(`⚠️ Webhook from unknown provider: ${providerParam}`);
       return { received: true };
     }
 
-    const isSquare = provider === 'square';
-    const isAcuity = provider === 'acuity';
+    // Read raw body for parsing and signature
     const rawBody = Buffer.isBuffer((req as any).body)
       ? (req as any).body.toString('utf8')
       : '';
 
-    if (isSquare && !rawBody) {
-      console.warn('⚠️ rawBody is missing for Square webhook');
-      throw new BadRequestException('Missing rawBody');
-    }
-
-    let body: any;
+    let payload: any;
     try {
-      if (isAcuity) {
-        // Parse urlencoded form
+      if (provider === 'acuity') {
+        // Acuity sends application/x-www-form-urlencoded
         const params = new URLSearchParams(rawBody);
-        body = {
+        payload = {
           action: params.get('action') || params.get('status'),
           id: params.get('id'),
           staffID: params.get('staffID'),
           appointmentTypeID: params.get('appointmentTypeID'),
         };
       } else {
-        body = isSquare ? JSON.parse(rawBody) : req.body;
+        // Square sends JSON
+        if (!rawBody) {
+          console.warn('⚠️ rawBody is missing for Square webhook');
+          throw new BadRequestException('Missing rawBody');
+        }
+        payload = JSON.parse(rawBody);
       }
-    } catch {
-      throw new BadRequestException('Invalid body format');
+    } catch (err) {
+      console.error('❌ Error parsing webhook body:', err);
+      throw new BadRequestException('Invalid webhook body');
     }
 
-    if (isAcuity && body.action?.includes('cancel')) {
-      const integration = await this.prisma.connectedIntegration.findFirst({
-        where: { provider: 'acuity' },
-      });
+    if (provider === 'acuity') {
+      // Only process cancellations
+      if (!payload.action?.toLowerCase().includes('cancel')) {
+        console.log('ℹ️ Ignoring non-cancel Acuity action:', payload.action);
+        return { received: true };
+      }
+
+      // Fetch integration
+      const integration = await this.prisma.connectedIntegration.findFirst({ where: { provider: 'acuity' } });
       if (!integration?.accessToken) {
         console.error('⚠️ No Acuity accessToken found');
         return { received: true };
       }
 
-      const appointmentId = body.id;
+      // Fetch appointment via Acuity v1 API
+      const appointmentId = payload.id;
       const basicAuth = Buffer.from(`${integration.accessToken}:`).toString('base64');
-      const url = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
+      const apiUrl = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
       let details: any;
       try {
-        const response = await fetch(url, {
+        const res = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Basic ${basicAuth}`,
             'Accept': 'application/json',
           },
         });
-        if (!response.ok) {
-          throw new Error(`Acuity API v1 responded ${response.status}`);
-        }
-        details = await response.json();
+        if (!res.ok) throw new Error(`Acuity API responded ${res.status}`);
+        details = await res.json();
       } catch (error) {
-        console.error('❌ Error fetching Acuity appointment details', error);
+        console.error('❌ Error fetching Acuity appointment:', error);
         return { received: true };
       }
 
@@ -198,6 +203,7 @@ export class WebhooksController {
       const appointmentTime = new Date(appt.datetime);
       const duration = appt.duration;
 
+      // Record cancellation and open slot
       const [, openSlot] = await this.prisma.$transaction([
         this.prisma.user.update({
           where: { id: integration.userId },
@@ -214,19 +220,20 @@ export class WebhooksController {
             userId: integration.userId,
             startAt: appointmentTime,
             durationMinutes: duration,
-            teamMemberId: body.staffID || 'unknown',
-            serviceVariationId: body.appointmentTypeID || 'unknown',
+            teamMemberId: payload.staffID || 'unknown',
+            serviceVariationId: payload.appointmentTypeID || 'unknown',
             locationId: 'acuity_location',
           },
         }),
       ]);
 
+      // Trigger notification campaign
       await this.notificationService.startCampaign(
         'acuity',
         integration,
         {
           appointmentId: appt.id,
-          appointmentTypeID: body.appointmentTypeID,
+          appointmentTypeID: payload.appointmentTypeID,
           datetime: appt.datetime,
           firstName: appt.firstName,
           lastName: appt.lastName,
@@ -234,38 +241,26 @@ export class WebhooksController {
         },
         openSlot.gapletSlotId,
       );
-    }
-    if (isSquare) {
+
+    } else if (provider === 'square') {
+      // Validate Square signature
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
-      const payloadToSign = fullUrl + rawBody;
-      const expectedSignature = crypto
-        .createHmac('sha256', signatureKey)
-        .update(payloadToSign)
-        .digest('base64');
-
-      if (signature !== expectedSignature) {
+      const signed = crypto.createHmac('sha256', signatureKey).update(fullUrl + rawBody).digest('base64');
+      if (signature !== signed) {
         throw new BadRequestException('Invalid Square signature');
       }
 
-      const eventType = body.type;
-      const booking = body.data?.object?.booking;
+      const eventType = payload.type;
+      const booking = payload.data?.object?.booking;
       if ((eventType === 'booking.updated' || eventType === 'appointments.cancelled') && booking?.status === 'CANCELLED_BY_SELLER') {
-        const integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square', externalUserId: body.merchant_id },
-        });
+        const integration = await this.prisma.connectedIntegration.findFirst({ where: { provider: 'square', externalUserId: payload.merchant_id } });
         if (!integration) return { received: true };
 
         const appointmentTime = new Date(booking.start_at);
         const [, openSlot] = await this.prisma.$transaction([
-          this.prisma.user.update({
-            where: { id: integration.userId },
-            data: {
-              totalCancellations: { increment: 1 },
-              lastCancellationAt: new Date(),
-            },
-          }),
+          this.prisma.user.update({ where: { id: integration.userId }, data: { totalCancellations: { increment: 1 }, lastCancellationAt: new Date() } }),
           this.prisma.openSlot.create({
             data: {
               gapletSlotId: crypto.randomUUID(),
@@ -283,10 +278,6 @@ export class WebhooksController {
 
         await this.notificationService.startCampaign('square', integration, { booking }, openSlot.gapletSlotId);
       }
-
-    // UNKNOWN PROVIDER
-    } else {
-      console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
     }
 
     return { received: true };
