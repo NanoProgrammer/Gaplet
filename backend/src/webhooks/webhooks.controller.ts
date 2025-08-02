@@ -118,7 +118,8 @@ export class WebhooksController {
     // Respuesta vacía XML para confirmar recepción al servicio SMS (Twilio)
     res.type('text/xml').send('<Response></Response>');
   }
-   @Post(':provider')
+   
+  @Post(':provider')
   @HttpCode(200)
   async handleWebhook(
     @Param('provider') provider: 'calendly' | 'acuity' | 'square',
@@ -150,38 +151,27 @@ export class WebhooksController {
 
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
+    // ACUITY BRANCH
     if (provider === 'acuity') {
-      // Detectar cancelación en cualquier formato
-      const action = body.action as string;
-      if (
-        action === 'appointment.canceled' ||
-        action.endsWith('.canceled') ||
-        body.status === 'canceled'
-      ) {
-        // Obtener integración de Acuity
+      const action = String(body.action || body.status);
+      if (action.endsWith('.canceled') || action === 'canceled') {
+        // 1. Retrieve integration and ensure we have an accessToken
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'acuity' },
         });
-        if (!integration) return { received: true };
-        const userId = integration.userId;
+        if (!integration || !integration.accessToken) {
+          console.error('⚠️ No Acuity integration or accessToken found');
+          return { received: true };
+        }
 
-        // Llamada con fetch para detalles del turno
-        let details: {
-          datetime: string;
-          firstName: string;
-          lastName: string;
-          email: string;
-          duration?: number;
-        };
+        // 2. Fetch appointment details using Bearer token
+        let details: { datetime: string; firstName: string; lastName: string; email: string; duration?: number };
         try {
           const url = `https://acuityscheduling.com/api/v1/appointments/${body.id}`;
-          const auth = Buffer.from(
-            `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
-          ).toString('base64');
           const response = await fetch(url, {
             method: 'GET',
             headers: {
-              'Authorization': `Basic ${auth}`,
+              'Authorization': `Bearer ${integration.accessToken}`,
               'Accept': 'application/json',
             },
           });
@@ -190,16 +180,16 @@ export class WebhooksController {
           }
           details = await response.json();
         } catch (error) {
-          console.error('❌ Error fetching Acuity details', error);
+          console.error('❌ Error fetching Acuity details with Bearer token', error);
           return { received: true };
         }
 
-        // Crear OpenSlot y actualizar contador
+        // 3. Create open slot and update user stats
         const appointmentTime = new Date(details.datetime);
         const duration = details.duration ?? 30;
         const [, openSlot] = await this.prisma.$transaction([
           this.prisma.user.update({
-            where: { id: userId },
+            where: { id: integration.userId },
             data: {
               totalCancellations: { increment: 1 },
               lastCancellationAt: new Date(),
@@ -210,7 +200,7 @@ export class WebhooksController {
               gapletSlotId: crypto.randomUUID(),
               provider: 'acuity',
               providerBookingId: body.id,
-              userId,
+              userId: integration.userId,
               startAt: appointmentTime,
               durationMinutes: duration,
               teamMemberId: body.staffID?.toString() || 'unknown',
@@ -220,7 +210,7 @@ export class WebhooksController {
           }),
         ]);
 
-        // Iniciar campaña con datos completos
+        // 4. Trigger notification campaign
         await this.notificationService.startCampaign(
           'acuity',
           integration,
@@ -236,8 +226,8 @@ export class WebhooksController {
         );
       }
 
+    // SQUARE BRANCH (unchanged)
     } else if (isSquare) {
-      // — Square branch: lógica original sin cambios —
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
@@ -253,21 +243,16 @@ export class WebhooksController {
 
       const eventType = body.type;
       const booking = body.data?.object?.booking;
-
-      if (
-        (eventType === 'booking.updated' || eventType === 'appointments.cancelled') &&
-        booking?.status === 'CANCELLED_BY_SELLER'
-      ) {
+      if ((eventType === 'booking.updated' || eventType === 'appointments.cancelled') && booking?.status === 'CANCELLED_BY_SELLER') {
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'square', externalUserId: body.merchant_id },
         });
         if (!integration) return { received: true };
-        const userId = integration.userId;
 
         const appointmentTime = new Date(booking.start_at);
         const [, openSlot] = await this.prisma.$transaction([
           this.prisma.user.update({
-            where: { id: userId },
+            where: { id: integration.userId },
             data: {
               totalCancellations: { increment: 1 },
               lastCancellationAt: new Date(),
@@ -278,7 +263,7 @@ export class WebhooksController {
               gapletSlotId: crypto.randomUUID(),
               provider: 'square',
               providerBookingId: booking.id,
-              userId,
+              userId: integration.userId,
               startAt: appointmentTime,
               durationMinutes: booking.appointment_segments?.[0]?.duration_minutes || 60,
               teamMemberId: booking.appointment_segments?.[0]?.team_member_id || 'unknown',
@@ -291,6 +276,7 @@ export class WebhooksController {
         await this.notificationService.startCampaign('square', integration, { booking }, openSlot.gapletSlotId);
       }
 
+    // UNKNOWN PROVIDER
     } else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
     }
