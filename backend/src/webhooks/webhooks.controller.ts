@@ -120,7 +120,7 @@ export class WebhooksController {
   }
    @Post(':provider')
   @HttpCode(200)
-   async handleWebhook(
+  async handleWebhook(
     @Param('provider') provider: 'calendly' | 'acuity' | 'square',
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
@@ -150,75 +150,91 @@ export class WebhooksController {
 
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
-    if (provider === 'acuity' && (body.status === 'canceled' || body.action === 'canceled')) {
-      // — Acuity branch: llamamos a la API con fetch para detalles y luego creamos el hueco
-      const integration = await this.prisma.connectedIntegration.findFirst({
-        where: { provider: 'acuity' },
-      });
-      if (!integration) return { received: true };
-      const userId = integration.userId;
-
-      let details: { datetime: string; firstName: string; lastName: string; email: string; duration?: number };
-      try {
-        const url = `https://acuityscheduling.com/api/v1/appointments/${body.id}`;
-        const auth = Buffer.from(
-          `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
-        ).toString('base64');
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Accept': 'application/json',
-          },
+    if (provider === 'acuity') {
+      // Detectar cancelación en cualquier formato
+      const action = body.action as string;
+      if (
+        action === 'appointment.canceled' ||
+        action.endsWith('.canceled') ||
+        body.status === 'canceled'
+      ) {
+        // Obtener integración de Acuity
+        const integration = await this.prisma.connectedIntegration.findFirst({
+          where: { provider: 'acuity' },
         });
-        if (!response.ok) {
-          throw new Error(`Acuity API responded with ${response.status}`);
+        if (!integration) return { received: true };
+        const userId = integration.userId;
+
+        // Llamada con fetch para detalles del turno
+        let details: {
+          datetime: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+          duration?: number;
+        };
+        try {
+          const url = `https://acuityscheduling.com/api/v1/appointments/${body.id}`;
+          const auth = Buffer.from(
+            `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
+          ).toString('base64');
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Accept': 'application/json',
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`Acuity API responded with ${response.status}`);
+          }
+          details = await response.json();
+        } catch (error) {
+          console.error('❌ Error fetching Acuity details', error);
+          return { received: true };
         }
-        details = await response.json();
-      } catch (error) {
-        console.error('❌ Error fetching Acuity details', error);
-        return { received: true };
+
+        // Crear OpenSlot y actualizar contador
+        const appointmentTime = new Date(details.datetime);
+        const duration = details.duration ?? 30;
+        const [, openSlot] = await this.prisma.$transaction([
+          this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              totalCancellations: { increment: 1 },
+              lastCancellationAt: new Date(),
+            },
+          }),
+          this.prisma.openSlot.create({
+            data: {
+              gapletSlotId: crypto.randomUUID(),
+              provider: 'acuity',
+              providerBookingId: body.id,
+              userId,
+              startAt: appointmentTime,
+              durationMinutes: duration,
+              teamMemberId: body.staffID?.toString() || 'unknown',
+              serviceVariationId: body.appointmentTypeID?.toString() || 'unknown',
+              locationId: 'acuity_location',
+            },
+          }),
+        ]);
+
+        // Iniciar campaña con datos completos
+        await this.notificationService.startCampaign(
+          'acuity',
+          integration,
+          {
+            appointmentId: body.id,
+            appointmentTypeID: body.appointmentTypeID,
+            datetime: details.datetime,
+            firstName: details.firstName,
+            lastName: details.lastName,
+            email: details.email,
+          },
+          openSlot.gapletSlotId,
+        );
       }
-
-      const appointmentTime = new Date(details.datetime);
-      const duration = details.duration ?? 30;
-
-      const [, openSlot] = await this.prisma.$transaction([
-        this.prisma.user.update({
-          where: { id: userId },
-          data: {
-            totalCancellations: { increment: 1 },
-            lastCancellationAt: new Date(),
-          },
-        }),
-        this.prisma.openSlot.create({
-          data: {
-            gapletSlotId: crypto.randomUUID(),
-            provider: 'acuity',
-            providerBookingId: body.id,
-            userId,
-            startAt: appointmentTime,
-            durationMinutes: duration,
-            teamMemberId: body.staffID?.toString() || 'unknown',
-            serviceVariationId: body.appointmentTypeID?.toString() || 'unknown',
-            locationId: 'acuity_location',
-          },
-        }),
-      ]);
-
-      await this.notificationService.startCampaign(
-        'acuity',
-        integration,
-        {
-          appointmentId: body.id,
-          appointmentTypeID: body.appointmentTypeID,
-          datetime: details.datetime,
-          firstName: details.firstName,
-          lastName: details.lastName,
-          email: details.email,
-        },
-        openSlot.gapletSlotId,
-      );
 
     } else if (isSquare) {
       // — Square branch: lógica original sin cambios —
