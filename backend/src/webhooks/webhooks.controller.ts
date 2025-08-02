@@ -119,6 +119,7 @@ export class WebhooksController {
     res.type('text/xml').send('<Response></Response>');
   }
    
+  
   @Post(':provider')
   @HttpCode(200)
   async handleWebhook(
@@ -151,11 +152,11 @@ export class WebhooksController {
 
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
-    // ACUITY BRANCH
+    // ACUITY BRANCH with Bearer Token
     if (provider === 'acuity') {
       const action = String(body.action || body.status);
       if (action.endsWith('.canceled') || action === 'canceled') {
-        // 1. Retrieve integration and ensure we have an accessToken
+        // 1. Retrieve integration
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'acuity' },
         });
