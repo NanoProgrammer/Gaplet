@@ -153,22 +153,31 @@ export class WebhooksController {
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
     // ACUITY BRANCH with Bearer Token
-    if (provider === 'acuity') {
+     if (provider === 'acuity') {
       const action = String(body.action || body.status);
       if (action.endsWith('.canceled') || action === 'canceled') {
-        // 1. Retrieve integration
+        // 1) Retrieve integration and ensure we have an accessToken
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'acuity' },
         });
-        if (!integration || !integration.accessToken) {
-          console.error('⚠️ No Acuity integration or accessToken found');
+        if (!integration?.accessToken) {
+          console.error('⚠️ No Acuity accessToken found');
           return { received: true };
         }
 
-        // 2. Fetch appointment details using Bearer token
-        let details: { datetime: string; firstName: string; lastName: string; email: string; duration?: number };
+        // 2) Fetch appointment details via v2 endpoint
+        let details: {
+          appointment: {
+            id: string;
+            datetime: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            duration: number;
+          }
+        };
         try {
-          const url = `https://acuityscheduling.com/api/v1/appointments/${body.id}`;
+          const url = `https://acuityscheduling.com/api/v2/appointments/${body.id}`;
           const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -177,30 +186,30 @@ export class WebhooksController {
             },
           });
           if (!response.ok) {
-            throw new Error(`Acuity API responded with ${response.status}`);
+            throw new Error(`Acuity v2 API responded ${response.status}`);
           }
           details = await response.json();
-        } catch (error) {
-          console.error('❌ Error fetching Acuity details with Bearer token', error);
+        } catch (err) {
+          console.error('❌ Error fetching v2 appointment', err);
           return { received: true };
         }
 
-        // 3. Create open slot and update user stats
-        const appointmentTime = new Date(details.datetime);
-        const duration = details.duration ?? 30;
+        // 3) Extract fields from details.appointment
+        const appt = details.appointment;
+        const appointmentTime = new Date(appt.datetime);
+        const duration = appt.duration;
+
+        // 4) DB transaction: user update + create slot
         const [, openSlot] = await this.prisma.$transaction([
           this.prisma.user.update({
             where: { id: integration.userId },
-            data: {
-              totalCancellations: { increment: 1 },
-              lastCancellationAt: new Date(),
-            },
+            data: { totalCancellations: { increment: 1 }, lastCancellationAt: new Date() },
           }),
           this.prisma.openSlot.create({
             data: {
               gapletSlotId: crypto.randomUUID(),
               provider: 'acuity',
-              providerBookingId: body.id,
+              providerBookingId: appt.id,
               userId: integration.userId,
               startAt: appointmentTime,
               durationMinutes: duration,
@@ -211,20 +220,15 @@ export class WebhooksController {
           }),
         ]);
 
-        // 4. Trigger notification campaign
-        await this.notificationService.startCampaign(
-          'acuity',
-          integration,
-          {
-            appointmentId: body.id,
-            appointmentTypeID: body.appointmentTypeID,
-            datetime: details.datetime,
-            firstName: details.firstName,
-            lastName: details.lastName,
-            email: details.email,
-          },
-          openSlot.gapletSlotId,
-        );
+        // 5) Trigger notifications
+        await this.notificationService.startCampaign('acuity', integration, {
+          appointmentId: appt.id,
+          appointmentTypeID: body.appointmentTypeID,
+          datetime: appt.datetime,
+          firstName: appt.firstName,
+          lastName: appt.lastName,
+          email: appt.email,
+        }, openSlot.gapletSlotId);
       }
 
     // SQUARE BRANCH (unchanged)
