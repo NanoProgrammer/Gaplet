@@ -407,17 +407,18 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
   const target = `${base}/webhooks/${provider}`;
 
   if (provider === 'acuity') {
-  const response = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${integration.accessToken}`,
-    },
-    body: JSON.stringify({
-      target,
-      event: 'appointment.canceled',
-    }),
-  });
+  const basic = Buffer.from(
+  `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
+).toString('base64');
+
+const response = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Basic ${basic}`,
+  },
+  body: JSON.stringify({ target, event: 'appointment.canceled' }),
+});
 
   const res = await response.json();
 

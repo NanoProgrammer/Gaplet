@@ -178,13 +178,19 @@ async handleWebhook(
     const url = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
     let details: any;
     try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${integration.accessToken}`,
-          'Accept': 'application/json',
-        },
-      });
+      // Construye Basic Auth con UserID:APIKey de tu entorno
+const basic = Buffer.from(
+  `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
+).toString('base64');
+
+const res = await fetch(url, {
+  method: 'GET',
+  headers: {
+    'Authorization': `Basic ${basic}`,
+    'Accept': 'application/json',
+  },
+});
+
       if (!res.ok) throw new Error(`Acuity v1 responded ${res.status}`);
       details = await res.json();
     } catch (err) {
