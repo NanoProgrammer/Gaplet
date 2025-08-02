@@ -1,3 +1,4 @@
+// main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -7,22 +8,41 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 1) Stripe y Square siguen con raw JSON
-  app.use('/webhooks/stripe',  express.raw({ type: 'application/json' }));
-  app.use('/webhooks/square',  express.raw({ type: 'application/json' }));
+  // Helper para guardar el buffer original
+  const rawBodySaver = (req: any, res: any, buf: Buffer) => {
+    if (buf && buf.length) {
+      req.rawBody = buf;
+    }
+  };
 
-  // 2) Solo Acuity necesita urlencoded
+  // 1) Stripe & Square: reciben JSON crudo
   app.use(
-    '/webhooks/acuity',
-    bodyParser.urlencoded({ extended: true })
+    '/webhooks/stripe',
+    express.raw({ type: 'application/json', verify: rawBodySaver })
+  );
+  app.use(
+    '/webhooks/square',
+    express.raw({ type: 'application/json', verify: rawBodySaver })
   );
 
-  // 3) JSON parser para TODO lo demás
+  // 2) Acuity: recibe urlencoded
+  app.use(
+    '/webhooks/acuity',
+    bodyParser.urlencoded({ 
+      extended: true, 
+      verify: rawBodySaver 
+    })
+  );
+
+  // 3) JSON parser para todas las demás rutas
   app.use((req, res, next) => {
-    const isRaw = ['/webhooks/stripe', '/webhooks/square', '/webhooks/acuity']
+    const isWebhookPath = ['/webhooks/stripe', '/webhooks/square', '/webhooks/acuity']
       .some(path => req.originalUrl.startsWith(path));
-    if (isRaw) return next();
-    return bodyParser.json()(req, res, next);
+    if (isWebhookPath) {
+      return next();
+    }
+    // Para el resto, usamos JSON parser y también guardamos rawBody
+    return bodyParser.json({ verify: rawBodySaver })(req, res, next);
   });
 
   // CORS
@@ -46,5 +66,4 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 4000);
 }
-
 bootstrap();
