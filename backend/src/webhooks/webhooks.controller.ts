@@ -134,29 +134,40 @@ export class WebhooksController {
     }
 
     const isSquare = provider === 'square';
+    const isAcuity = provider === 'acuity';
+    // preserve raw body for signature checks and manual parsing
     const rawBody = Buffer.isBuffer((req as any).body)
       ? (req as any).body.toString('utf8')
       : '';
 
+    // Square requires rawBody signature validation
     if (isSquare && !rawBody) {
       console.warn('⚠️ rawBody is missing for Square webhook');
       throw new BadRequestException('Missing rawBody');
     }
 
+    // Parse body: JSON for Square/Calendly, urlencoded for Acuity
     let body: any;
     try {
-      body = isSquare ? JSON.parse(rawBody) : req.body;
+      if (isAcuity) {
+        // Acuity sends form-urlencoded payload
+        const params = new URLSearchParams(rawBody);
+        body = {
+          action: params.get('action') || params.get('status'),
+          id: params.get('id'),
+          staffID: params.get('staffID'),
+          appointmentTypeID: params.get('appointmentTypeID'),
+        };
+      } else {
+        body = isSquare ? JSON.parse(rawBody) : req.body;
+      }
     } catch {
-      throw new BadRequestException('Invalid JSON body');
+      throw new BadRequestException('Invalid body format');
     }
 
-    console.log(`📩 Webhook from ${provider}`, { headers, body });
-
-    // ACUITY BRANCH with Bearer Token
-      if (provider === 'acuity') {
-    const action = String(body.action || body.status);
-    if (action.endsWith('.canceled') || action === 'canceled') {
-      // 1) Obtengo la integración y el accessToken
+    // Common handling for cancellation events
+    if (isAcuity && body.action && body.action.includes('cancel')) {
+      // 1) Load integration
       const integration = await this.prisma.connectedIntegration.findFirst({
         where: { provider: 'acuity' },
       });
@@ -165,36 +176,29 @@ export class WebhooksController {
         return { received: true };
       }
 
-      // 2) Llamo al endpoint v2 con Bearer token
-      let details: {
-        appointment: {
-          id: string;
-          datetime: string;
-          firstName: string;
-          lastName: string;
-          email: string;
-          duration: number;
-        }
-      };
+      // 2) Fetch appointment details via v1 API with Basic Auth
+      const appointmentId = body.id;
+      const basicAuth = Buffer.from(`${integration.accessToken}:`).toString('base64');
+      const url = `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`;
+      let details: any;
       try {
-        const url = `https://acuityscheduling.com/api/v2/appointments/${body.id}`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
+            'Authorization': `Basic ${basicAuth}`,
             'Accept': 'application/json',
           },
         });
         if (!response.ok) {
-          throw new Error(`Acuity v2 API responded ${response.status}`);
+          throw new Error(`Acuity API v1 responded ${response.status}`);
         }
         details = await response.json();
       } catch (error) {
-        console.error('❌ Error fetching v2 appointment', error);
+        console.error('❌ Error fetching Acuity appointment details', error);
         return { received: true };
       }
 
-      // 3) Extraigo datos y creo el OpenSlot
+      // 3) Create OpenSlot and update user
       const appt = details.appointment;
       const appointmentTime = new Date(appt.datetime);
       const duration = appt.duration;
@@ -215,14 +219,14 @@ export class WebhooksController {
             userId: integration.userId,
             startAt: appointmentTime,
             durationMinutes: duration,
-            teamMemberId: body.staffID?.toString() || 'unknown',
-            serviceVariationId: body.appointmentTypeID?.toString() || 'unknown',
+            teamMemberId: body.staffID || 'unknown',
+            serviceVariationId: body.appointmentTypeID || 'unknown',
             locationId: 'acuity_location',
           },
         }),
       ]);
 
-      // 4) Inicio la campaña de notificaciones
+      // 4) Trigger notification campaign
       await this.notificationService.startCampaign(
         'acuity',
         integration,
@@ -237,7 +241,7 @@ export class WebhooksController {
         openSlot.gapletSlotId,
       );
     }
-    } else if (isSquare) {
+    if (isSquare) {
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
