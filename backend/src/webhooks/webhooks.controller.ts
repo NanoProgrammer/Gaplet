@@ -120,18 +120,19 @@ export class WebhooksController {
   }
    @Post(':provider')
   @HttpCode(200)
-  async handleWebhook(
+   async handleWebhook(
     @Param('provider') provider: 'calendly' | 'acuity' | 'square',
     @Headers() headers: Record<string, string>,
     @Req() req: Request,
   ) {
     const allowedProviders = ['square', 'acuity', 'calendly'];
-  if (!allowedProviders.includes(provider)) {
-    console.warn(`❌ Ignoring unknown provider webhook: ${provider}`);
-    throw new BadRequestException('Unknown webhook provider');
-  }
+    if (!allowedProviders.includes(provider)) {
+      console.warn(`❌ Ignoring unknown provider webhook: ${provider}`);
+      throw new BadRequestException('Unknown webhook provider');
+    }
+
     const isSquare = provider === 'square';
-    const rawBody = (req as any).body instanceof Buffer
+    const rawBody = Buffer.isBuffer((req as any).body)
       ? (req as any).body.toString('utf8')
       : '';
 
@@ -143,55 +144,84 @@ export class WebhooksController {
     let body: any;
     try {
       body = isSquare ? JSON.parse(rawBody) : req.body;
-    } catch (e) {
+    } catch {
       throw new BadRequestException('Invalid JSON body');
     }
 
     console.log(`📩 Webhook from ${provider}`, { headers, body });
 
-    if (provider === 'acuity') {
-      if (body.status === 'canceled' || body.action === 'canceled') {
-        // Buscar la integración Acuity activa
-        const integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'acuity' },
+    if (provider === 'acuity' && (body.status === 'canceled' || body.action === 'canceled')) {
+      // — Acuity branch: llamamos a la API con fetch para detalles y luego creamos el hueco
+      const integration = await this.prisma.connectedIntegration.findFirst({
+        where: { provider: 'acuity' },
+      });
+      if (!integration) return { received: true };
+      const userId = integration.userId;
+
+      let details: { datetime: string; firstName: string; lastName: string; email: string; duration?: number };
+      try {
+        const url = `https://acuityscheduling.com/api/v1/appointments/${body.id}`;
+        const auth = Buffer.from(
+          `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
+        ).toString('base64');
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Accept': 'application/json',
+          },
         });
-        if (!integration) return { received: true };
-        const userId = integration.userId;
-        // Registrar cancelación y crear OpenSlot en base de datos
-        const appointmentTime = new Date(body.datetime);
-        const [updatedUser, openSlot] = await this.prisma.$transaction([
-          this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              totalCancellations: { increment: 1 },
-              lastCancellationAt: new Date(),
-            },
-          }),
-          this.prisma.openSlot.create({
-            data: {
-              gapletSlotId: crypto.randomUUID(),
-              provider: 'acuity',
-              providerBookingId: body.id,
-              userId,
-              startAt: appointmentTime,
-              durationMinutes: body.duration || 30,
-              teamMemberId: body.staffID?.toString() || 'unknown',
-              serviceVariationId: body.appointmentTypeID?.toString() || 'unknown',
-              locationId: 'acuity_location', // Ajustar si hay información de ubicación real
-            },
-          }),
-        ]);
-        // Iniciar campaña de notificaciones para este hueco cancelado
-        await this.notificationService.startCampaign('acuity', integration, {
-          appointmentId: body.id,
-          appointmentTypeID: body.appointmentTypeID || body.appointmentTypeId,
-          datetime: body.datetime,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          email: body.email,
-        }, openSlot.gapletSlotId);
+        if (!response.ok) {
+          throw new Error(`Acuity API responded with ${response.status}`);
+        }
+        details = await response.json();
+      } catch (error) {
+        console.error('❌ Error fetching Acuity details', error);
+        return { received: true };
       }
+
+      const appointmentTime = new Date(details.datetime);
+      const duration = details.duration ?? 30;
+
+      const [, openSlot] = await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            totalCancellations: { increment: 1 },
+            lastCancellationAt: new Date(),
+          },
+        }),
+        this.prisma.openSlot.create({
+          data: {
+            gapletSlotId: crypto.randomUUID(),
+            provider: 'acuity',
+            providerBookingId: body.id,
+            userId,
+            startAt: appointmentTime,
+            durationMinutes: duration,
+            teamMemberId: body.staffID?.toString() || 'unknown',
+            serviceVariationId: body.appointmentTypeID?.toString() || 'unknown',
+            locationId: 'acuity_location',
+          },
+        }),
+      ]);
+
+      await this.notificationService.startCampaign(
+        'acuity',
+        integration,
+        {
+          appointmentId: body.id,
+          appointmentTypeID: body.appointmentTypeID,
+          datetime: details.datetime,
+          firstName: details.firstName,
+          lastName: details.lastName,
+          email: details.email,
+        },
+        openSlot.gapletSlotId,
+      );
+
     } else if (isSquare) {
+      // — Square branch: lógica original sin cambios —
       const signature = headers['x-square-hmacsha256-signature'];
       const signatureKey = process.env.WEBHOOK_SQUARE_KEY;
       const fullUrl = `${process.env.API_BASE_URL}/webhooks/square`;
@@ -212,16 +242,14 @@ export class WebhooksController {
         (eventType === 'booking.updated' || eventType === 'appointments.cancelled') &&
         booking?.status === 'CANCELLED_BY_SELLER'
       ) {
-        // Buscar integración Square correspondiente al merchant
         const integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'square', externalUserId: body.merchant_id },
         });
         if (!integration) return { received: true };
         const userId = integration.userId;
-        // Registrar cancelación y crear OpenSlot en base de datos
-        
+
         const appointmentTime = new Date(booking.start_at);
-        const [updatedUser, openSlot] = await this.prisma.$transaction([
+        const [, openSlot] = await this.prisma.$transaction([
           this.prisma.user.update({
             where: { id: userId },
             data: {
@@ -243,9 +271,10 @@ export class WebhooksController {
             },
           }),
         ]);
-        // Iniciar campaña de notificaciones para este hueco cancelado
+
         await this.notificationService.startCampaign('square', integration, { booking }, openSlot.gapletSlotId);
       }
+
     } else {
       console.warn(`⚠️ Webhook from unknown provider: ${provider}`);
     }
