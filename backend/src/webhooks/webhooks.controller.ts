@@ -122,8 +122,6 @@ export class WebhooksController {
   
   @Post(':provider')
   @HttpCode(200)
-  @Post(':provider')
-  @HttpCode(200)
   async handleWebhook(
     @Param('provider') providerParam: string,
     @Headers() headers: Record<string, string>,
