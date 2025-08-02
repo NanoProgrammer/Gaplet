@@ -396,96 +396,117 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
 }
 
 
-  async ensureWebhook(provider: 'acuity' | 'google', userId: string) {
-  const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({ where: { userId } });
+async ensureWebhook(provider: 'acuity' | 'google', userId: string) {
+  const integration = await this.prisma.connectedIntegration.findUniqueOrThrow({
+    where: { userId },
+  });
 
   if (integration.webhookId) return;
 
   const base = this.config.get('API_BASE_URL')?.trim();
-  if (!base || !/^https?:\/\//.test(base)) throw new Error(`Invalid API_BASE_URL`);
+  if (!base || !/^https?:\/\//.test(base)) {
+    throw new Error(`Invalid API_BASE_URL`);
+  }
 
   const target = `${base}/webhooks/${provider}`;
 
   if (provider === 'acuity') {
-  const basic = Buffer.from(
-  `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
-).toString('base64');
+    // 1) Prepara Basic Auth con User ID y API Key
+    const basic = Buffer.from(
+      `${process.env.ACUITY_USER_ID}:${process.env.ACUITY_API_KEY}`
+    ).toString('base64');
 
-const response = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    Authorization: `Basic ${basic}`,
-  },
-  body: JSON.stringify({ target, event: 'appointment.canceled' }),
-});
-
-  const res = await response.json();
-
-  if (response.status === 400 && res.error === 'duplicate_webhook') {
-    // Ya existe un webhook con ese target, vamos a obtenerlo
-    const allWebhooks = await fetch('https://acuityscheduling.com/api/v1/webhooks', {
-      headers: {
-        Authorization: `Bearer ${integration.accessToken}`,
-      },
-    }).then(r => r.json());
-
-    const existing = allWebhooks.find(
-      (wh: any) => wh.target === target && wh.event === 'appointment.canceled',
+    // 2) Crea el webhook (v1) usando Basic Auth
+    const createRes = await fetch(
+      'https://acuityscheduling.com/api/v1/webhooks',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${basic}`,
+        },
+        body: JSON.stringify({
+          target,
+          event: 'appointment.canceled',
+        }),
+      }
     );
+    const createJson = await createRes.json();
 
-    if (!existing?.id) {
-      throw new Error('Duplicate webhook found, but ID not retrievable.');
+    // 3) Si ya existe, recupera la lista también con Basic Auth
+    if (
+      createRes.status === 400 &&
+      createJson.error === 'duplicate_webhook'
+    ) {
+      const allWebhooks = await fetch(
+        'https://acuityscheduling.com/api/v1/webhooks',
+        {
+          headers: { 'Authorization': `Basic ${basic}` },
+        }
+      ).then(r => r.json());
+
+      const existing = allWebhooks.find(
+        (wh: any) =>
+          wh.target === target && wh.event === 'appointment.canceled'
+      );
+      if (!existing?.id) {
+        throw new Error(
+          'Duplicate webhook found, but ID not retrievable.'
+        );
+      }
+      await this.prisma.connectedIntegration.update({
+        where: { id: integration.id },
+        data: { webhookId: existing.id.toString() },
+      });
+      return;
     }
 
+    if (!createJson.id) {
+      throw new Error(
+        `Acuity webhook error: ${JSON.stringify(createJson)}`
+      );
+    }
     await this.prisma.connectedIntegration.update({
       where: { id: integration.id },
-      data: { webhookId: existing.id.toString() },
+      data: { webhookId: createJson.id.toString() },
     });
-
-    return; // Ya todo hecho
   }
-
-  if (!res.id) throw new Error(`Acuity webhook error: ${JSON.stringify(res)}`);
-
-  await this.prisma.connectedIntegration.update({
-    where: { id: integration.id },
-    data: { webhookId: res.id.toString() },
-  });
-}
-
 
   if (provider === 'google') {
     const channelId = `gaplet-${crypto.randomUUID()}`;
     const calendarId = 'primary';
 
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
+    const watchRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        calendarId
+      )}/events/watch`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${integration.accessToken}`,
+          'Authorization': `Bearer ${integration.accessToken}`,
         },
         body: JSON.stringify({
           id: channelId,
           type: 'web_hook',
           address: target,
         }),
-      },
+      }
     ).then(r => r.json());
 
-    if (!res.id || !res.resourceId) throw new Error('Google Calendar webhook setup failed');
-
+    if (!watchRes.id || !watchRes.resourceId) {
+      throw new Error('Google Calendar webhook setup failed');
+    }
     await this.prisma.connectedIntegration.update({
       where: { id: integration.id },
       data: {
-        webhookId: res.id,
-        externalOrgId: res.resourceId,
+        webhookId: watchRes.id,
+        externalOrgId: watchRes.resourceId,
       },
     });
   }
 }
+
 
 
 
