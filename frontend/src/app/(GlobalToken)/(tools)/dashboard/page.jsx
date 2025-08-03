@@ -202,7 +202,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
         <StatCard label="Replacements" value={`${userInfo?.totalReplacements || 0}/${replacementLimit}`} icon={<RefreshCw className="w-6 h-6 text-blue-500" />} color="border-l-blue-500" />
         <StatCard label="Cancellations" value={userInfo?.totalCancellations || 0} icon={<Slash className="w-6 h-6 text-red-500" />} color="border-l-red-500" />
-        <StatCard label="Recovery Rate" value={`${((userInfo?.totalReplacements/(userInfo?.totalCancellations || 1)).toFixed(2)) * 100 || 0}%`} icon={<TrendingUp className="w-6 h-6 text-green-500" />} color="border-l-green-500" />
+        <StatCard label="Recovery Rate" value={`${(((userInfo?.totalReplacements/(userInfo?.totalCancellations || 1))) * 100).toFixed(2) || 0}%`} icon={<TrendingUp className="w-6 h-6 text-green-500" />} color="border-l-green-500" />
         <StatCard label="Last Recovery" value={userInfo?.lastReplacementAt ? formatDate(userInfo.lastReplacementAt) : '—'} icon={<Clock className="w-6 h-6 text-purple-500" />} color="border-l-purple-500" />
         <StatCard label="SMS Sent" value={userInfo?.smsSent || 0} icon={<MessageSquare className="w-6 h-6 text-pink-500" />} color="border-l-pink-500" />
         <StatCard label="Emails Sent" value={userInfo?.emailSent || 0} icon={<Mail className="w-6 h-6 text-indigo-500" />} color="border-l-indigo-500" />
