@@ -252,7 +252,7 @@ export default function SettingsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block font-medium mb-1">Notify only if the last appointment was more than:</label>
+                <label className="block font-medium mb-1">Notify only if the last appointment was before than:</label>
                 <div className="flex gap-3">
                   <input
                     type="number"
@@ -273,7 +273,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block font-medium mb-1">Notify only if the next appointment is more than:</label>
+                <label className="block font-medium mb-1">Notify only if the next appointment is later than:</label>
                 <div className="flex gap-3">
                   <input
                     type="number"
