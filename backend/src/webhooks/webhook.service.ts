@@ -607,16 +607,8 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
     if (plan === 'PRO') {
       const emailBatchSize = 10;
       const emailIntervalMs = 5 * 60_000;
+      
       let batchStart = 0;
-      for (let wave = 0; batchStart < emailList.length && wave < 10; wave++) {
-        const batchRecipients = emailList.slice(batchStart, batchStart + emailBatchSize);
-        if (batchRecipients.length === 0) break;
-        const delayMs = wave * emailIntervalMs;
-        setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
-        }, delayMs);
-        batchStart += batchRecipients.length;
-      }
       const smsBatchSize = 5;
       const smsIntervalMs = 2 * 60_000;
       batchStart = 0;
