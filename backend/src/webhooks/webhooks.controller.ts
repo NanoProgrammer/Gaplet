@@ -1,5 +1,6 @@
 import { 
-  Controller, Post, Param, Headers, HttpCode, BadRequestException, Req, UseInterceptors, Res 
+  Controller, Post, Param, Headers, HttpCode, BadRequestException, Req, UseInterceptors, Res, 
+  Body
 } from '@nestjs/common';
 import * as multer from 'multer';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
@@ -80,21 +81,24 @@ export class WebhooksController {
 
 
 
+
   @Post('sms-response')
-  async handleSmsResponse(@Req() req: Request, @Res() res: Response) {
-    const body: any = req.body;
-    const fromPhone: string = body.From;
-    const smsText: string = body.Body || '';
+  @HttpCode(200)
+  async handleSmsResponse(
+    @Body('From') fromPhone: string,
+    @Body('Body') smsTextRaw: string,
+    @Res() res: Response,
+  ) {
+    const smsText = smsTextRaw || '';
     console.log('📱 SMS response received', { fromPhone, smsText });
+
     if (fromPhone && smsText) {
-      // Procesar la respuesta SMS entrante
+      // 1) Procesar la respuesta SMS (reordenamiento, validación de “I will take it”)
       await this.notificationService.handleSmsReply(fromPhone, smsText);
-      // Si la respuesta SMS es afirmativa (ej. "Sí" o "yes"), actualizar métricas (el NotificationService se encarga del resto)
+
+      // 2) Si es afirmativa, actualizar métricas en user (se podría mover a handleSmsReply)
       const text = smsText.toLowerCase();
-      const positiveReply =
-        text.includes('yes') ;
-      if (positiveReply) {
-        // Buscar alguna integración activa (priorizar Square, luego Acuity)
+      if (text.includes('yes')) {
         let integration = await this.prisma.connectedIntegration.findFirst({
           where: { provider: 'square' },
         });
@@ -104,9 +108,8 @@ export class WebhooksController {
           });
         }
         if (integration) {
-          const userId = integration.userId;
           await this.prisma.user.update({
-            where: { id: userId },
+            where: { id: integration.userId },
             data: {
               totalReplacements: { increment: 1 },
               lastReplacementAt: new Date(),
@@ -115,7 +118,8 @@ export class WebhooksController {
         }
       }
     }
-    // Respuesta vacía XML para confirmar recepción al servicio SMS (Twilio)
+
+    // Twilio requiere respuesta XML vacía para confirmar recepción
     res.type('text/xml').send('<Response></Response>');
   }
    

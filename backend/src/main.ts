@@ -25,19 +25,23 @@ async function bootstrap() {
     express.raw({ type: 'application/json', verify: rawBodySaver })
   );
 
-  // 2) Acuity: recibe urlencoded
+  // 3) Twilio SMS responses: también urlencoded
   app.use(
-    '/webhooks/acuity',
-    bodyParser.urlencoded({ 
-      extended: true, 
-      verify: rawBodySaver 
+    '/webhooks/sms-response',
+    bodyParser.urlencoded({
+      extended: true,
+      verify: rawBodySaver,
     })
   );
 
-  // 3) JSON parser para todas las demás rutas
+  // 4) JSON parser para todas las demás rutas
   app.use((req, res, next) => {
-    const isWebhookPath = ['/webhooks/stripe', '/webhooks/square', '/webhooks/acuity']
-      .some(path => req.originalUrl.startsWith(path));
+    const isWebhookPath = [
+      '/webhooks/stripe',
+      '/webhooks/square',
+      '/webhooks/acuity',
+      '/webhooks/sms-response',  // <-- agregado aquí
+    ].some(path => req.originalUrl.startsWith(path));
     if (isWebhookPath) {
       return next();
     }
