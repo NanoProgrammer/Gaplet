@@ -605,59 +605,25 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
     }
 
     if (plan === 'PRO') {
-      const emailBatchSize = 10;
-      const emailIntervalMs = 5 * 60_000;
-      
-      let batchStart = 0;
-      const smsBatchSize = 5;
-      const smsIntervalMs = 2 * 60_000;
-      batchStart = 0;
-      for (let wave = 0; batchStart < smsList.length && wave < 5; wave++) {
-        const batchRecipients = smsList.slice(batchStart, batchStart + smsBatchSize);
-        if (batchRecipients.length === 0) break;
-        const delayMs = 50 * 60_000 + wave * smsIntervalMs;
-        setTimeout(() => {
-          this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
-        }, delayMs);
-        batchStart += batchRecipients.length;
-      }
-      const firstCycleCount = emailList.length + smsList.length;
-      if (notifyList.length > firstCycleCount) {
-        const remainingList = notifyList.slice(firstCycleCount);
-        batchStart = 0;
-        for (let wave = 0; batchStart < remainingList.length && wave < 10; wave++) {
-          const batchRecipients = remainingList.slice(batchStart, batchStart + emailBatchSize).filter(r => r.email);
-          if (batchRecipients.length === 0) break;
-          const delayMs = 60 * 60_000 + wave * emailIntervalMs;
-          setTimeout(() => {
-            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
-          }, delayMs);
-          batchStart += batchRecipients.length;
-        }
-        const remainingAfterEmails = remainingList.filter(r => r.email).length < remainingList.length
-          ? remainingList.slice(remainingList.findIndex(r => !r.email))
-          : [];
-        batchStart = 0;
-        for (let wave = 0; batchStart < remainingAfterEmails.length && wave < 5; wave++) {
-          const batchRecipients = remainingAfterEmails.slice(batchStart, batchStart + smsBatchSize).filter(r => r.phone);
-          if (batchRecipients.length === 0) break;
-          const delayMs = 110 * 60_000 + wave * smsIntervalMs;
-          setTimeout(() => {
-            this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
-          }, delayMs);
-          batchStart += batchRecipients.length;
-        }
-        if (notifyList.length > firstCycleCount + remainingList.length) {
-          const lastBatch = notifyList.slice(firstCycleCount + remainingList.length);
-          lastBatch.filter(r => r.phone).forEach((rec, index) => {
-            const delayMs = 120 * 60_000 + index * (2 * 60_000);
-            setTimeout(() => {
-              this.sendSmsBatch(campaignId, [rec], smsText, userId);
-            }, delayMs);
-          });
-        }
-      }
-    }
+  // Only SMS, in batches of 5, spaced 2 minutes apart
+  const smsBatchSize = 5;
+  const smsIntervalMs = 2 * 60_000; // 2 minutes
+
+  // Compute number of waves we need
+  const totalWaves = Math.ceil(smsList.length / smsBatchSize);
+
+  for (let wave = 0; wave < totalWaves; wave++) {
+    const batchRecipients = smsList.slice(
+      wave * smsBatchSize,
+      wave * smsBatchSize + smsBatchSize
+    );
+    const delayMs = wave * smsIntervalMs;
+
+    setTimeout(() => {
+      this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
+    }, delayMs);
+  }
+}
 
     if (plan === 'PREMIUM') {
       const emailBatchSize = 10;
