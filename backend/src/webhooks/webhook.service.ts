@@ -1269,233 +1269,310 @@ The ${businessName} Team
 
 
 
-  async handleSmsReply(fromPhone: string, messageText: string) {
-    const campaignId = this.phoneToCampaign.get(fromPhone);
-    if (!campaignId) {
-      console.warn(`No active campaign found for SMS from ${fromPhone}`);
-      return;
+ async handleSmsReply(fromPhone: string, messageText: string) {
+  const campaignId = this.phoneToCampaign.get(fromPhone);
+  if (!campaignId) {
+    console.warn(`No active campaign found for SMS from ${fromPhone}`);
+    return;
+  }
+  const campaign = this.activeCampaigns.get(campaignId);
+  if (!campaign) {
+    console.warn(`Campaign ${campaignId} not found or already completed (SMS).`);
+    return;
+  }
+
+  // ——————————————————————————————————————————
+  // 1) Preparar formateador con la zona horaria del slot
+  // ——————————————————————————————————————————
+  const integForTZ = await this.prisma.connectedIntegration.findUnique({
+    where: { userId: campaign.userId, provider: campaign.provider }
+  });
+
+  const slotTimeZone = integForTZ
+    ? await this.resolveTimeZone(
+        campaign.provider as 'square' | 'acuity',
+        integForTZ.accessToken,
+        campaign.locationId
+      )
+    : 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month:   'long',
+    day:     'numeric',
+    year:    'numeric',
+    hour:    'numeric',
+    minute:  '2-digit',
+    hour12:  true,
+    timeZone: slotTimeZone,
+  });
+
+  const slotTimeStr = formatter.format(campaign.slotTime);
+
+
+  // ——————————————————————————————————————————
+  // 2) Si el slot ya está tomado, envia disculpa
+  // ——————————————————————————————————————————
+  if (campaign.filled) {
+    const recipient = campaign.recipients.find(r => r.phone === fromPhone);
+    let sorryText = `We’re sorry, that appointment slot on ${slotTimeStr} has just been filled by another client.`;
+
+    if (recipient && recipient.nextAppt) {
+      const nextApptStr = formatter.format(recipient.nextAppt);
+      sorryText += ` Your upcoming appointment on ${nextApptStr} is still confirmed as scheduled.`;
+    } else {
+      sorryText += ` We hope to see you in the future. You’re always welcome to book another appointment with us.`;
     }
-    const campaign = this.activeCampaigns.get(campaignId);
-    if (!campaign) {
-      console.warn(`Campaign ${campaignId} not found or already completed (SMS).`);
-      return;
-    }
-    if (campaign.filled) {
-      const recipient = campaign.recipients.find(r => r.phone === fromPhone);
-      let sorryText = `We’re sorry, that appointment slot has just been filled by another client.`;
-      if (recipient) {
-        if (recipient.nextAppt) {
-          sorryText += ` Your upcoming appointment on ${recipient.nextAppt.toLocaleString()} is still confirmed as scheduled.`;
-        } else {
-          sorryText += ` We hope to see you in the future. You're always welcome to book another appointment with us.`;
-        }
-      }
-      try {
-        await this.twilioClient.messages.create({
-          to: fromPhone,
-          from: process.env.TWILIO_FROM_NUMBER,
-          body: sorryText,
-        });
-        console.log(`Sent apology SMS to ${fromPhone} (slot already filled).`);
-      } catch (err) {
-        console.error('Failed to send apology SMS:', err);
-      }
-      return;
-    }
-    if (!messageText || messageText.trim().toLowerCase() !== 'i will take it') {
-      console.log(`SMS from ${fromPhone} does not match confirmation phrase. Ignoring.`);
-      return;
-    }
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
-    const winner = campaign.recipients.find(r => r.phone === fromPhone);
-    if (!winner) {
-      console.error('Winner not found in campaign recipient list (SMS).');
-      return;
-    }
-    console.log(`🎉 Client ${fromPhone} responded first via SMS for campaign ${campaignId}. Booking appointment...`);
-    let businessName = 'your business';
+
+    sorryText += ` We apologize for any inconvenience.`;
+
     try {
-      if (campaign.provider === 'square') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'square' },
-        });
-        if (integration) {
-          const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
-            headers: {
-              Authorization: `Bearer ${integration.accessToken}`,
-              'Square-Version': '2025-07-16',
-            },
-          });
-          const merchantsData = await merchantsRes.json();
-          if (merchantsData.merchant && merchantsData.merchant.length > 0) {
-            businessName = merchantsData.merchant[0].business_name;
-          }
-        }
-      } else if (campaign.provider === 'acuity') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'acuity' },
-        });
-        if (integration) {
-          const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
-            headers: { Authorization: `Bearer ${integration.accessToken}` },
-          });
-          const acuityData = await acuityRes.json();
-          if (acuityData.businessName) {
-            businessName = acuityData.businessName;
-          } else if (acuityData.name) {
-            businessName = acuityData.name;
-          }
-        }
-      }
-    } catch {}
-    try {
-      if (campaign.provider === 'acuity') {
-        const names = winner.name.split(' ');
-        const firstName = names[0] || 'Valued';
-        const lastName = names.slice(1).join(' ') || 'Client';
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'acuity' },
-        });
-        if (!integration) throw new Error('No Acuity integration for booking');
-        const createRes = await fetch('https://acuityscheduling.com/api/v1/appointments', {
-          method: 'POST',
+      await this.twilioClient.messages.create({
+        to: fromPhone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: sorryText,
+      });
+      console.log(`Sent apology SMS to ${fromPhone} (slot already filled).`);
+    } catch (err) {
+      console.error('Failed to send apology SMS:', err);
+    }
+    return;
+  }
+
+
+  // ——————————————————————————————————————————
+  // 3) Validar frase de confirmación
+  // ——————————————————————————————————————————
+  if (messageText.trim().toLowerCase() !== 'i will take it') {
+    console.log(`SMS from ${fromPhone} does not match confirmation phrase. Ignoring.`);
+    return;
+  }
+
+
+  // ——————————————————————————————————————————
+  // 4) Marcar campaña como llenada y reservar
+  // ——————————————————————————————————————————
+  campaign.filled = true;
+  this.activeCampaigns.set(campaignId, campaign);
+
+  const winner = campaign.recipients.find(r => r.phone === fromPhone);
+  if (!winner) {
+    console.error('Winner not found in campaign recipient list (SMS).');
+    return;
+  }
+  console.log(`🎉 Client ${fromPhone} responded first via SMS for campaign ${campaignId}. Booking appointment...`);
+
+
+  // ——————————————————————————————————————————
+  // 5) Lógica de booking (igual que antes)
+  // ——————————————————————————————————————————
+  let businessName = 'your business';
+  try {
+    if (campaign.provider === 'square') {
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'square' },
+      });
+      if (integration) {
+        const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
           headers: {
-            'Content-Type': 'application/json',
             Authorization: `Bearer ${integration.accessToken}`,
+            'Square-Version': '2025-07-16',
           },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email: winner.email || null,
-            phone: winner.phone || fromPhone,
-            datetime: campaign.slotTime,
-            appointmentTypeID: campaign.appointmentTypeId,
-          }),
         });
-        const apptCreated = await createRes.json();
-        if (!apptCreated.id) {
-          throw new Error(`Acuity booking failed: ${JSON.stringify(apptCreated)}`);
-        }
-      } else if (campaign.provider === 'square') {
-        const integration = await this.prisma.connectedIntegration.findUnique({
-          where: { userId: campaign.userId, provider: 'square' },
-        });
-        if (!integration) throw new Error('No Square integration for booking');
-        const newBooking = {
-          start_at: campaign.slotTime.toISOString(),
-          location_id: campaign.locationId,
-          customer_id: winner.customerId,
-          customer_note: 'Booked via SMS response',
-          appointment_segments: [
-            {
-              duration_minutes: campaign.duration || 0,
-              service_variation_id: campaign.serviceVariationId,
-              service_variation_version: campaign.serviceVariationVersion || 1,
-              team_member_id: campaign.teamMemberId,
-            },
-          ],
-        };
-        const createRes = await fetch('https://connect.squareup.com/v2/bookings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${integration.accessToken}`,
-          },
-          body: JSON.stringify({ booking: newBooking }),
-        });
-        const result = await createRes.json();
-        if (!result.booking) {
-          throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
+        const merchantsData = await merchantsRes.json();
+        if (merchantsData.merchant?.length) {
+          businessName = merchantsData.merchant[0].business_name;
         }
       }
-      // Actualizar openSlot en DB y log de reemplazo
-      let slot = null;
-      if (campaign.gapletSlotId) {
-        slot = await this.prisma.openSlot.findUnique({ where: { gapletSlotId: campaign.gapletSlotId } });
-      }
-      if (!slot) {
-        slot = await this.prisma.openSlot.findFirst({
-          where: { 
-            userId: campaign.userId,
-            provider: campaign.provider,
-            startAt: campaign.slotTime,
-            locationId: campaign.locationId || undefined
-          }
+    } else {
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' },
+      });
+      if (integration) {
+        const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
+          headers: { Authorization: `Bearer ${integration.accessToken}` },
         });
+        const acuityData = await acuityRes.json();
+        businessName = acuityData.businessName ?? acuityData.name ?? businessName;
       }
-      if (slot) {
-        await this.prisma.openSlot.update({
-          where: { id: slot.id },
-          data: { isTaken: true, takenAt: new Date() },
-        });
+    }
+  } catch {}
+
+  try {
+    if (campaign.provider === 'acuity') {
+      const [firstName, ...rest] = winner.name.split(' ');
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' },
+      });
+      if (!integration) throw new Error('No Acuity integration for booking');
+      const createRes = await fetch('https://acuityscheduling.com/api/v1/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${integration.accessToken}`,
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName: rest.join(' ') || undefined,
+          email: winner.email || null,
+          phone: winner.phone,
+          datetime: campaign.slotTime,
+          appointmentTypeID: campaign.appointmentTypeId,
+        }),
+      });
+      const apptCreated = await createRes.json();
+      if (!apptCreated.id) {
+        throw new Error(`Acuity booking failed: ${JSON.stringify(apptCreated)}`);
       }
-      await this.prisma.replacementLog.create({
-        data: {
+    } else {
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'square' },
+      });
+      if (!integration) throw new Error('No Square integration for booking');
+      const newBooking = {
+        start_at: campaign.slotTime.toISOString(),
+        location_id: campaign.locationId,
+        customer_id: winner.customerId,
+        customer_note: 'Booked via SMS response',
+        appointment_segments: [
+          {
+            duration_minutes: campaign.duration || 0,
+            service_variation_id: campaign.serviceVariationId,
+            service_variation_version: campaign.serviceVariationVersion || 1,
+            team_member_id: campaign.teamMemberId,
+          },
+        ],
+      };
+      const createRes = await fetch('https://connect.squareup.com/v2/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${integration.accessToken}`,
+        },
+        body: JSON.stringify({ booking: newBooking }),
+      });
+      const result = await createRes.json();
+      if (!result.booking) {
+        throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
+      }
+    }
+
+    // Actualizar openSlot y replacementLog
+    let slot = campaign.gapletSlotId
+      ? await this.prisma.openSlot.findUnique({ where: { gapletSlotId: campaign.gapletSlotId } })
+      : null;
+    if (!slot) {
+      slot = await this.prisma.openSlot.findFirst({
+        where: {
           userId: campaign.userId,
-          clientEmail: winner.email || '',
-          clientPhone: winner.phone || null,
-          clientName: winner.name || null,
-          appointmentTime: campaign.slotTime,
           provider: campaign.provider,
-          providerBookingId: '', // ID de la nueva cita (se podría obtener del resultado de la API si se necesitara)
-          respondedAt: new Date(),
+          startAt: campaign.slotTime,
+          locationId: campaign.locationId ?? undefined,
         },
       });
-      await this.prisma.user.update({
-        where: { id: campaign.userId },
-        data: {
-          totalReplacements: { increment: 1 },
-          lastReplacementAt: new Date(),
-        },
+    }
+    if (slot) {
+      await this.prisma.openSlot.update({
+        where: { id: slot.id },
+        data: { isTaken: true, takenAt: new Date() },
       });
-      const confirmText = `${businessName}: Your appointment on ${campaign.slotTime.toLocaleString()} is confirmed. Thank you!`;
+    }
+
+    await this.prisma.replacementLog.create({
+      data: {
+        userId: campaign.userId,
+        clientEmail: winner.email || '',
+        clientPhone: winner.phone,
+        clientName: winner.name,
+        appointmentTime: campaign.slotTime,
+        provider: campaign.provider,
+        providerBookingId: '', // opcional
+        respondedAt: new Date(),
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: campaign.userId },
+      data: {
+        totalReplacements: { increment: 1 },
+        lastReplacementAt: new Date(),
+      },
+    });
+
+    // ——————————————————————————————————————————
+    // 6) Enviar SMS de confirmación utilizando slotTimeStr
+    // ——————————————————————————————————————————
+    const confirmText = `Your appointment on ${slotTimeStr} is confirmed. Thank you!`;
+    try {
+      await this.twilioClient.messages.create({
+        to: fromPhone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: confirmText,
+      });
+      console.log(`Sent confirmation SMS to ${fromPhone}.`);
+    } catch (err) {
+      console.error('Failed to send confirmation SMS:', err);
+    }
+
+    // ——————————————————————————————————————————
+    // 7) Enviar email de confirmación si corresponde
+    // ——————————————————————————————————————————
+    if (winner.email) {
+      const firstName = winner.name.split(' ')[0];
+      const emailBody =
+        `Hello ${firstName},\n\n` +
+        `Your appointment on ${slotTimeStr} is confirmed. Thank you, and we look forward to seeing you!\n\n` +
+        `Best regards,\n${businessName}`;
       try {
-        await this.twilioClient.messages.create({
-          to: fromPhone,
-          from: process.env.TWILIO_FROM_NUMBER,
-          body: confirmText,
+        await sgMail.send({
+          to: winner.email,
+          from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+          subject: `Appointment Confirmed`,
+          text: emailBody,
         });
+        console.log(`Sent confirmation email to ${winner.email}.`);
       } catch (err) {
-        console.error('Failed to send confirmation SMS:', err);
+        console.error('Failed to send confirmation email:', err);
       }
-      if (winner.email) {
-        const firstName = winner.name.split(' ')[0];
-        try {
-          await sgMail.send({
-            to: winner.email,
-            from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-            subject: `Appointment Confirmed`,
-            text: `Hello ${firstName},\n\nYour appointment on ${campaign.slotTime.toLocaleString()} at ${businessName} is confirmed. Thank you, and we look forward to seeing you!\n\n${businessName}`,
-          });
-        } catch (err) {
-          console.error('Failed to send confirmation email to SMS responder:', err);
-        }
-      }
-    } catch (error) {
-      console.error('Error during booking for SMS reply:', error);
+    }
+  } catch (error) {
+    console.error('Error during booking for SMS reply:', error);
+
+    // ——————————————————————————————————————————
+    // 8) Si falla el booking, enviar disculpa con slotTimeStr
+    // ——————————————————————————————————————————
+    const errorText =
+      `We received your response for the slot on ${slotTimeStr}, but unfortunately it was no longer available. ` +
+      `We apologize for the inconvenience.`;
+    try {
+      await this.twilioClient.messages.create({
+        to: fromPhone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: errorText,
+      });
+    } catch {}
+
+    if (winner?.email) {
+      const firstName = winner.name.split(' ')[0];
+      const emailBody =
+        `Hello ${firstName},\n\n` +
+        `We received your response for the open slot on ${slotTimeStr}, but unfortunately it was no longer available. ` +
+        `We apologize for the inconvenience.\n\n` +
+        `Best regards,\n${businessName}`;
       try {
-        await this.twilioClient.messages.create({
-          to: fromPhone,
-          from: process.env.TWILIO_FROM_NUMBER,
-          body: `${businessName}: We received your response, but that ${campaign.slotTime.toLocaleString()} slot was no longer available. Sorry for the inconvenience.`,
+        await sgMail.send({
+          to: winner.email,
+          from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+          subject: `Appointment Not Available`,
+          text: emailBody,
         });
       } catch {}
-      if (winner && winner.email) {
-        const firstName = winner.name.split(' ')[0];
-        try {
-          await sgMail.send({
-            to: winner.email,
-            from: `${businessName} <no-reply@${process.env.SENDGRID_DOMAIN}>`,
-            subject: `Appointment not available`,
-            text: `Hello ${firstName},\n\nWe received your response for the open slot on ${campaign.slotTime.toLocaleString()}, but unfortunately it was no longer available. We apologize for the inconvenience.\n\n${businessName}`,
-          });
-        } catch {}
-      }
-      campaign.filled = true;
-      this.activeCampaigns.set(campaignId, campaign);
     }
+
+    campaign.filled = true;
+    this.activeCampaigns.set(campaignId, campaign);
   }
+}
+
 
   // Métodos utilitarios para campaña
   getCampaign(campaignId: string): CampaignState | undefined {
