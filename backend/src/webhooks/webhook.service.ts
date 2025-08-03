@@ -29,6 +29,7 @@ interface CampaignState {
   originalCustomerId?: string | null;
   recipients: Recipient[];
   gapletSlotId?: string | null;
+  scheduledTimeouts: NodeJS.Timeout[];  // NEW
 }
 
 @Injectable()
@@ -417,6 +418,7 @@ const notifyList = eligibleRecipients.slice(0, maxNotifications);
       originalCustomerId: canceledCustomerId || null,
       recipients: notifyList,
       gapletSlotId: gapletSlotId || null,
+      scheduledTimeouts: [],
     };
     this.activeCampaigns.set(campaignId, campaignState);
     // Mapear info de contacto de destinatarios a campaignId
@@ -591,115 +593,102 @@ const emailBodyTemplate = `
 
 const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Reply “I will take it” to book now.`;
 
-
-    /* Enviar notificaciones según el plan del usuario */
-    if (plan === 'STARTER') {
-      const batchSize = 5;
-      for (let i = 0; i < emailList.length; i += batchSize) {
-        const batchRecipients = emailList.slice(i, i + batchSize);
-        const delayMs = (i / batchSize) * 60_000;
-        setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
+if (plan === 'STARTER') {
+      const waveSize = 5;
+      const waveDelays = [0, 30, 60, 90].map((m) => m * 60_000);
+      waveDelays.forEach((delayMs, w) => {
+        const batch = emailList.slice(w * waveSize, (w + 1) * waveSize);
+        if (!batch.length) return;
+        const t = setTimeout(() => {
+          if (!this.isCampaignFilled(campaignId)) {
+            this.sendEmailBatch(
+              campaignId,
+              batch,
+              emailSubject,
+              textPlain,
+              emailBodyTemplate,
+              userId,
+              businessName
+            );
+          }
         }, delayMs);
-      }
+        campaignState.scheduledTimeouts.push(t);
+      });
     }
 
     if (plan === 'PRO') {
-  // 1) Filtrar solo clientes con número de teléfono
-  const smsList = notifyList.filter(c => !!c.phone);
-
-  // 2) Opciones de batching
-  const batchSize  = 5;               // 5 SMS por batch
-  const intervalMs = 2 * 60_000;      // cada 2 minutos
-
-  // 3) Calcular cuántas olas (waves) necesitamos
-  const totalWaves = Math.ceil(smsList.length / batchSize);
-  console.log(`PRO SMS: ${smsList.length} destinatarios en ${totalWaves} waves`);
-
-  // 4) Programar cada wave
-  for (let wave = 0; wave < totalWaves; wave++) {
-    const batchRecipients = smsList.slice(
-      wave * batchSize,
-      wave * batchSize + batchSize
-    );
-    const delayMs = wave * intervalMs;
-
-    setTimeout(() => {
-      console.log(
-        `Enviando wave ${wave + 1}/${totalWaves} — ${
-          batchRecipients.map(r => r.phone).join(', ')
-        }`
-      );
-      this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
-    }, delayMs);
-  }
-}
-
-
-    if (plan === 'PREMIUM') {
-      const emailBatchSize = 10;
-      const emailIntervalMs = 3 * 60_000;
-      let batchStart = 0;
-      for (let wave = 0; batchStart < emailList.length && wave < 16; wave++) {
-        const batchRecipients = emailList.slice(batchStart, batchStart + emailBatchSize);
-        if (batchRecipients.length === 0) break;
-        const delayMs = wave * emailIntervalMs;
-        setTimeout(() => {
-          this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
+      // Email waves
+      [0, 30].map((m) => m * 60_000).forEach((delayMs, i) => {
+        const batch = emailList.slice(i * 20, (i + 1) * 20);
+        if (!batch.length) return;
+        const t = setTimeout(() => {
+          if (!this.isCampaignFilled(campaignId)) {
+            this.sendEmailBatch(
+              campaignId,
+              batch,
+              emailSubject,
+              textPlain,
+              emailBodyTemplate,
+              userId,
+              businessName
+            );
+          }
         }, delayMs);
-        batchStart += batchRecipients.length;
-      }
-      const smsBatchSize = 5;
-      const smsIntervalMs = 3 * 60_000;
-      batchStart = 0;
-      for (let wave = 0; batchStart < smsList.length && wave < 4; wave++) {
-        const batchRecipients = smsList.slice(batchStart, batchStart + smsBatchSize);
-        if (batchRecipients.length === 0) break;
-        const delayMs = 48 * 60_000 + wave * smsIntervalMs;
-        setTimeout(() => {
-          this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
+        campaignState.scheduledTimeouts.push(t);
+      });
+      // SMS waves
+      [60, 90].map((m) => m * 60_000).forEach((delayMs, j) => {
+        const batch = smsList.slice(j * 5, (j + 1) * 5);
+        if (!batch.length) return;
+        const t = setTimeout(() => {
+          if (!this.isCampaignFilled(campaignId)) {
+            this.sendSmsBatch(campaignId, batch, smsText, userId);
+          }
         }, delayMs);
-        batchStart += batchRecipients.length;
-      }
-      const firstCycleCount = emailList.length + smsList.length;
-      if (notifyList.length > firstCycleCount) {
-        const remainingList = notifyList.slice(firstCycleCount);
-        batchStart = 0;
-        for (let wave = 0; batchStart < remainingList.length && wave < 16; wave++) {
-          const batchRecipients = remainingList.slice(batchStart, batchStart + emailBatchSize).filter(r => r.email);
-          if (batchRecipients.length === 0) break;
-          const delayMs = 60 * 60_000 + wave * emailIntervalMs;
-          setTimeout(() => {
-            this.sendEmailBatch(campaignId, batchRecipients, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
-          }, delayMs);
-          batchStart += batchRecipients.length;
-        }
-        const remainingAfterEmails = remainingList.filter(r => r.email).length < remainingList.length
-          ? remainingList.slice(remainingList.findIndex(r => !r.email))
-          : [];
-        batchStart = 0;
-        for (let wave = 0; batchStart < remainingAfterEmails.length && wave < 4; wave++) {
-          const batchRecipients = remainingAfterEmails.slice(batchStart, batchStart + smsBatchSize).filter(r => r.phone);
-          if (batchRecipients.length === 0) break;
-          const delayMs = 108 * 60_000 + wave * smsIntervalMs;
-          setTimeout(() => {
-            this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
-          }, delayMs);
-          batchStart += batchRecipients.length;
-        }
-        if (notifyList.length > firstCycleCount + remainingList.length) {
-          const lastBatch = notifyList.slice(firstCycleCount + remainingList.length);
-          lastBatch.filter(r => r.phone).forEach((rec, index) => {
-            const delayMs = 120 * 60_000 + index * (2 * 60_000);
-            setTimeout(() => {
-              this.sendSmsBatch(campaignId, [rec], smsText, userId);
-            }, delayMs);
-          });
-        }
-      }
+        campaignState.scheduledTimeouts.push(t);
+      });
     }
 
-    console.log(`🚀 Started notification campaign ${campaignId} for user ${userId}: notifying up to ${notifyList.length} clients.`);
+    if (plan === 'PREMIUM') {
+      // Email waves
+      [0, 15].map((m) => m * 60_000).forEach((delayMs, i) => {
+        const sizes = [15, 10];
+        const batch = emailList.slice(
+          sizes.slice(0, i).reduce((a, b) => a + b, 0),
+          sizes.slice(0, i + 1).reduce((a, b) => a + b, 0)
+        );
+        if (!batch.length) return;
+        const t = setTimeout(() => {
+          if (!this.isCampaignFilled(campaignId)) {
+            this.sendEmailBatch(
+              campaignId,
+              batch,
+              emailSubject,
+              textPlain,
+              emailBodyTemplate,
+              userId,
+              businessName
+            );
+          }
+        }, delayMs);
+        campaignState.scheduledTimeouts.push(t);
+      });
+      // SMS waves
+      [30, 45].map((m) => m * 60_000).forEach((delayMs, j) => {
+        const batch = smsList.slice(j * 5, (j + 1) * 5);
+        if (!batch.length) return;
+        const t = setTimeout(() => {
+          if (!this.isCampaignFilled(campaignId)) {
+            this.sendSmsBatch(campaignId, batch, smsText, userId);
+          }
+        }, delayMs);
+        campaignState.scheduledTimeouts.push(t);
+      });
+    }
+
+    console.log(
+      `🚀 Started notification campaign ${campaignId} for user ${userId}`
+    );
   }
 
   private isCampaignFilled(campaignId: string): boolean {
@@ -855,16 +844,22 @@ async handleEmailReply(
     this.emailToCampaign.get(gapletSlotId) ||
     this.emailToCampaign.get(normalized);
   if (!campaignId) return;
+
+  // 3) Retrieve and validate campaign
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) return;
 
-  // 3) Load integration once
+  // Cancel pending waves if already filled
+  if (campaign.filled && campaign.scheduledTimeouts.length) {
+    campaign.scheduledTimeouts.forEach(clearTimeout);
+    campaign.scheduledTimeouts = [];
+  }
+
+  // 4) Load integration for timezone
   const integ = await this.prisma.connectedIntegration.findFirst({
     where: { userId: campaign.userId, provider: campaign.provider },
   });
   if (!integ) return;
-
-  // 4) Resolve timezone dynamically
   const slotTimeZone = await this.resolveTimeZone(
     campaign.provider as 'square' | 'acuity',
     integ.accessToken,
@@ -873,12 +868,8 @@ async handleEmailReply(
 
   // 5) Format appointment time
   const appointmentTime = new Intl.DateTimeFormat('en-US', {
-    month:  'long',
-    day:    'numeric',
-    year:   'numeric',
-    hour:   'numeric',
-    minute: '2-digit',
-    hour12: true,
+    month:  'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
     timeZone: slotTimeZone,
   }).format(campaign.slotTime);
 
@@ -886,61 +877,63 @@ async handleEmailReply(
   let businessName = 'Your Business';
   try {
     if (campaign.provider === 'square') {
-      const res = await fetch(
-        'https://connect.squareup.com/v2/merchants',
-        { headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' } }
-      );
+      const res = await fetch('https://connect.squareup.com/v2/merchants', {
+        headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' }
+      });
       const js = await res.json();
       if (js.merchant?.length) businessName = js.merchant[0].business_name;
     } else {
-      const res = await fetch(
-        'https://acuityscheduling.com/api/v1/me',
-        { headers: { Authorization: `Bearer ${integ.accessToken}` } }
-      );
+      const res = await fetch('https://acuityscheduling.com/api/v1/me', {
+        headers: { Authorization: `Bearer ${integ.accessToken}` }
+      });
       const js = await res.json();
       businessName = js.businessName || js.name || businessName;
     }
   } catch {}
 
-  // 7) Check if already filled
-  const wasFilled = this.isCampaignFilled(campaignId);
+  // 7) Handle already taken
+  const wasFilled = campaign.filled;
   const isOriginal = campaign.recipients.some(
     r => r.email?.toLowerCase() === normalized
   );
-
   if (wasFilled) {
     if (isOriginal) {
       return this.sendSlotTakenReplyEmail(
         fromEmail, fromName,
         { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-        businessName,
-        appointmentTime
+        businessName, appointmentTime
       );
     }
     return this.sendSlotAlreadyTakenEmail(
       fromEmail, fromName,
       { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-      businessName,
-      appointmentTime
+      businessName, appointmentTime
     );
   }
 
-  // 8) Confirm text
+  // 8) Validate confirmation phrase
   if (!bodyText.toLowerCase().includes('i will take it')) return;
 
-  // 9) First responder wins
+  // 9) Mark filled and clear waves
   campaign.filled = true;
+  if (campaign.scheduledTimeouts.length) {
+    campaign.scheduledTimeouts.forEach(clearTimeout);
+    campaign.scheduledTimeouts = [];
+  }
   this.activeCampaigns.set(campaignId, campaign);
+
+  // 10) Identify winner
   const rec = campaign.recipients.find(
     r => r.email?.toLowerCase() === normalized
   );
-  const winner = rec ? { ...rec, email: fromEmail } : { name: fromName, email: fromEmail };
+  const winner = rec
+    ? { ...rec, email: fromEmail }
+    : { name: fromName, email: fromEmail };
 
   try {
+    // Create booking and log
     await this.createAppointmentAndNotify(
-      campaign,
-      winner,
-      {
+      campaign, winner, {
         gapletSlotId,
         startAt: campaign.slotTime,
         locationId: campaign.locationId,
@@ -951,12 +944,11 @@ async handleEmailReply(
       }
     );
 
-    // 10) Send confirmation
+    // 11) Send confirmation email
     await this.sendConfirmationReplyEmail(
       winner.email!, winner.name,
       { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-      businessName,
-      appointmentTime
+      businessName, appointmentTime
     );
   } catch (err) {
     console.error('Booking failed:', err);
@@ -965,19 +957,18 @@ async handleEmailReply(
       await this.sendSlotTakenReplyEmail(
         fromEmail, winner.name,
         { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-        businessName,
-        appointmentTime
+        businessName, appointmentTime
       );
     } else {
       await this.sendSlotAlreadyTakenEmail(
         fromEmail, winner.name,
         { gapletSlotId, startAt: campaign.slotTime, timeZone: slotTimeZone },
-        businessName,
-        appointmentTime
+        businessName, appointmentTime
       );
     }
   }
 }
+
 
 
 
@@ -1275,19 +1266,17 @@ The ${businessName} Team
     console.warn(`No active campaign found for SMS from ${fromPhone}`);
     return;
   }
+
   const campaign = this.activeCampaigns.get(campaignId);
   if (!campaign) {
     console.warn(`Campaign ${campaignId} not found or already completed (SMS).`);
     return;
   }
 
-  // ——————————————————————————————————————————
-  // 1) Preparar formateador con la zona horaria del slot
-  // ——————————————————————————————————————————
+  // 1) Prepare formatter with slot timezone
   const integForTZ = await this.prisma.connectedIntegration.findUnique({
     where: { userId: campaign.userId, provider: campaign.provider }
   });
-
   const slotTimeZone = integForTZ
     ? await this.resolveTimeZone(
         campaign.provider as 'square' | 'acuity',
@@ -1297,118 +1286,102 @@ The ${businessName} Team
     : 'UTC';
 
   const formatter = new Intl.DateTimeFormat('en-US', {
-    month:   'long',
-    day:     'numeric',
-    year:    'numeric',
-    hour:    'numeric',
-    minute:  '2-digit',
-    hour12:  true,
-    timeZone: slotTimeZone,
+    month:   'long', day: 'numeric', year: 'numeric',
+    hour:    'numeric', minute: '2-digit', hour12: true,
+    timeZone: slotTimeZone
   });
-
   const slotTimeStr = formatter.format(campaign.slotTime);
 
-
-  // ——————————————————————————————————————————
-  // 2) Si el slot ya está tomado, envia disculpa
-  // ——————————————————————————————————————————
+  // 2) If already filled, send apology
   if (campaign.filled) {
     const recipient = campaign.recipients.find(r => r.phone === fromPhone);
     let sorryText = `We’re sorry, that appointment slot on ${slotTimeStr} has just been filled by another client.`;
-
-    if (recipient && recipient.nextAppt) {
+    if (recipient?.nextAppt) {
       const nextApptStr = formatter.format(recipient.nextAppt);
-      sorryText += ` Your upcoming appointment on ${nextApptStr} is still confirmed as scheduled.`;
+      sorryText += ` Your upcoming appointment on ${nextApptStr} is still confirmed.`;
     } else {
-      sorryText += ` We hope to see you in the future. You’re always welcome to book another appointment with us.`;
+      sorryText += ` We hope to see you in the future. You’re always welcome to book again.`;
     }
-
     sorryText += ` We apologize for any inconvenience.`;
 
     try {
       await this.twilioClient.messages.create({
         to: fromPhone,
         from: process.env.TWILIO_FROM_NUMBER,
-        body: sorryText,
+        body: sorryText
       });
-      console.log(`Sent apology SMS to ${fromPhone} (slot already filled).`);
+      console.log(`Sent apology SMS to ${fromPhone}`);
     } catch (err) {
       console.error('Failed to send apology SMS:', err);
     }
     return;
   }
 
-
-  // ——————————————————————————————————————————
-  // 3) Validar frase de confirmación
-  // ——————————————————————————————————————————
+  // 3) Validate confirmation phrase
   if (messageText.trim().toLowerCase() !== 'i will take it') {
     console.log(`SMS from ${fromPhone} does not match confirmation phrase. Ignoring.`);
     return;
   }
 
-
-  // ——————————————————————————————————————————
-  // 4) Marcar campaña como llenada y reservar
-  // ——————————————————————————————————————————
+  // 4) Cancel any pending waves and mark filled
+  if (Array.isArray(campaign.scheduledTimeouts)) {
+    for (const t of campaign.scheduledTimeouts) clearTimeout(t);
+    campaign.scheduledTimeouts = [];
+  }
   campaign.filled = true;
   this.activeCampaigns.set(campaignId, campaign);
 
   const winner = campaign.recipients.find(r => r.phone === fromPhone);
   if (!winner) {
-    console.error('Winner not found in campaign recipient list (SMS).');
+    console.error('Winner not found for SMS responder');
     return;
   }
-  console.log(`🎉 Client ${fromPhone} responded first via SMS for campaign ${campaignId}. Booking appointment...`);
+  console.log(`🎉 SMS responder ${fromPhone} wins campaign ${campaignId}`);
 
-
-  // ——————————————————————————————————————————
-  // 5) Lógica de booking (igual que antes)
-  // ——————————————————————————————————————————
-  let businessName = 'your business';
+  // 5) Perform booking and capture bookingId
+  let bookingId = '';
   try {
     if (campaign.provider === 'square') {
       const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'square' },
+        where: { userId: campaign.userId, provider: 'square' }
       });
-      if (integration) {
-        const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
-          headers: {
-            Authorization: `Bearer ${integration.accessToken}`,
-            'Square-Version': '2025-07-16',
-          },
-        });
-        const merchantsData = await merchantsRes.json();
-        if (merchantsData.merchant?.length) {
-          businessName = merchantsData.merchant[0].business_name;
+      if (!integration) throw new Error('No Square integration');
+      const payload = {
+        booking: {
+          start_at: campaign.slotTime.toISOString(),
+          location_id: campaign.locationId,
+          customer_id: winner.customerId,
+          customer_note: 'Booked via SMS',
+          appointment_segments: [{
+            duration_minutes: campaign.duration || 0,
+            service_variation_id: campaign.serviceVariationId,
+            service_variation_version: campaign.serviceVariationVersion || 1,
+            team_member_id: campaign.teamMemberId
+          }]
         }
-      }
-    } else {
-      const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'acuity' },
-      });
-      if (integration) {
-        const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
-          headers: { Authorization: `Bearer ${integration.accessToken}` },
-        });
-        const acuityData = await acuityRes.json();
-        businessName = acuityData.businessName ?? acuityData.name ?? businessName;
-      }
-    }
-  } catch {}
-
-  try {
-    if (campaign.provider === 'acuity') {
-      const [firstName, ...rest] = winner.name.split(' ');
-      const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'acuity' },
-      });
-      if (!integration) throw new Error('No Acuity integration for booking');
-      const createRes = await fetch('https://acuityscheduling.com/api/v1/appointments', {
+      };
+      const res = await fetch('https://connect.squareup.com/v2/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${integration.accessToken}`,
+          Authorization: `Bearer ${integration.accessToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.booking?.id) throw new Error(`Square booking failed ${JSON.stringify(json)}`);
+      bookingId = json.booking.id;
+    } else {
+      const [firstName, ...rest] = winner.name.split(' ');
+      const integration = await this.prisma.connectedIntegration.findUnique({
+        where: { userId: campaign.userId, provider: 'acuity' }
+      });
+      if (!integration) throw new Error('No Acuity integration');
+      const resp = await fetch('https://acuityscheduling.com/api/v1/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${integration.accessToken}`
         },
         body: JSON.stringify({
           firstName,
@@ -1416,160 +1389,84 @@ The ${businessName} Team
           email: winner.email || null,
           phone: winner.phone,
           datetime: campaign.slotTime,
-          appointmentTypeID: campaign.appointmentTypeId,
-        }),
+          appointmentTypeID: campaign.appointmentTypeId
+        })
       });
-      const apptCreated = await createRes.json();
-      if (!apptCreated.id) {
-        throw new Error(`Acuity booking failed: ${JSON.stringify(apptCreated)}`);
-      }
-    } else {
-      const integration = await this.prisma.connectedIntegration.findUnique({
-        where: { userId: campaign.userId, provider: 'square' },
-      });
-      if (!integration) throw new Error('No Square integration for booking');
-      const newBooking = {
-        start_at: campaign.slotTime.toISOString(),
-        location_id: campaign.locationId,
-        customer_id: winner.customerId,
-        customer_note: 'Booked via SMS response',
-        appointment_segments: [
-          {
-            duration_minutes: campaign.duration || 0,
-            service_variation_id: campaign.serviceVariationId,
-            service_variation_version: campaign.serviceVariationVersion || 1,
-            team_member_id: campaign.teamMemberId,
-          },
-        ],
-      };
-      const createRes = await fetch('https://connect.squareup.com/v2/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${integration.accessToken}`,
-        },
-        body: JSON.stringify({ booking: newBooking }),
-      });
-      const result = await createRes.json();
-      if (!result.booking) {
-        throw new Error(`Square booking failed: ${JSON.stringify(result)}`);
-      }
+      const appt = await resp.json();
+      if (!appt.id) throw new Error(`Acuity booking failed ${JSON.stringify(appt)}`);
+      bookingId = appt.id;
     }
-
-    // Actualizar openSlot y replacementLog
-    let slot = campaign.gapletSlotId
-      ? await this.prisma.openSlot.findUnique({ where: { gapletSlotId: campaign.gapletSlotId } })
-      : null;
-    if (!slot) {
-      slot = await this.prisma.openSlot.findFirst({
-        where: {
-          userId: campaign.userId,
-          provider: campaign.provider,
-          startAt: campaign.slotTime,
-          locationId: campaign.locationId ?? undefined,
-        },
-      });
-    }
-    if (slot) {
-      await this.prisma.openSlot.update({
-        where: { id: slot.id },
-        data: { isTaken: true, takenAt: new Date() },
-      });
-    }
-
-    await this.prisma.replacementLog.create({
-      data: {
-        userId: campaign.userId,
-        clientEmail: winner.email || '',
-        clientPhone: winner.phone,
-        clientName: winner.name,
-        appointmentTime: campaign.slotTime,
-        provider: campaign.provider,
-        providerBookingId: '', // opcional
-        respondedAt: new Date(),
-      },
-    });
-
-    await this.prisma.user.update({
-      where: { id: campaign.userId },
-      data: {
-        totalReplacements: { increment: 1 },
-        lastReplacementAt: new Date(),
-      },
-    });
-
-    // ——————————————————————————————————————————
-    // 6) Enviar SMS de confirmación utilizando slotTimeStr
-    // ——————————————————————————————————————————
-    const confirmText = `Your appointment on ${slotTimeStr} is confirmed. Thank you!`;
-    try {
-      await this.twilioClient.messages.create({
-        to: fromPhone,
-        from: process.env.TWILIO_FROM_NUMBER,
-        body: confirmText,
-      });
-      console.log(`Sent confirmation SMS to ${fromPhone}.`);
-    } catch (err) {
-      console.error('Failed to send confirmation SMS:', err);
-    }
-
-    // ——————————————————————————————————————————
-    // 7) Enviar email de confirmación si corresponde
-    // ——————————————————————————————————————————
+  } catch (err) {
+    console.error('Booking error:', err);
+    // fallback apology
+    const errorMsg = `We received your response for ${slotTimeStr}, but the slot was no longer available. We apologize.`;
+    try { await this.twilioClient.messages.create({ to: fromPhone, from: process.env.TWILIO_FROM_NUMBER, body: errorMsg }); } catch {}
     if (winner.email) {
-      const firstName = winner.name.split(' ')[0];
-      const emailBody =
-        `Hello ${firstName},\n\n` +
-        `Your appointment on ${slotTimeStr} is confirmed. Thank you, and we look forward to seeing you!\n\n` +
-        `Best regards,\n${businessName}`;
       try {
         await sgMail.send({
           to: winner.email,
           from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
-          subject: `Appointment Confirmed`,
-          text: emailBody,
-        });
-        console.log(`Sent confirmation email to ${winner.email}.`);
-      } catch (err) {
-        console.error('Failed to send confirmation email:', err);
-      }
-    }
-  } catch (error) {
-    console.error('Error during booking for SMS reply:', error);
-
-    // ——————————————————————————————————————————
-    // 8) Si falla el booking, enviar disculpa con slotTimeStr
-    // ——————————————————————————————————————————
-    const errorText =
-      `We received your response for the slot on ${slotTimeStr}, but unfortunately it was no longer available. ` +
-      `We apologize for the inconvenience.`;
-    try {
-      await this.twilioClient.messages.create({
-        to: fromPhone,
-        from: process.env.TWILIO_FROM_NUMBER,
-        body: errorText,
-      });
-    } catch {}
-
-    if (winner?.email) {
-      const firstName = winner.name.split(' ')[0];
-      const emailBody =
-        `Hello ${firstName},\n\n` +
-        `We received your response for the open slot on ${slotTimeStr}, but unfortunately it was no longer available. ` +
-        `We apologize for the inconvenience.\n\n` +
-        `Best regards,\n${businessName}`;
-      try {
-        await sgMail.send({
-          to: winner.email,
-          from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
-          subject: `Appointment Not Available`,
-          text: emailBody,
+          subject: `Slot Not Available`,
+          text: `Hello ${winner.name.split(' ')[0]},\n\n${errorMsg}`
         });
       } catch {}
     }
+    return;
+  }
 
-    campaign.filled = true;
-    this.activeCampaigns.set(campaignId, campaign);
+  // 6) Update DB: mark slot, log replacement, increment metrics
+  let slot = campaign.gapletSlotId
+    ? await this.prisma.openSlot.findUnique({ where: { gapletSlotId: campaign.gapletSlotId } })
+    : null;
+  if (!slot) {
+    slot = await this.prisma.openSlot.findFirst({
+      where: { userId: campaign.userId, provider: campaign.provider, startAt: campaign.slotTime }
+    });
+  }
+  if (slot) {
+    await this.prisma.openSlot.update({ where: { id: slot.id }, data: { isTaken: true, takenAt: new Date() } });
+  }
+
+  await this.prisma.replacementLog.create({
+    data: {
+      userId: campaign.userId,
+      clientEmail: winner.email || '',
+      clientPhone: winner.phone || null,
+      clientName: winner.name,
+      appointmentTime: campaign.slotTime,
+      provider: campaign.provider,
+      providerBookingId: bookingId,
+      respondedAt: new Date()
+    }
+  });
+  await this.prisma.user.update({
+    where: { id: campaign.userId },
+    data: { totalReplacements: { increment: 1 }, lastReplacementAt: new Date() }
+  });
+
+  // 7) Send confirmations
+  try {
+    await this.twilioClient.messages.create({
+      to: fromPhone,
+      from: process.env.TWILIO_FROM_NUMBER,
+      body: `Your appointment on ${slotTimeStr} is confirmed. Thank you!`
+    });
+    console.log(`Sent confirmation SMS to ${fromPhone}`);
+  } catch (err) {
+    console.error('Failed SMS confirmation:', err);
+  }
+  if (winner.email) {
+    try {
+      await sgMail.send({
+        to: winner.email,
+        from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+        subject: `Appointment Confirmed`,
+        text: `Hello ${winner.name.split(' ')[0]},\n\nYour appointment on ${slotTimeStr} is confirmed. Thank you!`
+      });
+      console.log(`Sent confirmation email to ${winner.email}`);
+    } catch (err) {
+      console.error('Failed email confirmation:', err);
+    }
   }
 }
 
