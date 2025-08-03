@@ -605,25 +605,36 @@ const smsText = `${businessName}: A new slot is available on ${slotTimeStr}. Rep
     }
 
     if (plan === 'PRO') {
-  // Only SMS, in batches of 5, spaced 2 minutes apart
-  const smsBatchSize = 5;
-  const smsIntervalMs = 2 * 60_000; // 2 minutes
+  // 1) Filtrar solo clientes con número de teléfono
+  const smsList = notifyList.filter(c => !!c.phone);
 
-  // Compute number of waves we need
-  const totalWaves = Math.ceil(smsList.length / smsBatchSize);
+  // 2) Opciones de batching
+  const batchSize  = 5;               // 5 SMS por batch
+  const intervalMs = 2 * 60_000;      // cada 2 minutos
 
+  // 3) Calcular cuántas olas (waves) necesitamos
+  const totalWaves = Math.ceil(smsList.length / batchSize);
+  console.log(`PRO SMS: ${smsList.length} destinatarios en ${totalWaves} waves`);
+
+  // 4) Programar cada wave
   for (let wave = 0; wave < totalWaves; wave++) {
     const batchRecipients = smsList.slice(
-      wave * smsBatchSize,
-      wave * smsBatchSize + smsBatchSize
+      wave * batchSize,
+      wave * batchSize + batchSize
     );
-    const delayMs = wave * smsIntervalMs;
+    const delayMs = wave * intervalMs;
 
     setTimeout(() => {
+      console.log(
+        `Enviando wave ${wave + 1}/${totalWaves} — ${
+          batchRecipients.map(r => r.phone).join(', ')
+        }`
+      );
       this.sendSmsBatch(campaignId, batchRecipients, smsText, userId);
     }, delayMs);
   }
 }
+
 
     if (plan === 'PREMIUM') {
       const emailBatchSize = 10;
