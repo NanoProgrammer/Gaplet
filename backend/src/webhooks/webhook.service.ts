@@ -247,13 +247,14 @@ if (provider === 'acuity') {
   const customersData = await customersRes.json();
   const squareCustomers = customersData.customers || [];
   for (const c of squareCustomers) {
-    clients.push({
-      name: `${c.given_name || ''} ${c.family_name || ''}`.trim() || 'Client',
-      email: c.email_address || undefined,
-      phone: c.phone_number || undefined,
-      customerId: c.id,
-    });
-  }
+  const custId = String(c.id);
+  clients.push({
+    name: `${c.given_name || ''} ${c.family_name || ''}`.trim() || 'Client',
+    email: c.email_address?.toLowerCase(),
+    phone: c.phone_number,
+    customerId: custId,
+  });
+}
 
   const nowISO = new Date().toISOString();
   // 2) Historial de bookings pasados
@@ -268,16 +269,17 @@ if (provider === 'acuity') {
   const pastData = await pastSearch.json();
   const pastBookings = pastData.bookings || [];
   for (const book of pastBookings) {
-    if (!book.customer_id) continue;
-    const start = new Date(book.start_at);
-    const prevLast = lastApptMap.get(book.customer_id);
-    if (!prevLast || start > prevLast) lastApptMap.set(book.customer_id, start);
+  if (!book.customer_id) continue;
+  const custId = String(book.customer_id);
+  const start = new Date(book.start_at);
+  const prevLast = lastApptMap.get(custId);
+  if (!prevLast || start > prevLast) lastApptMap.set(custId, start);
     if (book.appointment_segments) {
       for (const seg of book.appointment_segments) {
-        if (!clientServiceTypes.has(book.customer_id)) {
-          clientServiceTypes.set(book.customer_id, new Set());
+        if (!clientServiceTypes.has(custId)) {
+          clientServiceTypes.set(custId, new Set());
         }
-        clientServiceTypes.get(book.customer_id)!.add(seg.service_variation_id);
+        clientServiceTypes.get(custId)!.add(seg.service_variation_id);
       }
     }
   }
@@ -294,16 +296,17 @@ if (provider === 'acuity') {
   const futureData = await futureSearch.json();
   const futureBookings = futureData.bookings || [];
   for (const book of futureBookings) {
-    if (!book.customer_id) continue;
-    const start = new Date(book.start_at);
-    const prevNext = nextApptMap.get(book.customer_id);
-    if (!prevNext || start < prevNext) nextApptMap.set(book.customer_id, start);
+  if (!book.customer_id) continue;
+  const custId = String(book.customer_id);
+  const start = new Date(book.start_at);
+  const prevNext = nextApptMap.get(custId);
+  if (!prevNext || start < prevNext) nextApptMap.set(custId, start);
     if (book.appointment_segments) {
       for (const seg of book.appointment_segments) {
-        if (!clientServiceTypes.has(book.customer_id)) {
-          clientServiceTypes.set(book.customer_id, new Set());
+        if (!clientServiceTypes.has(custId)) {
+          clientServiceTypes.set(custId, new Set());
         }
-        clientServiceTypes.get(book.customer_id)!.add(seg.service_variation_id);
+        clientServiceTypes.get(custId)!.add(seg.service_variation_id);
       }
     }
   }
@@ -311,10 +314,7 @@ if (provider === 'acuity') {
 
   // -------------- FILTRADO REFACTORIZADO --------------
   const eligibleRecipients: Recipient[] = clients.filter(client => {
-    const idKey = client.customerId
-      || client.email?.toLowerCase()
-      || client.phone!;
-
+    const idKey = client.customerId!; 
     // Excluir al que canceló
     if (provider === 'acuity'
         && canceledCustomerEmail
@@ -1405,4 +1405,3 @@ class SlotUnavailableError extends Error {
   }
   
 }
-
