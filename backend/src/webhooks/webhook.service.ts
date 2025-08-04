@@ -282,6 +282,7 @@ if (provider === 'acuity') {
           query: {
             filter: {
               start_at_range: { start_at: start, end_at: end },
+              location_ids:   [locationId!], 
             }
           },
           limit: 100
