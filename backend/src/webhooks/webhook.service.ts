@@ -242,7 +242,7 @@ if (provider === 'acuity') {
 } else if (provider === 'square') {
   // 1) Obtener lista de clientes de Square
   const customersRes = await fetch('https://connect.squareup.com/v2/customers', {
-    headers: { Authorization: `Bearer ${integration.accessToken}` },
+    headers: { Authorization: `Bearer ${integration.accessToken}`,'Square-Version': '2025-07-16', },
   });
   const customersData = await customersRes.json();
   const squareCustomers = customersData.customers || [];
@@ -265,6 +265,7 @@ const pastSearch = await fetch('https://connect.squareup.com/v2/bookings/search'
   method: 'POST',
   headers: {
     Authorization:   `Bearer ${integration.accessToken}`,
+    'Square-Version': '2025-07-16',
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
@@ -294,6 +295,7 @@ for (const b of pastBookings) {
   method: 'POST',
   headers: {
     Authorization:   `Bearer ${integration.accessToken}`,
+    'Square-Version': '2025-07-16',
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
