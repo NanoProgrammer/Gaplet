@@ -77,6 +77,7 @@ export class NotificationService {
     where: { id: userId },
     include: { preferences: true },
   });
+  console.log(user.preferences);
   if (!user) {
     console.error(`Usuario ${userId} no encontrado para campaña de notificación.`);
     return;
