@@ -436,9 +436,165 @@ if (provider === 'acuity') {
     this.emailToCampaign.set(`reply+${gapletSlotId}`, campaignId);
     this.emailToCampaign.set(gapletSlotId, campaignId);
   }
+  // Antes de construir los mensajes, define businessName y locationTimeZone
+  let businessName = 'Your Business';      // valor por defecto
+  let locationTimeZone = 'UTC';            // valor por defecto
 
-  // Construir emailSubject, smsText, etc. (igual que antes)...
-  // Envío de waves de email/SMS según plan (igual que antes)...
+  if (provider === 'square') {
+    try {
+      // Obtener nombre del negocio de Square
+      const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
+        headers: {
+          Authorization: `Bearer ${integration.accessToken}`,
+          'Square-Version': '2025-07-16',
+        },
+      });
+      const merchantsData = await merchantsRes.json();
+      if (
+        merchantsData.merchant &&
+        Array.isArray(merchantsData.merchant) &&
+        merchantsData.merchant.length > 0
+      ) {
+        businessName = merchantsData.merchant[0].business_name;
+      }
+
+      // Obtener timezone de la ubicación
+      if (locationId) {
+        const locRes = await fetch(
+          `https://connect.squareup.com/v2/locations/${locationId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${integration.accessToken}`,
+              'Square-Version': '2025-07-16',
+            },
+          }
+        );
+        const locJson = await locRes.json();
+        if (locJson.location?.timezone) {
+          locationTimeZone = locJson.location.timezone;
+        }
+      }
+    } catch (err) {
+      console.warn('No se pudo obtener businessName o timezone de Square, usando valores por defecto:', err);
+    }
+
+  } else {
+    // Para Acuity, intenta leer el nombre del negocio vía /me
+    try {
+      const acuityRes = await fetch('https://acuityscheduling.com/api/v1/me', {
+        headers: { Authorization: `Bearer ${integration.accessToken}` },
+      });
+      const acuityData = await acuityRes.json();
+      businessName = acuityData.businessName || acuityData.name || businessName;
+    } catch (err) {
+      console.warn('No se pudo obtener el nombre del negocio de Acuity, usando valor por defecto:', err);
+    }
+  }
+
+    // ——— Construir asunto y cuerpos de mensaje ———
+  const opts: Intl.DateTimeFormatOptions = {
+    month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: locationTimeZone
+  };
+  const slotTimeStr = new Intl.DateTimeFormat('en-US', opts).format(slotTime);
+
+  const emailSubject = `New Appointment Slot Available at ${businessName} – ${slotTimeStr}`;
+  const textPlain = `Great news! An appointment slot has just opened up at ${businessName}.\n\n` +
+                    `Date & Time: ${slotTimeStr}\n\n` +
+                    `To claim this slot, reply with “I will take it”.`;
+  const emailBodyTemplate = `
+    <!DOCTYPE html>
+    <html><body style="font-family:Arial,sans-serif;color:#333;">
+      <p><strong>Great news!</strong> An appointment slot has just opened at <strong>${businessName}</strong>:</p>
+      <ul>
+        <li><strong>Date & Time:</strong> ${slotTimeStr}</li>
+        <li><strong>Location:</strong> ${businessName}</li>
+      </ul>
+      <p>Reply with <em>“I will take it”</em> and we’ll confirm the first response.</p>
+      <hr>
+      <p style="font-size:12px;color:#999;">
+        You’re receiving this because you requested notifications. Reply “STOP” to unsubscribe.
+      </p>
+    </body></html>
+  `.trim();
+
+  const smsText = `${businessName}: New slot on ${slotTimeStr}. Reply “I will take it” to book.`;
+
+  // ——— Envío en “waves” según plan ———
+  if (plan === 'STARTER') {
+    // Solo email en oleadas de 5 cada 30 min
+    const waveSize = 5;
+    const waveMinutes = [0, 30, 60, 90];
+    waveMinutes.forEach((mins, idx) => {
+      const batch = notifyList.slice(idx * waveSize, (idx + 1) * waveSize)
+                              .filter(c => !!c.email);
+      if (!batch.length) return;
+      const t = setTimeout(() => {
+        if (!this.isCampaignFilled(campaignId)) {
+          this.sendEmailBatch(campaignId, batch, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
+        }
+      }, mins * 60_000);
+      campaignState.scheduledTimeouts.push(t);
+    });
+
+  } else if (plan === 'PRO') {
+    // Emails y SMS en fases: primeros 100 emails en 2 oleadas, luego hasta 25 SMS
+    const emailCaps = [{count: 50, delay: 0}, {count: 50, delay: 30}];
+    emailCaps.forEach(({count, delay}, phase) => {
+      const batch = notifyList.slice(phase * count, phase * count + count)
+                              .filter(c => !!c.email);
+      if (!batch.length) return;
+      const t = setTimeout(() => {
+        if (!this.isCampaignFilled(campaignId)) {
+          this.sendEmailBatch(campaignId, batch, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
+        }
+      }, delay * 60_000);
+      campaignState.scheduledTimeouts.push(t);
+    });
+
+    // SMS: hasta 25 en una sola oleada 60 min después
+    const smsBatch = notifyList.slice(100, 125).filter(c => !!c.phone);
+    if (smsBatch.length) {
+      const t = setTimeout(() => {
+        if (!this.isCampaignFilled(campaignId)) {
+          this.sendSmsBatch(campaignId, smsBatch, smsText, userId);
+        }
+      }, 60 * 60_000);
+      campaignState.scheduledTimeouts.push(t);
+    }
+
+  } else if (plan === 'PREMIUM') {
+    // Emails (2 fases: 80+80) y SMS (2 fases: 20+20)
+    const emailCaps = [{count: 80, delay: 0}, {count: 80, delay: 15}];
+    emailCaps.forEach(({count, delay}, phase) => {
+      const batch = notifyList.slice(phase * count, phase * count + count)
+                              .filter(c => !!c.email);
+      if (!batch.length) return;
+      const t = setTimeout(() => {
+        if (!this.isCampaignFilled(campaignId)) {
+          this.sendEmailBatch(campaignId, batch, emailSubject, textPlain, emailBodyTemplate, userId, businessName);
+        }
+      }, delay * 60_000);
+      campaignState.scheduledTimeouts.push(t);
+    });
+
+    const smsCaps = [{count: 20, delay: 30}, {count: 20, delay: 45}];
+    smsCaps.forEach(({count, delay}, phase) => {
+      const batch = notifyList.slice(160 + phase * count, 160 + (phase + 1) * count)
+                              .filter(c => !!c.phone);
+      if (!batch.length) return;
+      const t = setTimeout(() => {
+        if (!this.isCampaignFilled(campaignId)) {
+          this.sendSmsBatch(campaignId, batch, smsText, userId);
+        }
+      }, delay * 60_000);
+      campaignState.scheduledTimeouts.push(t);
+    });
+  }
+
+  console.log(`✅ Scheduled waves for campaign ${campaignId}`);
+
 
   console.log(
     `🚀 Started notification campaign ${campaignId} for user ${userId}`
@@ -917,6 +1073,101 @@ The ${businessName} Team
   });
 }
 
+private isCampaignFilled(campaignId: string): boolean {
+    const campaign = this.activeCampaigns.get(campaignId);
+    return campaign ? campaign.filled : false;
+  }
+
+  private async sendEmailBatch(
+  campaignId: string,
+  recipients: Recipient[],
+  subject: string,
+  textTemplate: string,
+  htmlTemplate: string,
+  userId: string,
+  businessName: string,
+) {
+  if (this.isCampaignFilled(campaignId) || recipients.length === 0) return;
+
+  const messages = recipients.map(rec => {
+    // 1) Construir saludo personalizado
+    let greetingText = 'Hello,';
+    let greetingHtml = '<p>Hello,</p>';
+    if (rec.name && rec.name !== 'Client') {
+      const firstName = rec.name.split(' ')[0];
+      greetingText = `Hello ${firstName},`;
+      greetingHtml = `<p>Hello <strong>${firstName}</strong>,</p>`;
+    }
+
+    // 2) Texto plano
+    const textContent = `${greetingText}\n\n${textTemplate}`;
+const firstName = rec.name.split(' ')[0];
+    // 3) HTML (añadiendo el saludo al template)
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+      <p>Hello <strong>${firstName}</strong>,</p>
+        ${htmlTemplate}
+      <p>Thank you for choosing <strong>${businessName}</strong>.</p>
+      <p style="font-size: 12px; color: #999;">
+          The ${businessName} Team.
+      </p>
+      </div>
+    `.trim();
+
+    return {
+      to: rec.email!,
+      from: this.buildFrom(businessName),
+      replyTo: this.buildReplyTo(campaignId),
+      subject,
+      text: textContent,
+      html: htmlContent,
+    };
+  });
+
+  try {
+    await sgMail.send(messages);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailSent: { increment: messages.length } },
+    });
+    console.log(`✅ Sent ${messages.length} emails for campaign ${campaignId}`);
+  } catch (error) {
+    console.error(`❌ Error sending email batch for campaign ${campaignId}:`, error);
+  }
+}
+
+
+  private async sendSmsBatch(
+    campaignId: string,
+    recipients: Recipient[],
+    body: string,
+    userId: string,
+  ) {
+
+    
+    if (this.isCampaignFilled(campaignId)) return;
+    let sentCount = 0;
+    for (const rec of recipients) {
+      if (!rec.phone) continue;
+      try {
+        await this.twilioClient.messages.create({
+          to: rec.phone,
+          from: process.env.TWILIO_FROM_NUMBER,
+          body: body,
+        });
+        sentCount++;
+      } catch (err) {
+        console.error(`❌ SMS send failed for ${rec.phone}:`, err);
+      }
+    }
+    if (sentCount > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { smsSent: { increment: sentCount } },
+      });
+    }
+    console.log(`✅ Sent ${sentCount} SMS for campaign ${campaignId}`);
+  }
 
 
  async handleSmsReply(fromPhone: string, messageText: string) {
@@ -1152,4 +1403,6 @@ class SlotUnavailableError extends Error {
   constructor(slotId: string) {
     super(`Slot ${slotId} no longer available`);
   }
+  
 }
+
