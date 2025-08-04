@@ -246,7 +246,7 @@ if (provider === 'acuity') {
     {
       headers: {
         Authorization:   `Bearer ${integration.accessToken}`,
-        'Square-Version': '2025-07-16',
+        'Square-Version': '2025-06-18',
       },
     }
   );
@@ -274,14 +274,13 @@ if (provider === 'acuity') {
         method: 'POST',
         headers: {
           Authorization:    `Bearer ${integration.accessToken}`,
-          'Square-Version': '2025-07-16',
+          'Square-Version': '2025-06-18',
           'Content-Type':   'application/json',
         },
         body: JSON.stringify({
           query: {
             filter: {
               start_at_range: { start_at: start, end_at: end },
-              location_ids:   [locationId!],
             }
           },
           limit: 100
@@ -298,6 +297,7 @@ if (provider === 'acuity') {
 
   // 4) Llenar lastApptMap con citas pasadas
   const pastBookings = await bookingSearch(pastStartISO, nowISO);
+  console.log('⟵ Square search response:', JSON.stringify(pastBookings, null,2));
   for (const b of pastBookings) {
     if (!b.customer_id) continue;
     const dt = new Date(b.start_at);
@@ -307,6 +307,7 @@ if (provider === 'acuity') {
 
   // 5) Llenar nextApptMap con próximas citas
   const futureBookings = await bookingSearch(nowISO, endAtISO);
+  console.log('⟵ Square search response:', JSON.stringify(futureBookings, null,2));
   for (const b of futureBookings) {
     if (!b.customer_id) continue;
     const dt = new Date(b.start_at);
@@ -434,7 +435,7 @@ const eligibleRecipients = clients.filter(client => {
       const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
         headers: {
           Authorization: `Bearer ${integration.accessToken}`,
-          'Square-Version': '2025-07-16',
+          'Square-Version': '2025-06-18',
         },
       });
       const merchantsData = await merchantsRes.json();
@@ -453,7 +454,7 @@ const eligibleRecipients = clients.filter(client => {
           {
             headers: {
               Authorization: `Bearer ${integration.accessToken}`,
-              'Square-Version': '2025-07-16',
+              'Square-Version': '2025-06-18',
             },
           }
         );
@@ -604,7 +605,7 @@ const eligibleRecipients = clients.filter(client => {
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Square-Version': '2025-07-16'
+            'Square-Version': '2025-06-18'
           }
         }
       );
@@ -681,7 +682,7 @@ async handleEmailReply(
   try {
     if (campaign.provider === 'square') {
       const res = await fetch('https://connect.squareup.com/v2/merchants', {
-        headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' }
+        headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-06-18' }
       });
       const js = await res.json();
       if (js.merchant?.length) businessName = js.merchant[0].business_name;
