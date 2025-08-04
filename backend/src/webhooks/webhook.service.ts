@@ -261,25 +261,27 @@ const pastStartISO = new Date(Date.now() - notifyAfter  * 60_000).toISOString();
 const endAtISO     = new Date(Date.now() + notifyBefore * 60_000).toISOString();
 
 // 3) Histórico: entre [now−notifyAfter, now]
-const pastSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
-  method: 'POST',
-  headers: {
-    Authorization:   `Bearer ${integration.accessToken}`,
-    'Square-Version': '2025-07-16',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    query: {
-      filter: {
-        start_at_range: {
-          start_at: pastStartISO,
-          end_at:   nowISO
-        }
-      }
-    }
-  }),
-});
+const pastSearch = await fetch(
+  `https://connect.squareup.com/v2/bookings?\
+start_at_min=${encodeURIComponent(pastStartISO)}&\
+start_at_max=${encodeURIComponent(nowISO)}&\
+limit=100&\
+location_id=${locationId}&\
+sort_order=ASC`,
+  {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${integration.accessToken}`,
+      'Square-Version': '2025-07-16',
+      'Content-Type': 'application/json',
+    },
+  }
+);
 const pastData     = await pastSearch.json();
+if (pastData.errors?.length) {
+  console.error('Square API error:', pastData.errors);
+  return;
+}
 const pastBookings = pastData.bookings || [];
 for (const b of pastBookings) {
   if (!b.customer_id) continue;
@@ -291,25 +293,27 @@ for (const b of pastBookings) {
 
   // 3) Próximas bookings futuras
  
-  const futureSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
-  method: 'POST',
-  headers: {
-    Authorization:   `Bearer ${integration.accessToken}`,
-    'Square-Version': '2025-07-16',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    query: {
-      filter: {
-        start_at_range: {
-          start_at: nowISO,
-          end_at:   endAtISO
-        }
-      }
-    }
-  }),
-});
+  const futureSearch = await fetch(
+  `https://connect.squareup.com/v2/bookings?\
+start_at_min=${encodeURIComponent(nowISO)}&\
+start_at_max=${encodeURIComponent(endAtISO)}&\
+limit=100&\
+location_id=${locationId}&\
+sort_order=ASC`,
+  {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${integration.accessToken}`,
+      'Square-Version': '2025-07-16',
+      'Content-Type': 'application/json',
+    },
+  }
+);
 const futureData     = await futureSearch.json();
+if (futureData.errors?.length) {
+  console.error('Square API error:', futureData.errors);
+  return;
+}
 const futureBookings = futureData.bookings || [];
 for (const b of futureBookings) {
   if (!b.customer_id) continue;
