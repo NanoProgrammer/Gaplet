@@ -114,7 +114,35 @@ export class NotificationService {
   let teamMemberId: string | null = null;
   let locationId: string | null = null;
   let duration: number | null = null;
-
+const bookingSearch = async (start: string, end: string) => {
+  console.log('[DEBUG] bookingSearch', { start, end, locationId });
+  const res = await fetch(
+    'https://connect.squareup.com/v2/bookings/search',
+    {
+      method: 'POST',
+      headers: {
+        Authorization:    `Bearer ${integration.accessToken}`,
+        'Square-Version': '2025-06-18',
+        'Content-Type':   'application/json',
+      },
+      body: JSON.stringify({
+        query: {
+          filter: {
+            start_at_range: { start_at: start, end_at: end },
+            location_ids:   [locationId!],
+          }
+        },
+        limit: 100
+      }),
+    }
+  );
+  const data = await res.json();
+  if (data.errors?.length) {
+    console.error('Square API error:', data.errors);
+    return [];
+  }
+  return data.bookings || [];
+};
   if (provider === 'acuity') {
     slotTime = new Date(payload.datetime);
     appointmentTypeId = payload.appointmentTypeID ? Number(payload.appointmentTypeID) : null;
@@ -239,18 +267,16 @@ if (provider === 'acuity') {
         || clientServiceTypes.set(clientKey, new Set([Number(appt.appointmentTypeID)]));
     }
   }
+  
 
-} else if (provider === 'square') {
-  // 1) Obtener lista de clientes de Square
-  const customersRes = await fetch(
-    'https://connect.squareup.com/v2/customers',
-    {
-      headers: {
-        Authorization:   `Bearer ${integration.accessToken}`,
-        'Square-Version': '2025-06-18',
-      },
-    }
-  );
+}  else if (provider === 'square') {
+ // 1) Clientes de Square
+  const customersRes = await fetch('https://connect.squareup.com/v2/customers', {
+    headers: {
+      Authorization:   `Bearer ${integration.accessToken}`,
+      'Square-Version': '2025-06-18',
+    },
+  });
   const { customers = [] } = await customersRes.json();
   for (const c of customers) {
     const id = String(c.id);
@@ -262,45 +288,10 @@ if (provider === 'acuity') {
     });
   }
 
-  // 2) Calcular ventanas de tiempo
-  const nowISO       = new Date().toISOString();
-  const pastStartISO = new Date(Date.now() - notifyAfter * 60_000).toISOString();
-  const endAtISO     = new Date(Date.now() + notifyBefore * 60_000).toISOString();
-
-  // 3) Helper para buscar bookings vía POST /v2/bookings/search
-  const bookingSearch = async (start: string, end: string) => {
-     console.log('[DEBUG] bookingSearch', { start, end, locationId });
-    const res = await fetch(
-      'https://connect.squareup.com/v2/bookings/search',
-      {
-        method: 'POST',
-        headers: {
-          Authorization:    `Bearer ${integration.accessToken}`,
-          'Square-Version': '2025-06-18',
-          'Content-Type':   'application/json',
-        },
-        body: JSON.stringify({
-          query: {
-            filter: {
-              start_at_range: { start_at: start, end_at: end },
-              location_ids:   [locationId!], 
-            }
-          },
-          limit: 100
-        }),
-      }
-    );
-    const data = await res.json();
-    if (data.errors?.length) {
-      console.error('Square API error:', data.errors);
-      return [];
-    }
-    return data.bookings || [];
-  };
-
-  // 4) Llenar lastApptMap con citas pasadas
-  const pastBookings = await bookingSearch(pastStartISO, nowISO);
-  console.log('⟵ Square search response:', JSON.stringify(pastBookings, null,2));
+  // 2) Historial completo de pasadas (último año)
+  const oneYearAgoISO = new Date(Date.now() - 365*24*60*60*1000).toISOString();
+  const pastBookings    = await bookingSearch(oneYearAgoISO, new Date().toISOString());
+  console.log('⟵ Square past bookings:', pastBookings);
   for (const b of pastBookings) {
     if (!b.customer_id) continue;
     const dt = new Date(b.start_at);
@@ -308,9 +299,10 @@ if (provider === 'acuity') {
     if (!prev || dt > prev) lastApptMap.set(b.customer_id, dt);
   }
 
-  // 5) Llenar nextApptMap con próximas citas
-  const futureBookings = await bookingSearch(nowISO, endAtISO);
-  console.log('⟵ Square search response:', JSON.stringify(futureBookings, null,2));
+  // 3) Futuras completas (próximos 6 meses)
+  const sixMonthsISO    = new Date(Date.now() + 6*30*24*60*60*1000).toISOString();
+  const futureBookings  = await bookingSearch(new Date().toISOString(), sixMonthsISO);
+  console.log('⟵ Square future bookings:', futureBookings);
   for (const b of futureBookings) {
     if (!b.customer_id) continue;
     const dt = new Date(b.start_at);
@@ -318,11 +310,6 @@ if (provider === 'acuity') {
     if (!prev || dt < prev) nextApptMap.set(b.customer_id, dt);
   }
 }
-
-
-
-
-
 
   // -------------- FILTRADO CORRECTO --------------
 // ——— FILTRADO DE CLIENTES ———
