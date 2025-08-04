@@ -269,6 +269,7 @@ if (provider === 'acuity') {
 
   // 3) Helper para buscar bookings vía POST /v2/bookings/search
   const bookingSearch = async (start: string, end: string) => {
+     console.log('[DEBUG] bookingSearch', { start, end, locationId });
     const res = await fetch(
       'https://connect.squareup.com/v2/bookings/search',
       {
