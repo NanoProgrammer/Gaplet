@@ -256,60 +256,66 @@ if (provider === 'acuity') {
   });
 }
 
-  const nowISO = new Date().toISOString();
-  // 2) Historial de bookings pasados
-  const pastSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${integration.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: { filter: { start_at_range: { end_at: nowISO } } } }),
-  });
-  const pastData = await pastSearch.json();
-  const pastBookings = pastData.bookings || [];
-  for (const book of pastBookings) {
-  if (!book.customer_id) continue;
-  const custId = String(book.customer_id);
-  const start = new Date(book.start_at);
-  const prevLast = lastApptMap.get(custId);
-  if (!prevLast || start > prevLast) lastApptMap.set(custId, start);
-    if (book.appointment_segments) {
-      for (const seg of book.appointment_segments) {
-        if (!clientServiceTypes.has(custId)) {
-          clientServiceTypes.set(custId, new Set());
+  const nowISO       = new Date().toISOString();
+const pastStartISO = new Date(Date.now() - notifyAfter  * 60_000).toISOString();
+const endAtISO     = new Date(Date.now() + notifyBefore * 60_000).toISOString();
+
+// 3) Histórico: entre [now−notifyAfter, now]
+const pastSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
+  method: 'POST',
+  headers: {
+    Authorization:   `Bearer ${integration.accessToken}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    query: {
+      filter: {
+        start_at_range: {
+          start_at: pastStartISO,
+          end_at:   nowISO
         }
-        clientServiceTypes.get(custId)!.add(seg.service_variation_id);
       }
     }
-  }
+  }),
+});
+const pastData     = await pastSearch.json();
+const pastBookings = pastData.bookings || [];
+for (const b of pastBookings) {
+  if (!b.customer_id) continue;
+  const id = String(b.customer_id);
+  const dt = new Date(b.start_at);
+  const prev = lastApptMap.get(id);
+  if (!prev || dt > prev) lastApptMap.set(id, dt);
+}
 
   // 3) Próximas bookings futuras
+ 
   const futureSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${integration.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: { filter: { start_at_range: { start_at: nowISO } } } }),
-  });
-  const futureData = await futureSearch.json();
-  const futureBookings = futureData.bookings || [];
-  for (const book of futureBookings) {
-  if (!book.customer_id) continue;
-  const custId = String(book.customer_id);
-  const start = new Date(book.start_at);
-  const prevNext = nextApptMap.get(custId);
-  if (!prevNext || start < prevNext) nextApptMap.set(custId, start);
-    if (book.appointment_segments) {
-      for (const seg of book.appointment_segments) {
-        if (!clientServiceTypes.has(custId)) {
-          clientServiceTypes.set(custId, new Set());
+  method: 'POST',
+  headers: {
+    Authorization:   `Bearer ${integration.accessToken}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    query: {
+      filter: {
+        start_at_range: {
+          start_at: nowISO,
+          end_at:   endAtISO
         }
-        clientServiceTypes.get(custId)!.add(seg.service_variation_id);
       }
     }
-  }
+  }),
+});
+const futureData     = await futureSearch.json();
+const futureBookings = futureData.bookings || [];
+for (const b of futureBookings) {
+  if (!b.customer_id) continue;
+  const id = String(b.customer_id);
+  const dt = new Date(b.start_at);
+  const prev = nextApptMap.get(id);
+  if (!prev || dt < prev) nextApptMap.set(id, dt);
+}
 }
 
   // -------------- FILTRADO CORRECTO --------------
