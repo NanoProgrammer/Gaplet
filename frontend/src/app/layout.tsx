@@ -1,62 +1,58 @@
-// ✅ app/layout.tsx
+// app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-// ✅ Fuentes con CSS variables
 const geistSans = Geist({
   subsets: ["latin"],
   variable: "--font-geist-sans",
   display: "swap",
 });
-
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
   display: "swap",
 });
 
-// ✅ Metadata global
 export const metadata: Metadata = {
-  title: "Gaplets | Last-Minute Appointment App for Clinics and Salons",
+  title: "Gaplets | Square-Powered Last-Minute Appointment Filler",
   description:
-    "Gaplets helps you fill last-minute cancellations automatically. Notify eligible clients from your waitlist and recover lost revenue — all in one smart scheduling app.",
+    "Seamlessly integrate with Square to automatically detect last-minute cancellations and notify your Square customers. Recover lost revenue and streamline scheduling right from your Square dashboard.",
   keywords: [
-    "last minute appointment app",
-    "fill last minute cancellations",
-    "waitlist automation software",
-    "smart scheduling for clinics",
-    "appointment recovery platform",
-    "calendar integration",
-    "clinic no-show solution",
+    "Square integration",
+    "Square appointments",
+    "Square waitlist",
+    "fill last-minute cancellations",
+    "appointment automation",
+    "salon scheduling with Square",
+    "clinic scheduling Square",
   ],
   metadataBase: new URL("https://gaplets.com/"),
   openGraph: {
-    title: "Gaplets | Fill Last-Minute Appointments with Automation",
+    title: "Gaplets | Fill Last-Minute Appointments via Square",
     description:
-      "Stop losing revenue on no-shows. Gaplets fills last-minute cancellations using your own waitlist — fully automated.",
+      "Leverage Square’s customer management—Gaplets auto-fills your last-minute cancellations from your Square waitlist with zero manual work.",
     url: "https://gaplets.com/",
     siteName: "Gaplets",
     type: "website",
     images: [
       {
-        url: "/og_gaplet.png",
+        url: "/og_square_gaplet.png",
         width: 1200,
         height: 630,
-        alt: "Gaplets waitlist automation app",
+        alt: "Gaplets Square integration screenshot",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gaplets | Recover Lost Appointments Automatically",
+    title: "Gaplets | Square Integration for No-Show Recovery",
     description:
-      "Smart software to fill appointment gaps. Use Gaplets to notify waitlisted clients when last-minute slots open up.",
-    images: ["/og_gaplet.png"],
+      "Plug Gaplets into your Square account to instantly notify clients when slots free up—never lose revenue to no-shows again.",
+    images: ["/og_square_gaplet.png"],
   },
 };
 
-// ✅ Este es el layout real
 export default function RootLayout({
   children,
 }: {
