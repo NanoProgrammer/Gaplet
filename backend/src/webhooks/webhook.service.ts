@@ -313,50 +313,40 @@ if (provider === 'acuity') {
 }
 
   // -------------- FILTRADO CORRECTO --------------
-const eligibleRecipients: Recipient[] = clients.filter(client => {
-  const idKey = client.customerId!; // ya String(id) o email.toLowerCase()
+// ——— FILTRADO DE CLIENTES ———
+const eligibleRecipients = clients.filter(client => {
+  const id = client.customerId!;            // para Square siempre será String(customer_id)
+  const last = lastApptMap.get(id);         // fecha de última cita
+  const next = nextApptMap.get(id);         // fecha de próxima cita
 
-  // 1) Excluir al que canceló
-  if (
-    (provider === 'acuity' && canceledCustomerEmail?.toLowerCase() === idKey) ||
-    (provider === 'square' && canceledCustomerId === idKey)
-  ) {
+  // 1) Excluir al que canceló (comparamos ID en Square)
+  if (provider === 'square' && canceledCustomerId === id) {
     return false;
   }
 
-  // 2) Filtrar por tipo de cita si corresponde
-  if (matchType) {
-    const services = clientServiceTypes.get(idKey) ?? new Set();
-    const requiredId = provider === 'acuity'
-      ? appointmentTypeId
-      : serviceVariationId;
-    if (requiredId && !services.has(requiredId)) {
+  // 2) Excluir si la ÚLTIMA cita fue hace menos de notifyAfter minutos
+  if (notifyAfter > 0 && last) {
+    const minsSinceLast = (now.getTime() - last.getTime()) / 60000;
+    if (minsSinceLast < notifyAfter) {
       return false;
     }
   }
 
-  // 3) Excluir si LA ÚLTIMA cita fue hace menos de “notifyAfter”
-  const last = lastApptMap.get(idKey);
-  if (notifyAfter > 0 && last) {
-    const minutesSince = (now.getTime() - last.getTime()) / 60000;
-    if (minutesSince < notifyAfter) return false;
-  }
-
-  // 4) Excluir si LA PRÓXIMA cita está en menos de “notifyBefore”
-  const next = nextApptMap.get(idKey);
+  // 3) Excluir si la PRÓXIMA cita está en menos de notifyBefore minutos
   if (notifyBefore > 0 && next) {
-    const minutesUntil = (next.getTime() - now.getTime()) / 60000;
-    if (minutesUntil < notifyBefore) return false;
+    const minsUntilNext = (next.getTime() - now.getTime()) / 60000;
+    if (minsUntilNext < notifyBefore) {
+      return false;
+    }
   }
 
-  // 5) Validar canal de contacto y plan
+  // 4) Validar canal de contacto y plan
   if (!client.email && !client.phone) return false;
   if (plan === 'STARTER' && !client.email) return false;
 
-  client.lastAppt = last  || null;
-  client.nextAppt = next  || null;
-  return true;
+  return true;  // pasa todas las condiciones → elegible
 });
+
 
 
   if (eligibleRecipients.length === 0) {
