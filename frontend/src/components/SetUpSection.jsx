@@ -17,8 +17,8 @@ export default function SetUpSection() {
             <h3 className="text-2xl font-semibold mb-4">Connect Your Tools</h3>
             <p>
               Easily connect your Client management system platforms—
-              like Square Appointments, or Acuity Scheduling. Keep everything in sync, effortlessly.
-              We are actively working on integrating with more platforms like Google Calendar, Google Sheets, and Mindbody.
+              like <strong>Square</strong>. Keep everything in sync, effortlessly.
+              We are actively working on integrating with more platforms like Google Calendar, and Google Sheets.
             </p>
           </div>
 
@@ -43,14 +43,14 @@ export default function SetUpSection() {
               initial={{ opacity: 0, y: 40, rotate: 10 }}
               whileInView={{ opacity: 1, y: 0, rotate: 12 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="absolute bottom-50 right-0 z-20"
+              className="absolute bottom-50 right-5 z-20"
             >
               <Image
-                src="/calendly.webp"
-                alt="Calendly"
-                width={260}
-                height={260}
-                className="rounded-xl drop-shadow-lg"
+                src="/googleSheets.jpg"
+                alt="Google Sheets"
+                width={210}
+                height={190}
+                className="rounded-xl drop-shadow-lg w-56 h-40"
               />
             </motion.div>
 
@@ -58,23 +58,23 @@ export default function SetUpSection() {
               initial={{ opacity: 0, y: 40, rotate: -5 }}
               whileInView={{ opacity: 1, y: 0, rotate: -3 }}
               transition={{ duration: 0.4, delay: 0.2 }}
-              className="absolute top-5/11 right-40 z-10"
+              className="absolute top-5/11 right-40 z-40"
             >
               <Image
-                src="/janeApp.avif"
-                alt="Jane App"
-                width={310}
-                height={300}
-                className="rounded-xl shadow-xl"
+                src="/squareimg.png"
+                alt="Square"
+                width={290}
+                height={260}
+                className="rounded-xl drop-shadow-lg scale-120"
               />
             </motion.div>
 
             <Image
-              src="/mindbody.avif"
-              alt="Mindbody"
+              src="/google-sheets.webp"
+              alt="Google Sheets"
               width={64}
               height={64}
-              className="rounded-full object-cover absolute top-3/5 right-1/9"
+              className=" object-cover absolute top-5/8 right-2/13"
             />
 
             <Image 

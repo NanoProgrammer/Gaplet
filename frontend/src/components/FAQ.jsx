@@ -7,18 +7,14 @@ const faqs = [
   {
     question: "Do I need to change my booking system?",
     answer:
-      "No. Gaplet works with your existing booking system or calendar. We integrate with popular platforms and keep integrating more constantly. right now, Square, and Acuity Scheduling. But soon, we will support more platforms like google calendar, google sheets, or Mindbody. we are actively working on it.",
+      "Gaplets is compatible with square booking system, and we are actively working on integrating with more platforms like Google Calendar, and Google Sheets.",
   },
   {
     question: "Do my clients need to download an app?",
     answer:
       "Not at all. Clients receive SMS or email notifications and can book directly through the link—no app required.",
   },
-  {
-    question: "Can I choose which appointments trigger notifications?",
-    answer:
-      "Yes. You can set filters by service type, the last appointment date, and next appointment date. This way, you control which appointments are eligible for replacements.",
-  },
+
   {
     question: "How fast do replacements usually happen?",
     answer:

@@ -8,7 +8,7 @@ const plans = [
   {
     name: 'starter',
     price: '$49/mo',
-    shadow: 'shadow-blue-400/30 hover:shadow-blue-400/50',
+    shadow: 'shadow-lg',
     features: ['20 auto-fills per month', 'Email notifications', '2 hour response time'],
     buttonColor: 'bg-blue-600 hover:bg-blue-700',
     textColor: 'text-blue-500',
@@ -30,7 +30,7 @@ const plans = [
   {
     name: 'premium',
     price: '$180/mo',
-    shadow: 'shadow-amber-400/30 hover:shadow-amber-400/50',
+    shadow: 'shadow-lg',
     features: [
       '100 auto-fills per month',
       'SMS + Email notifications',

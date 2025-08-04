@@ -4,7 +4,7 @@ const plans = [
   {
     name: 'Starter',
     price: '$49/mo',
-    shadow: 'shadow-[0_0_16px_rgba(59,130,246,0.4)] hover:shadow-[0_0_22px_rgba(59,130,246,0.6)]',
+    shadow: 'shadow-lg',
     features: [
       '20 auto-fills per month',
       'Email notifications',
@@ -17,7 +17,7 @@ const plans = [
   {
     name: 'Pro',
     price: '$110/mo',
-    shadow: 'shadow-[0_0_18px_rgba(34,197,94,0.4)] hover:shadow-[0_0_28px_rgba(34,197,94,0.6)]',
+    shadow: 'shadow-green-400/30 hover:shadow-green-400/50 shadow-lg z-10',
     features: [
       '50 auto-fills per month',
       'SMS + Email notifications',
@@ -32,7 +32,7 @@ const plans = [
   {
     name: 'Premium',
     price: '$180/mo',
-    shadow: 'shadow-[0_0_20px_rgba(253,186,116,0.4)] hover:shadow-[0_0_32px_rgba(253,186,116,0.6)]',
+    shadow: 'shadow-lg',
     features: [
       '100/mo auto-fills',
       'SMS + Email notifications',
@@ -78,7 +78,7 @@ export default function Pricing() {
                 href="/signup"
               >
                 <button
-                className={`w-full rounded-xl px-6 py-3 text-white font-medium transition-colors ${plan.buttonColor}`}
+                className={`w-full rounded-xl px-6 py-3 text-white font-medium transition-colors ease-in-out duration-300 ${plan.buttonColor}`}
               >
                 Try 1 week free
               </button>

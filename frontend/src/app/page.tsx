@@ -11,7 +11,7 @@ import Demo from '../components/Demo'
 import FAQ from '../components/FAQ'
 import CTA from '../components/CTA'
 import Footer from '../components/Footer'
-
+import ComingSoon from '../components/ComingSoon'
 export default function Home() {
   return (
     <div>
@@ -25,6 +25,7 @@ export default function Home() {
       <Pricing />
       <Demo />
       <FAQ />
+      <ComingSoon />
       <CTA />
       <Footer />
     </div>
