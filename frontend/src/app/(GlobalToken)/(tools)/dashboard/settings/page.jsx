@@ -278,8 +278,8 @@ export default function SettingsPage() {
                   <input
                     type="number"
                     className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                    value={form.notifyAfter.value}
-                    onChange={(e) => handleValueChange(e, 'notifyAfter')}
+                    value={form.notifyBefore.value}
+                    onChange={(e) => handleValueChange(e, 'notifyBefore')}
                   />
                   <select
                     value={form.notifyBefore.unit}
