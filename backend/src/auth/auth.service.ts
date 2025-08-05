@@ -257,7 +257,7 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
     case 'acuity':
       return `https://acuityscheduling.com/oauth2/authorize?client_id=${process.env.ACUITY_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=api-v1&state=${state}`;
     case 'square':
-      return `https://connect.squareup.com/oauth2/authorize?client_id=${process.env.SQUARE_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=APPOINTMENTS_READ+APPOINTMENTS_WRITE+CUSTOMERS_READ+MERCHANT_PROFILE_READ&state=${state}&session=false`;
+      return `https://connect.squareup.com/oauth2/authorize?client_id=${process.env.SQUARE_CLIENT_ID}&response_type=code&redirect_uri=${redirect}&scope=APPOINTMENTS_WRITE+CUSTOMERS_READ+MERCHANT_PROFILE_READ+APPOINTMENTS_ALL_READ&state=${state}&session=false`;
     case 'google':
       const scope = encodeURIComponent([
         'https://www.googleapis.com/auth/calendar',
