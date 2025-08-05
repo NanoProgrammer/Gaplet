@@ -213,6 +213,7 @@ const clientServiceTypes: Map<string, Set<string | number>> = new Map();
   const endAtISO     = new Date(Date.now() + (notifyBefore * 60_000)).toISOString();
 
   // 3) Helper para buscar bookings vía POST /v2/bookings/search
+
   const bookingSearch = async (start: string, end: string) => {
     const res = await fetch(
       'https://connect.squareup.com/v2/bookings/search',
@@ -235,12 +236,23 @@ const clientServiceTypes: Map<string, Set<string | number>> = new Map();
       }
     );
     const data = await res.json();
-    if (data.errors?.length) {
-      console.error('Square API error:', data.errors);
-      return [];
-    }
-    return data.bookings || [];
+console.log('--- [DEBUG] BookingSearch Raw Response ---');
+console.log('start:', start, 'end:', end, 'locationId:', locationId);
+console.log(JSON.stringify(data, null, 2));
+if (!data.bookings?.length) {
+  console.warn('[WARN] No bookings found in this range!');
+}
+return data.bookings || [];
   };
+
+  console.log('--- [DEBUG] Square BookingSearch Params ---');
+console.log('now:', now.toISOString(), 'epoch:', now.getTime());
+console.log('slotTime:', slotTime?.toISOString(), 'epoch:', slotTime?.getTime());
+console.log('notifyAfter (min):', notifyAfter, 'notifyBefore (min):', notifyBefore);
+console.log('pastStartISO:', pastStartISO, 'epoch:', new Date(pastStartISO).getTime());
+console.log('nowISO:', nowISO, 'epoch:', new Date(nowISO).getTime());
+console.log('endAtISO:', endAtISO, 'epoch:', new Date(endAtISO).getTime());
+console.log('locationId:', locationId);
 
   // 4) Llenar lastApptMap con citas pasadas
   const pastBookings = await bookingSearch(pastStartISO, nowISO);
@@ -261,15 +273,41 @@ const clientServiceTypes: Map<string, Set<string | number>> = new Map();
     const prev = nextApptMap.get(b.customer_id);
     if (!prev || dt < prev) nextApptMap.set(b.customer_id, dt);
   }
+  console.log('--- [DEBUG] futureBookings recibidos ---');
+futureBookings.forEach(b => {
+  console.log(
+    'ID:', b.id,
+    'customer_id:', b.customer_id,
+    'start_at:', b.start_at,
+    'epoch:', new Date(b.start_at).getTime(),
+    'status:', b.status
+  );
+});
+
 }
 
   // -------------- FILTRADO CORRECTO --------------
+  clients.forEach(c => {
+  const last = lastApptMap.get(c.customerId);
+  const next = nextApptMap.get(c.customerId);
+  console.log(
+    '>>> Client:', c.customerId,
+    'Email:', c.email,
+    'Phone:', c.phone,
+    'last:', last ? last.toISOString() : null,
+    'next:', next ? next.toISOString() : null
+  );
+});
+
 // ——— FILTRADO DE CLIENTES ———
 const eligibleRecipients = clients.filter(client => {
   const id = client.customerId!;            // para Square siempre será String(customer_id)
   const last = lastApptMap.get(id);         // fecha de última cita
   const next = nextApptMap.get(id);         // fecha de próxima cita
-
+  if (!last && !next) {
+    console.log('[FILTER] Excluido por no tener citas:', id);
+    return false;
+  }
   // 1) Excluir al que canceló (comparamos ID en Square)
   if (provider === 'square' && canceledCustomerId === id) {
     return false;
