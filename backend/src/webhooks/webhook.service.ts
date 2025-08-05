@@ -77,7 +77,6 @@ export class NotificationService {
     where: { id: userId },
     include: { preferences: true },
   });
-  console.log(user.preferences);
   if (!user) {
     console.error(`Usuario ${userId} no encontrado para campaña de notificación.`);
     return;
@@ -185,157 +184,190 @@ const nextApptMap: Map<string, Date> = new Map();
 const clientServiceTypes: Map<string, Set<string | number>> = new Map();
 
 // … lógica de fetch de Acuity y Square para llenar clients, lastApptMap, nextApptMap, clientServiceTypes
- if (provider === 'square') {
-  // 1) Obtener lista de clientes de Square
-  const customersRes = await fetch(
-    'https://connect.squareup.com/v2/customers',
-    {
-      headers: {
-        Authorization:   `Bearer ${integration.accessToken}`,
-        'Square-Version': '2025-06-18',
-      },
-    }
-  );
-  const { customers = [] } = await customersRes.json();
-  for (const c of customers) {
-    const id = String(c.id);
+if (provider === 'acuity') {
+  // 1) Obtener lista de clientes de Acuity
+  const clientsRes = await fetch('https://acuityscheduling.com/api/v1/clients', {
+    headers: { Authorization: `Bearer ${integration.accessToken}` },
+  });
+  const acuityClients = await clientsRes.json();
+  for (const c of acuityClients) {
+    const clientId = c.id ? String(c.id) : (c.email || '');
     clients.push({
-      name:       `${c.given_name || ''} ${c.family_name || ''}`.trim() || 'Client',
-      email:      c.email_address?.toLowerCase(),
-      phone:      c.phone_number,
-      customerId: id,
+      name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Client',
+      email: c.email || undefined,
+      phone: c.phone || undefined,
+      customerId: clientId,
     });
   }
 
-  // 2) Calcular ventanas de tiempo
-  const nowISO       = new Date().toISOString();
-  const pastStartISO = new Date(Date.now() - (notifyAfter * 60_000)).toISOString();
-  const endAtISO     = new Date(Date.now() + (notifyBefore * 60_000)).toISOString();
+  // 2) Historial de citas pasadas
+  const nowISO = new Date().toISOString();
+  const pastRes = await fetch(
+    `https://acuityscheduling.com/api/v1/appointments?maxDate=${encodeURIComponent(nowISO)}`,
+    { headers: { Authorization: `Bearer ${integration.accessToken}` } }
+  );
+  const pastAppointments = await pastRes.json();
+  for (const appt of pastAppointments) {
+    const clientKey = appt.clientId ? String(appt.clientId) : (appt.email || '');
+    const apptDate = new Date(appt.datetime);
+    const prevLast = lastApptMap.get(clientKey);
+    if (!prevLast || apptDate > prevLast) lastApptMap.set(clientKey, apptDate);
+    if (appt.appointmentTypeID) {
+      clientServiceTypes
+        .get(clientKey)
+        ?.add(Number(appt.appointmentTypeID)) 
+        || clientServiceTypes.set(clientKey, new Set([Number(appt.appointmentTypeID)]));
+    }
+  }
 
-  // 3) Helper para buscar bookings vía POST /v2/bookings/search
+  // 3) Próximas citas futuras
+  const futureRes = await fetch(
+    `https://acuityscheduling.com/api/v1/appointments?minDate=${encodeURIComponent(nowISO)}`,
+    { headers: { Authorization: `Bearer ${integration.accessToken}` } }
+  );
+  const futureAppointments = await futureRes.json();
+  for (const appt of futureAppointments) {
+    const clientKey = appt.clientId ? String(appt.clientId) : (appt.email || '');
+    const apptDate = new Date(appt.datetime);
+    const prevNext = nextApptMap.get(clientKey);
+    if (!prevNext || apptDate < prevNext) nextApptMap.set(clientKey, apptDate);
+    if (appt.appointmentTypeID) {
+      clientServiceTypes
+        .get(clientKey)
+        ?.add(Number(appt.appointmentTypeID)) 
+        || clientServiceTypes.set(clientKey, new Set([Number(appt.appointmentTypeID)]));
+    }
+  }
 
-  const bookingSearch = async (start: string, end: string) => {
-    const res = await fetch(
-      'https://connect.squareup.com/v2/bookings/search',
-      {
-        method: 'POST',
-        headers: {
-          Authorization:    `Bearer ${integration.accessToken}`,
-          'Square-Version': '2025-06-18',
-          'Content-Type':   'application/json',
-        },
-        body: JSON.stringify({
-          query: {
-            filter: {
-              start_at_range: { start_at: start, end_at: end },
-            }
-          },
-          limit: 100
-        }),
+} else if (provider === 'square') {
+  // 1) Obtener lista de clientes de Square
+  const customersRes = await fetch('https://connect.squareup.com/v2/customers', {
+    headers: { Authorization: `Bearer ${integration.accessToken}` },
+  });
+  const customersData = await customersRes.json();
+  const squareCustomers = customersData.customers || [];
+  for (const c of squareCustomers) {
+    clients.push({
+      name: `${c.given_name || ''} ${c.family_name || ''}`.trim() || 'Client',
+      email: c.email_address || undefined,
+      phone: c.phone_number || undefined,
+      customerId: c.id,
+    });
+  }
+
+  const nowISO = new Date().toISOString();
+  // 2) Historial de bookings pasados
+  const pastSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: { filter: { start_at_range: { end_at: nowISO } } } }),
+  });
+  const pastData = await pastSearch.json();
+  const pastBookings = pastData.bookings || [];
+  for (const book of pastBookings) {
+    if (!book.customer_id) continue;
+    const start = new Date(book.start_at);
+    const prevLast = lastApptMap.get(book.customer_id);
+    if (!prevLast || start > prevLast) lastApptMap.set(book.customer_id, start);
+    if (book.appointment_segments) {
+      for (const seg of book.appointment_segments) {
+        if (!clientServiceTypes.has(book.customer_id)) {
+          clientServiceTypes.set(book.customer_id, new Set());
+        }
+        clientServiceTypes.get(book.customer_id)!.add(seg.service_variation_id);
       }
-    );
-    const data = await res.json();
-console.log('--- [DEBUG] BookingSearch Raw Response ---');
-console.log('start:', start, 'end:', end, 'locationId:', locationId);
-console.log(JSON.stringify(data, null, 2));
-if (!data.bookings?.length) {
-  console.warn('[WARN] No bookings found in this range!');
-}
-return data.bookings || [];
-  };
-
-  console.log('--- [DEBUG] Square BookingSearch Params ---');
-console.log('now:', now.toISOString(), 'epoch:', now.getTime());
-console.log('slotTime:', slotTime?.toISOString(), 'epoch:', slotTime?.getTime());
-console.log('notifyAfter (min):', notifyAfter, 'notifyBefore (min):', notifyBefore);
-console.log('pastStartISO:', pastStartISO, 'epoch:', new Date(pastStartISO).getTime());
-console.log('nowISO:', nowISO, 'epoch:', new Date(nowISO).getTime());
-console.log('endAtISO:', endAtISO, 'epoch:', new Date(endAtISO).getTime());
-console.log('locationId:', locationId);
-
-  // 4) Llenar lastApptMap con citas pasadas
-  const pastBookings = await bookingSearch(pastStartISO, nowISO);
-  console.log('⟵ Square search response:', JSON.stringify(pastBookings, null,2));
-  for (const b of pastBookings) {
-    if (!b.customer_id) continue;
-    const dt = new Date(b.start_at);
-    const prev = lastApptMap.get(b.customer_id);
-    if (!prev || dt > prev) lastApptMap.set(b.customer_id, dt);
-  }
-
-  // 5) Llenar nextApptMap con próximas citas
-  const futureBookings = await bookingSearch(nowISO, endAtISO);
-  console.log('⟵ Square search response:', JSON.stringify(futureBookings, null,2));
-  for (const b of futureBookings) {
-    if (!b.customer_id) continue;
-    const dt = new Date(b.start_at);
-    const prev = nextApptMap.get(b.customer_id);
-    if (!prev || dt < prev) nextApptMap.set(b.customer_id, dt);
-  }
-  console.log('--- [DEBUG] futureBookings recibidos ---');
-futureBookings.forEach(b => {
-  console.log(
-    'ID:', b.id,
-    'customer_id:', b.customer_id,
-    'start_at:', b.start_at,
-    'epoch:', new Date(b.start_at).getTime(),
-    'status:', b.status
-  );
-});
-
-}
-
-  // -------------- FILTRADO CORRECTO --------------
-  clients.forEach(c => {
-  const last = lastApptMap.get(c.customerId);
-  const next = nextApptMap.get(c.customerId);
-  console.log(
-    '>>> Client:', c.customerId,
-    'Email:', c.email,
-    'Phone:', c.phone,
-    'last:', last ? last.toISOString() : null,
-    'next:', next ? next.toISOString() : null
-  );
-});
-
-// ——— FILTRADO DE CLIENTES ———
-const eligibleRecipients = clients.filter(client => {
-  const id = client.customerId!;            // para Square siempre será String(customer_id)
-  const last = lastApptMap.get(id);         // fecha de última cita
-  const next = nextApptMap.get(id);         // fecha de próxima cita
-  if (!last && !next) {
-    console.log('[FILTER] Excluido por no tener citas:', id);
-    return false;
-  }
-  // 1) Excluir al que canceló (comparamos ID en Square)
-  if (provider === 'square' && canceledCustomerId === id) {
-    return false;
-  }
-
-  // 2) Excluir si la ÚLTIMA cita fue hace menos de notifyAfter minutos
-  if (notifyAfter > 0 && last) {
-    const minsSinceLast = (now.getTime() - last.getTime()) / 60000;
-    if (minsSinceLast < notifyAfter) {
-      return false;
     }
   }
 
-  // 3) Excluir si la PRÓXIMA cita está en menos de notifyBefore minutos
-  if (notifyBefore > 0 && next) {
-    const minsUntilNext = (next.getTime() - now.getTime()) / 60000;
-    if (minsUntilNext < notifyBefore) {
-      return false;
+  // 3) Próximas bookings futuras
+  const futureSearch = await fetch('https://connect.squareup.com/v2/bookings/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: { filter: { start_at_range: { start_at: nowISO } } } }),
+  });
+  const futureData = await futureSearch.json();
+  const futureBookings = futureData.bookings || [];
+  for (const book of futureBookings) {
+    if (!book.customer_id) continue;
+    const start = new Date(book.start_at);
+    const prevNext = nextApptMap.get(book.customer_id);
+    if (!prevNext || start < prevNext) nextApptMap.set(book.customer_id, start);
+    if (book.appointment_segments) {
+      for (const seg of book.appointment_segments) {
+        if (!clientServiceTypes.has(book.customer_id)) {
+          clientServiceTypes.set(book.customer_id, new Set());
+        }
+        clientServiceTypes.get(book.customer_id)!.add(seg.service_variation_id);
+      }
     }
   }
+}
 
-  // 4) Validar canal de contacto y plan
-  if (!client.email && !client.phone) return false;
-  if (plan === 'STARTER' && !client.email) return false;
+  // -------------- FILTRADO REFACTORIZADO --------------
+  const eligibleRecipients: Recipient[] = clients.filter(client => {
+    const idKey = client.customerId
+      || client.email?.toLowerCase()
+      || client.phone!;
 
-  return true;  // pasa todas las condiciones → elegible
-});
+    // Excluir al que canceló
+    if (provider === 'acuity'
+        && canceledCustomerEmail
+        && client.email?.toLowerCase() === canceledCustomerEmail.toLowerCase()) {
+      return false;
+    }
+    if (provider === 'square'
+        && canceledCustomerId
+        && client.customerId === canceledCustomerId) {
+      return false;
+    }
 
+    // Filtrar por tipo de cita si corresponde
+    if (matchType) {
+      const services = clientServiceTypes.get(idKey) ?? new Set();
+      const requiredId = provider === 'acuity'
+        ? appointmentTypeId
+        : serviceVariationId;
+      if (requiredId && !services.has(requiredId)) {
+        return false;
+      }
+    }
 
+    // notifyAfter: excluir si próxima cita es antes de este umbral
+    const next = nextApptMap.get(idKey);
+    if (notifyAfter > 0 && next) {
+      const minsUntil = (next.getTime() - now.getTime()) / 60000;
+      if (minsUntil < notifyAfter) {
+        return false;
+      }
+    }
+
+    // notifyBefore: excluir si última cita fue más reciente que este umbral
+    const last = lastApptMap.get(idKey);
+    if (notifyBefore > 0 && last) {
+      const minsSince = (now.getTime() - last.getTime()) / 60000;
+      if (minsSince < notifyBefore) {
+        return false;
+      }
+    }
+
+    // Validar canal de contacto
+    if (!client.email && !client.phone) {
+      return false;
+    }
+    if (plan === 'STARTER' && !client.email) {
+      return false;
+    }
+
+    client.lastAppt = last || null;
+    client.nextAppt = next || null;
+    return true;
+  });
 
   if (eligibleRecipients.length === 0) {
     console.log(`No hay clientes elegibles para notificación (usuario ${userId}).`);
@@ -414,7 +446,7 @@ const eligibleRecipients = clients.filter(client => {
       const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
         headers: {
           Authorization: `Bearer ${integration.accessToken}`,
-          'Square-Version': '2025-06-18',
+          'Square-Version': '2025-07-16',
         },
       });
       const merchantsData = await merchantsRes.json();
@@ -433,7 +465,7 @@ const eligibleRecipients = clients.filter(client => {
           {
             headers: {
               Authorization: `Bearer ${integration.accessToken}`,
-              'Square-Version': '2025-06-18',
+              'Square-Version': '2025-07-16',
             },
           }
         );
@@ -584,7 +616,7 @@ const eligibleRecipients = clients.filter(client => {
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Square-Version': '2025-06-18'
+            'Square-Version': '2025-07-16'
           }
         }
       );
@@ -661,7 +693,7 @@ async handleEmailReply(
   try {
     if (campaign.provider === 'square') {
       const res = await fetch('https://connect.squareup.com/v2/merchants', {
-        headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-06-18' }
+        headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' }
       });
       const js = await res.json();
       if (js.merchant?.length) businessName = js.merchant[0].business_name;
