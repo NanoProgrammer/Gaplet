@@ -23,14 +23,18 @@ export default function StepsSections() {
         variants={fadeInDrop}
         className="bg-gradient-to-b from-purple-100 via-purple-200 to-purple-400 flex flex-col md:flex-row justify-center items-center gap-10 w-full min-h-[28rem] mb-36 px-6 py-12 rounded-xl"
       >
-        <div className="relative w-full md:flex-1 max-w-lg rounded-2xl overflow-hidden border-[12px] border-accent shadow-2xl shadow-purple-300">
-          <Image
-            src="/gitimg1.avif"
-            alt="Gift"
-            width={500}
-            height={500}
-            className="w-full h-full object-cover"
-          />
+        <div className="relative w-full md:flex-1 max-w-lg rounded-2xl overflow-hidden border-[14px] border-accent shadow-2xl shadow-purple-300">
+          <video
+      autoPlay
+      loop
+      muted
+      playsInline
+      style={{ width: "100%", height: "auto" }}
+      className="w-full h-full object-cover rounded-lg"
+    >
+      <source src="/gif1.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
         </div>
         <div className="bg-white rounded-2xl shadow-2xl shadow-purple-300 w-full md:flex-1 max-w-[30rem] p-6">
           <h3 className="text-2xl font-semibold text-gray-800 mb-4">
@@ -62,34 +66,21 @@ export default function StepsSections() {
           </p>
         </div>
 
-        <div className="relative bg-white rounded-2xl shadow-2xl shadow-orange-300 w-full md:flex-1 max-w-lg p-6 h-[21rem] flex items-center justify-center overflow-hidden box-border">
-          <Image
-            src="/emailimg.avif"
-            alt="email"
-            width={500}
-            height={500}
-            className="w-full h-full object-cover rounded-xl"
-          />
+        <div className="relative bg-white rounded-2xl shadow-2xl shadow-orange-300 w-full md:flex-1 max-w-lg py-2 px-4 h-[17rem] flex items-center justify-center overflow-hidden box-border">
+          <video
+      autoPlay
+      loop
+      muted
+      playsInline
+      className='mb-4 rounded-lg'
+      style={{ width: "100%", height: "auto" }}
+    >
+      <source src="/gif2.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
 
           {/* Bubble 1 */}
-          <motion.div
-            initial={{ opacity: 0, x: -40, y: -40 }}
-            whileInView={{ opacity: 1, x: 0, y: 0, rotate: 5 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
-            className="absolute top-2 left-2 bg-gray-100 px-4 py-2 rounded-xl -rotate-12 shadow-md text-sm text-gray-800 border"
-          >
-            New appointment available!
-          </motion.div>
-
-          {/* Bubble 2 */}
-          <motion.div
-            initial={{ opacity: 0, x: 40, y: 40 }}
-            whileInView={{ opacity: 1, x: 0, y: 0, rotate: -5 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
-            className="absolute bottom-4 right-4 bg-gray-100 px-4 py-2 rounded-xl -rotate-12 shadow-md text-sm text-gray-800 border"
-          >
-            Want to take this slot?
-          </motion.div>
+          
         </div>
       </motion.section>
 
@@ -113,13 +104,13 @@ export default function StepsSections() {
           </p>
         </div>
 
-        <div className="w-full md:flex-1 max-w-lg h-[24rem] border-[12px] border-accent rounded-2xl overflow-hidden shadow-lg shadow-gray-400 box-border">
+        <div className="w-full md:flex-1 max-w-[490px] h-[26rem] border-[9px] border-accent rounded-2xl overflow-hidden shadow-lg shadow-gray-400 box-border">
           <Image
-            src="/gitimg1.avif"
+            src="/gif3.png"
             alt="Client Notification"
-            width={500}
+            width={760}
             height={500}
-            className="h-full w-full object-cover"
+            className="h-full w-full "
           />
         </div>
       </motion.section>

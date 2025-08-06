@@ -90,9 +90,19 @@ export default function SetUpSection() {
 
       <div className="bg-gradient-to-b from-gray-100 via-gray-200 to-gray-300 py-16 px-6 md:px-12 flex flex-col md:flex-row items-center justify-evenly gap-12">
   {/* UI Preview Block */}
-  <div className="w-full max-w-md md:max-w-[520px] h-64 md:h-80 bg-[var(--color-accent)] shadow-md shadow-gray-400 rounded-2xl flex items-center justify-center">
+  <div className="w-full max-w-md md:max-w-[520px] h-64 py-16 px-4 md:h-60 bg-[var(--color-accent)] shadow-md shadow-gray-400 rounded-2xl flex items-center justify-center">
     {/* Replace with actual UI preview or animation */}
-    [Insert UI preview or animated GIF of options]
+    <video
+      autoPlay
+      loop
+      muted
+      playsInline
+      style={{ width: "100%", height: "auto" }}
+      className="w-full h-full object-cover rounded-xl"
+    >
+      <source src="/gif4.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
   </div>
 
   {/* Text Content Block */}
