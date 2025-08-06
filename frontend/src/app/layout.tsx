@@ -36,9 +36,6 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  verification: {
-    google: "GOOGLE_SITE_VERIFICATION_TOKEN", // <-- reemplaza con tu token real de GSC
-  },
   openGraph: {
     type: "website",
     siteName: "Gaplets",
