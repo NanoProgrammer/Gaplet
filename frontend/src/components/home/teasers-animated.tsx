@@ -45,13 +45,20 @@ function Card({ children, className = "", variant = "white" as Variant }: { chil
 }
 
 
-function Eyebrow({ children, color = "emerald" as "emerald" | "sky" | "amber" | "violet" }) {
-  const map: Record<string, string> = {
+function Eyebrow({
+  children,
+  color = "emerald",
+}: {
+  children: React.ReactNode;
+  color?: "emerald" | "sky" | "amber" | "violet";
+}) {
+  const map: Record<"emerald" | "sky" | "amber" | "violet", string> = {
     emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     sky: "bg-sky-50 text-sky-700 ring-sky-100",
     amber: "bg-amber-50 text-amber-700 ring-amber-100",
     violet: "bg-violet-50 text-violet-700 ring-violet-100",
   };
+
   return (
     <motion.span
       initial={{ opacity: 0, y: 6 }}
@@ -64,6 +71,7 @@ function Eyebrow({ children, color = "emerald" as "emerald" | "sky" | "amber" | 
     </motion.span>
   );
 }
+
 
 function GlowLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
