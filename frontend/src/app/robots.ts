@@ -1,6 +1,8 @@
 // app/robots.ts
 import type { MetadataRoute } from "next";
 
+const SITE = "https://gaplets.com";
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
@@ -8,17 +10,29 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         disallow: [
+          // API & internal
+          "/api/",
+          "/_next/",
+          "/static/",
+          "/assets/",
+
+          // Auth & account
           "/signin",
-          "/signup",             // si es solo auth; si es landing pública, quítala de aquí
+          "/signup",
           "/forgotPassword",
           "/recoverPassword",
-          "/recoverPassword/",
+          "/account",
+          "/account/",
+
+          // App (privado)
           "/dashboard",
           "/dashboard/",
+          "/tools",
+          "/tools/",
         ],
       },
     ],
-    sitemap: "https://gaplets.com/sitemap.xml",
-    host: "https://gaplets.com",
+    sitemap: `${SITE}/sitemap.xml`,
+    host: SITE,
   };
 }
