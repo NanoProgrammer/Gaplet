@@ -75,15 +75,15 @@ export default function Header() {
         Skip to content
       </a>
 
-      <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between px-4 sm:h-16 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-24 max-w-screen-xl items-center justify-between px-4 sm:h-16 sm:px-6 lg:px-8">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2" aria-label="Home">
           <Image
             src="/logo_gaplets.avif"
             alt="Gaplets"
-            width={132}
-            height={44}
-            className="h-8 w-auto sm:h-9"
+            width={152}
+            height={64}
+            className="h-18 w-auto sm:h-20"
             priority
           />
         </Link>
