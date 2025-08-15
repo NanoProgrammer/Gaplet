@@ -17,6 +17,8 @@ type Item = { title: string; desc: string; href: string; icon?: string };
 
 const icons = { Zap, BellRing, Settings2, Plug, BarChart3, ShieldCheck } as const;
 
+type IconName = keyof typeof icons;
+
 const EASE = [0.22, 1, 0.36, 1] as const;
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 12 },
@@ -46,8 +48,12 @@ export function FeaturesGrid({ items }: { items: readonly Item[] }) {
   );
 }
 
+function isIconName(x: unknown): x is IconName {
+  return typeof x === "string" && x in icons;
+}
+
 function Card({ item }: { item: Item }) {
-  const Icon = (icons as any)[item.icon as keyof typeof icons] ?? Zap;
+  const Icon = isIconName(item.icon) ? icons[item.icon] : Zap;
   const isAnchor = item.href.startsWith("#");
   const Label = (
     <span className="mt-3 inline-flex items-center text-emerald-700 font-medium">
@@ -58,7 +64,7 @@ function Card({ item }: { item: Item }) {
   return (
     <m.li variants={fadeUp} className="list-none">
       <Link
-        href={item.href as any}
+        href={item.href}
         className={classNames(
           "block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         )}

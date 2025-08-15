@@ -1,4 +1,3 @@
-// components/docs/DocsIndex.tsx
 "use client";
 
 import * as React from "react";
@@ -131,9 +130,12 @@ function MotionGrid({ cols, children }: { cols: string; children: React.ReactNod
   );
 }
 
+function isIconName(x: unknown): x is IconName {
+  return typeof x === "string" && x in icons;
+}
+
 function CardItem({ item }: { item: DocCard }) {
-  const Icon = item.icon && (icons as any)[item.icon as IconName];
-  const IconCmp = Icon ?? BookOpen;
+  const IconCmp = isIconName(item.icon) ? icons[item.icon] : BookOpen;
   return (
     <m.li variants={fadeUp} className="list-none">
       <Link
