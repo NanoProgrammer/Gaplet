@@ -1,49 +1,48 @@
-// src/app/(marketing)/docs/page.tsx
+// app/(marketing)/docs/page.tsx
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SectionHeader } from "@/components/home/teasers-animated";
+import { DocsIndex } from "@/components/docs/DocsIndex";
 
 export const metadata: Metadata = {
   title: "Help Center | Gaplets",
   description: "Setup guides, FAQs, and troubleshooting.",
 };
 
-export default function DocsHubPage() {
-  const links = [
-    { t: "FAQ", d: "Common questions about setup and billing.", href: "/docs/faq" },
-    { t: "Square", d: "How to connect and go live.", href: "/integrations/square" },
-    { t: "Pricing & billing", d: "Plans, trials, and invoices.", href: "/price" },
-  ];
+const PRICING_PATH = "/price" as const;
+const SQUARE_PATH = "/integrations/square" as const;
+const HOW_IT_WORKS_PATH = "/how-it-works" as const;
+const FEATURES_PATH = "/features" as const;
+const NOTIFICATIONS_PATH = "/features/notifications" as const;
+const SECURITY_PATH = "/security" as const;
 
+// Rutas SOLO existentes.
+const primary = [
+  { t: "FAQ", d: "Common questions about setup, usage, and billing.", href: "/docs/faq", icon: "BookOpen" },
+  { t: "Square", d: "Connect Square Appointments and go live.", href: SQUARE_PATH, icon: "Plug" },
+  { t: "Pricing & billing", d: "Plans, trials, invoices, and taxes.", href: PRICING_PATH, icon: "CreditCard" },
+] as const;
+
+// Guías → destinos canónicos (no anchors del FAQ)
+const guides = [
+  { t: "Getting started", d: "3-step setup to recover last-minute cancellations.", href: HOW_IT_WORKS_PATH, icon: "Zap" },
+  { t: "Eligibility rules", d: "Only notify clients who match your criteria.", href: `${FEATURES_PATH}#rules`, icon: "BookOpen" },
+  { t: "Notifications", d: "Email/SMS waves, throttling, and caps.", href: NOTIFICATIONS_PATH, icon: "BellRing" },
+  { t: "Metrics & logs", d: "OpenSlot and ReplacementLog explained.", href: `${FEATURES_PATH}#metrics`, icon: "BarChart3" },
+  { t: "Security & privacy", d: "Data handling and least privilege.", href: SECURITY_PATH, icon: "ShieldCheck" },
+] as const;
+
+export default function DocsHubPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-16">
+    <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
         eyebrow="Docs"
         title="Help Center"
         desc="Short guides to get you live in minutes."
-        href="/contact"
-        cta="Still need help?"
+        href={PRICING_PATH}
+        cta="View pricing"
         align="center"
       />
-
-      <div className="mt-10 grid gap-6 sm:grid-cols-3">
-        {links.map((x) => (
-          <Link
-            key={x.t}
-            href={x.href}
-            className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition"
-          >
-            <h3 className="font-semibold">{x.t}</h3>
-            <p className="mt-1 text-sm text-slate-600">{x.d}</p>
-          </Link>
-        ))}
-      </div>
-
-      {/*
-        TODO: <SearchBar />
-        • Visual: input con icono y “Search docs…”.
-        • Función: filtrar artículos cuando añadas más documentación o MDX.
-      */}
+      <DocsIndex primary={primary} guides={guides} quickStartHref={SQUARE_PATH} />
     </main>
   );
 }
