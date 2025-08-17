@@ -149,7 +149,8 @@ export function RevenueLossTeaser() {
         <SectionHeader
           eyebrow="The silent leak"
           title="Cancellations quietly drain your month"
-          desc="Every last‑minute cancellation is revenue you can reclaim. Gaplets spots the gap, pings the right clients simultaneously, and refills it while you keep working."
+          desc="Cancel the slot and our appointment waitlist app handles detection, notifications, and auto-booking — end-to-end."
+
           href="/use-cases"
           cta="See real use cases"
         />
@@ -191,7 +192,7 @@ export function RevenueLossTeaser() {
 
 export function HowItWorksTeaser() {
   const steps = [
-    { t: "Cancel → Detect", d: "Delete the slot in your booking tool (e.g., Square). We detect it instantly." },
+    { t: "Cancel → Detect", d: "Delete the slot in your booking tool (Square Appointments, etc.). We detect it instantly." },
     { t: "Notify the right clients", d: "We ping eligible clients by SMS/Email at once. No spam — just fit." },
     { t: "Auto‑book the first reply", d: "Fair race. First to confirm gets the spot. Your calendar updates automatically." },
   ];
@@ -242,7 +243,7 @@ export function HowItWorksTeaser() {
 
 export function IntegrationsTeaser() {
   const items = [
-    { t: "Square", badge: "Live", dim: false },
+    { t: "Square Appointments", badge: "Live", dim: false },
     { t: "Google Calendar", badge: "Coming soon", dim: true },
     { t: "Google Sheets", badge: "Coming soon", dim: true },
   ];
@@ -254,7 +255,8 @@ export function IntegrationsTeaser() {
         <SectionHeader
           eyebrow="Integrations"
           title="Connect your tools in minutes"
-          desc="Square is live. Calendar & Sheets are next. Configure rules, channels, and targeting — no stack changes."
+          desc="Connect Gaplets’ appointment waitlist to Square Appointments (live). Google Calendar & Sheets coming soon."
+
           href="/integrations"
           cta="Explore integrations"
           id="SetUp"
@@ -292,7 +294,8 @@ export function BenefitsMarquee() {
 
   return (
     <section className="relative mx-auto max-w-7xl px-0 py-16 overflow-x-clip">
-      <SectionHeader eyebrow="Benefits" title="Built to claw back lost revenue" desc="Automation + targeting + multi‑channel notifications." href="/features" cta="Explore features" align="center" />
+      <SectionHeader eyebrow="Benefits" title="Built to claw back lost revenue" desc="Includes appointment waitlist automation. Start free for 7 days. Cancel anytime."
+ href="/features" cta="Explore features" align="center" />
 
       <div className="relative mt-8 overflow-x-clip">
         {/* Track duplicated once to enable perfect wrap */}
