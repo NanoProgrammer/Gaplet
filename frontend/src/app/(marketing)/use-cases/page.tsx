@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     "use cases",
     "dentist cancellations",
     "barber no-shows",
+     "appointment waitlist",
     "spa last-minute openings",
     "massage therapist scheduling",
     "nail salon waitlist",

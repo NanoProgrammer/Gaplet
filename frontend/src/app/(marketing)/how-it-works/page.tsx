@@ -33,11 +33,12 @@ export const metadata: Metadata = {
     },
   },
   keywords: [
-    "how it works",
+    "appointment waitlist",
     "fill last-minute cancellations",
-    "waitlist automation",
-    "Square Appointments integration",
+    "cancellation recovery",
+    "Square Appointments waitlist",
     "sms email booking notifications",
+    "auto booking",
   ],
   openGraph: {
     type: "article",
@@ -95,6 +96,9 @@ export default function HowItWorksPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
+
+       <Script id="howitworks-howto-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howtoLd) }} />
+       <Script id="howitworks-breadcrumbs-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbsLd) }} />
       <SectionHeader
         eyebrow="Flow"
         title="From cancellation to confirmed booking"

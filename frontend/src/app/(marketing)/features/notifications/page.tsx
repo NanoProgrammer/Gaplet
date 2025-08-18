@@ -9,12 +9,12 @@ const OG_IMAGE = `${SITE_URL}/og/notifications.png` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Notifications — SMS + Email waves to eligible clients",
+    default: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
     template: "%s | Gaplets",
   },
   description:
-    "Multi-channel outreach: SMS + Email sent simultaneously to eligible clients. Waves stop on first booking.",
-  alternates: { canonical: PAGE_URL },
+    "Multi-channel notifications for your appointment waitlist: SMS + Email sent simultaneously to eligible clients. Waves stop on first booking.",
+  alternates: { canonical: "https://gaplets.com/features/notifications" },
   robots: {
     index: true,
     follow: true,
@@ -30,27 +30,27 @@ export const metadata: Metadata = {
     },
   },
   keywords: [
+    "appointment waitlist notifications",
     "sms notifications",
     "email notifications",
-    "last-minute cancellations",
     "waitlist automation",
-    "booking replacement",
+    "fill last-minute cancellations",
   ],
   openGraph: {
     type: "article",
-    url: PAGE_URL,
+    url: "https://gaplets.com/features/notifications",
     siteName: "Gaplets",
-    title: "Notifications — SMS + Email waves to eligible clients",
+    title: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
     description:
-      "Reach the right clients instantly. One tap to confirm, automatic stop on first booking.",
-    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets Notifications" }],
+      "Reach the right clients instantly. One tap to confirm; automatic stop on first booking.",
+    images: [{ url: "https://gaplets.com/og/notifications.png", width: 1200, height: 630, alt: "Notifications" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Notifications — SMS + Email waves to eligible clients",
+    title: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
     description:
       "Simultaneous SMS + Email to eligible clients. Smart throttling and caps.",
-    images: [OG_IMAGE],
+    images: ["https://gaplets.com/og/notifications.png"],
   },
 };
 
@@ -77,14 +77,14 @@ export default function NotificationsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
-      <SectionHeader
-        eyebrow="Notifications"
-        title="Right people, right away"
-        desc="Simultaneous SMS + Email to clients who can actually make it. First to confirm gets the spot."
-        href="/features" // back to features (ruta existente y lógica)
-        cta="Back to features"
-        align="center"
-      />
+     <SectionHeader
+  eyebrow="Notifications"
+  title="Appointment waitlist — right people, right away"
+  desc="Simultaneous SMS + Email to clients who can actually make it. First to confirm gets the spot."
+  href="/features"
+  cta="Back to features"
+  align="center"
+/>
 
       <NotificationsShowcase />
 

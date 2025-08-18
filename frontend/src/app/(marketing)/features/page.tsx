@@ -14,29 +14,23 @@ const OG_IMAGE = `${SITE_URL}/og/features.png` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Gaplets Features — Automation, Notifications, Rules, Analytics",
+    default: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
     template: "%s | Gaplets",
   },
   description:
-    "Automate last‑minute cancellation recovery: detect openings, notify eligible clients via SMS/Email, auto‑book, and track recovered revenue.",
-  alternates: { canonical: PAGE_URL },
+    "Automate last‑minute cancellation recovery with an appointment waitlist: detect openings, notify eligible clients via SMS/Email, auto‑book, and track recovered revenue.",
+  alternates: { canonical: "https://gaplets.com/features" },
   robots: {
     index: true,
     follow: true,
     "max-image-preview": "large",
     "max-snippet": -1,
     "max-video-preview": -1,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
   },
   keywords: [
-    "fill last-minute cancellations",
+    "appointment waitlist",
     "waitlist automation",
+    "fill last-minute cancellations",
     "Square Appointments integration",
     "SMS email notifications",
     "eligibility rules",
@@ -45,19 +39,19 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: "website",
-    url: PAGE_URL,
+    url: "https://gaplets.com/features",
     siteName: "Gaplets",
-    title: "Gaplets Features — Automation, Notifications, Rules, Analytics",
+    title: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
     description:
       "Detect cancellations, notify the right clients, auto‑book, and measure results.",
-    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets Features" }],
+    images: [{ url: "https://gaplets.com/og/features.png", width: 1200, height: 630, alt: "Gaplets Features" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gaplets Features — Automation, Notifications, Rules, Analytics",
+    title: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
     description:
       "Automate cancellation recovery: detect, notify, auto‑book, and track ROI.",
-    images: [OG_IMAGE],
+    images: ["https://gaplets.com/og/features.png"],
   },
 };
 
@@ -110,13 +104,13 @@ export default function FeaturesPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
-        eyebrow="Product"
-        title="All the building blocks to recover revenue"
-        desc="From detection to auto‑booking — simple, fast, and reliable."
-        href={PRICING_PATH}
-        cta="View pricing"
-        align="center"
-      />
+  eyebrow="Product"
+  title="Appointment Waitlist — All the building blocks"
+  desc="From detection to auto‑booking — simple, fast, and reliable."
+  href={PRICING_PATH}
+  cta="View pricing"
+  align="center"
+/>
 
       {/* Motion grid (client) */}
       <FeaturesGrid items={CARDS} />

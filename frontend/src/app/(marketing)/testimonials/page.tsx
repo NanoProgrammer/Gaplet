@@ -14,6 +14,12 @@ const OG_IMAGE = `${SITE_URL}/og/testimonials.png` as const;
 export const metadata: Metadata = {
   title: { default: "Testimonials — Loved by busy teams", template: "%s | Gaplets" },
   description: "What clinics, salons, and local services say after filling last‑minute cancellations with Gaplets.",
+   keywords: [
+    "gaplets testimonials",
+    "gaplets reviews",
+    "appointment waitlist reviews",
+    "fill cancellations case studies",
+ ],
   alternates: { canonical: PAGE_URL },
   robots: {
     index: true,
@@ -69,6 +75,22 @@ const ITEMS: readonly Testimonial[] = [
   { id: "t17", name: "Renee B.", role: "Spa Owner", org: "Quiet Waters", sector: "Spa", quote: "Booked a 90‑minute slot that would’ve gone empty. That covered the month." },
   { id: "t18", name: "Omar S.", role: "Chiro", org: "Uplift Chiro", sector: "Chiro", quote: "Patients who want earlier times jump on alerts immediately." },
 ] as const;
+const webpageLd = {
+  "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Gaplets Testimonials",
+    url: PAGE_URL,
+    description: "Real quotes from customers who stopped losing money to cancellations.",
+ } as const;
+
+  const breadcrumbsLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Testimonials", item: PAGE_URL },
+    ],
+  } as const;
 
 export default function TestimonialsPage() {
   // JSON‑LD: ItemList of testimonials (names only, no PII beyond names/orgs)
@@ -97,6 +119,8 @@ export default function TestimonialsPage() {
         <SubmitTestimonial />
       </div>
 
+     <Script id="testimonials-webpage-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageLd) }} />
+      <Script id="testimonials-breadcrumbs-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbsLd) }} />
       <Script id="testimonials-itemlist-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
     </main>
   );

@@ -10,7 +10,9 @@ const PAGE_URL = `${SITE_URL}/integrations/square` as const;
 const OG_IMAGE = `${SITE_URL}/og/integrations-square.png` as const; // asegúrate de tener esta imagen
 
 export const metadata: Metadata = {
-  title: { default: "Square Integration — One‑click connect, instant detection", template: "%s | Gaplets" },
+  title: { default: "Square Integration — Waitlist & cancellation recovery for Square Appointments",
+     template: "%s | Gaplets"
+   },
   description: "Use your Square customers & appointments to auto‑fill last‑minute gaps. Connect, set rules, and go live in minutes.",
   alternates: { canonical: PAGE_URL },
   robots: {
@@ -23,6 +25,7 @@ export const metadata: Metadata = {
   },
   keywords: [
     "Square Appointments integration",
+    "Square Appointments waitlist",
     "fill last-minute cancellations",
     "waitlist automation",
     "sms email notifications",
@@ -50,6 +53,23 @@ const bullets = [
   "Send SMS/Email simultaneously and auto‑book the first reply.",
 ] as const;
 
+const softwareAppLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Gaplets",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: PAGE_URL,
+    description: "Appointment waitlist & cancellation recovery integrated with Square Appointments.",
+    offers: {
+      "@type": "Offer",
+      price: 0,
+      priceCurrency: "USD",
+      description: "7‑day free trial available",
+      url: `${SITE_URL}/price`,
+    },
+    provider: { "@type": "Organization", name: "Gaplets" },
+  } as const;
 export default function SquareIntegrationPage() {
   // JSON‑LD: Breadcrumbs + HowTo (connect Square)
   const breadcrumbsLd = {
@@ -76,6 +96,9 @@ export default function SquareIntegrationPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
+      <Script id="square-breadcrumbs-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbsLd) }} />
+       <Script id="square-howto-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howtoLd) }} />
+      <Script id="square-softwareapp-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppLd) }} />
       <SectionHeader
         eyebrow="Square"
         title="No new system to learn — just connect Square"

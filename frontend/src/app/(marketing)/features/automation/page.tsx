@@ -10,48 +10,41 @@ const OG_IMAGE = `${SITE_URL}/og/automation.png` as const; // asegúrate de tene
 
 export const metadata: Metadata = {
   title: {
-    default: "Automation — Detect, notify & auto‑book last‑minute openings",
+    default: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
     template: "%s | Gaplets",
   },
   description:
-    "Replace cancellations in three steps: detect the opening, notify eligible clients via SMS/Email, and auto‑book the first response.",
-  alternates: { canonical: PAGE_URL },
+    "Replace cancellations in three steps with appointment waitlist automation: detect the opening, notify eligible clients via SMS/Email, and auto‑book the first response.",
+  alternates: { canonical: "https://gaplets.com/features/automation" },
   robots: {
     index: true,
     follow: true,
     "max-image-preview": "large",
     "max-snippet": -1,
     "max-video-preview": -1,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
   },
   keywords: [
+    "appointment waitlist automation",
     "fill last-minute cancellations",
-    "waitlist automation",
     "auto booking",
     "Square Appointments webhooks",
     "SMS email notifications",
   ],
   openGraph: {
     type: "article",
-    url: PAGE_URL,
+    url: "https://gaplets.com/features/automation",
     siteName: "Gaplets",
-    title: "Automation — Detect, notify & auto‑book last‑minute openings",
+    title: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
     description:
       "Detect cancellations, notify the right clients, auto‑book the first response, and keep originals intact.",
-    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets Automation" }],
+    images: [{ url: "https://gaplets.com/og/automation.png", width: 1200, height: 630, alt: "Automation" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Automation — Detect, notify & auto‑book last‑minute openings",
+    title: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
     description:
-      "Replace cancellations in three steps with Gaplets automation.",
-    images: [OG_IMAGE],
+      "Replace cancellations in three steps with automation.",
+    images: ["https://gaplets.com/og/automation.png"],
   },
 };
 
@@ -95,13 +88,13 @@ export default function AutomationPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
-        eyebrow="Automation"
-        title="Set it once. We do the busywork."
-        desc="Cancel the slot in your tool — Gaplets detects it and fills it."
-        href="/sign in"
-        cta="Get set up"
-        align="center"
-      />
+  eyebrow="Automation"
+  title="Appointment waitlist — set it once"
+  desc="Cancel the slot in your tool — Gaplets detects it and fills it."
+  href="/sign in"
+  cta="Get set up"
+  align="center"
+/>
 
       <div className="mt-10">
         <StepsSections />

@@ -4,20 +4,17 @@ import Link from "next/link";
 import Script from "next/script";
 import { SectionHeader } from "@/components/home/teasers-animated";
 
-// ────────────────────────────────────────────────────────────────────────────────
-// SEO
-// ────────────────────────────────────────────────────────────────────────────────
 const SITE_URL = "https://gaplets.com" as const;
 const PAGE_URL = `${SITE_URL}/docs/faq` as const;
 const OG_IMAGE = `${SITE_URL}/og/faq.png` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Gaplets FAQ — Square setup, notifications, rules & billing",
+    default: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
     template: "%s | Gaplets",
   },
   description:
-    "Step-by-step answers to connect Square, configure eligibility, send email/SMS waves, and understand billing & taxes.",
+    "Answers for appointment waitlist: connect Square, configure eligibility, send SMS/Email waves, and understand billing & taxes.",
   alternates: { canonical: PAGE_URL },
   robots: {
     index: true,
@@ -33,20 +30,27 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
+  keywords: [
+    "appointment waitlist",
+    "appointment waitlist automation",
+    "Square Appointments waitlist",
+    "fill last-minute cancellations",
+    "auto-book cancellations",
+  ],
   openGraph: {
     type: "article",
     url: PAGE_URL,
     siteName: "Gaplets",
-    title: "Gaplets FAQ — Square setup, notifications, rules & billing",
+    title: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
     description:
-      "Answers to get you live fast: connect Square, configure eligibility, notify via email/SMS, and handle billing & taxes.",
+      "Connect Square, set eligibility rules, send SMS/Email waves, and handle billing & taxes.",
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets FAQ" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gaplets FAQ — Square setup, notifications, rules & billing",
+    title: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
     description:
-      "Connect Square, configure rules, send email/SMS waves, and understand billing & taxes. Get live in minutes.",
+      "How to set up an appointment waitlist with Square: rules, notifications, and billing.",
     images: [OG_IMAGE],
   },
 };
@@ -231,17 +235,28 @@ export default function FAQPage() {
       { "@type": "ListItem", position: 3, name: "FAQ", item: PAGE_URL },
     ],
   } as const;
+  const webpageLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Appointment Waitlist — FAQ",
+  url: PAGE_URL,
+  description:
+    "FAQ about appointment waitlist: Square setup, eligibility rules, notifications, and billing.",
+} as const;
+
+
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
+      <Script id="faq-webpage-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageLd) }} />
       <SectionHeader
-        eyebrow="Docs"
-        title="FAQ"
-        desc="Short answers to get you live fast."
-        href={PRICING_PATH}
-        cta="View pricing"
-        align="center"
-      />
+  eyebrow="Docs"
+  title="Appointment Waitlist — FAQ"
+  desc="Short answers to set up your appointment waitlist, from Square connection to notifications and billing."
+  href={PRICING_PATH}
+  cta="View pricing"
+  align="center"
+/>
 
       {/* TOC */}
       <nav

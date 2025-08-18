@@ -4,8 +4,35 @@ import { SectionHeader } from "@/components/home/teasers-animated";
 import { DocsIndex } from "@/components/docs/DocsIndex";
 
 export const metadata: Metadata = {
-  title: "Help Center | Gaplets",
-  description: "Setup guides, FAQs, and troubleshooting.",
+  title: {
+    default: "Help Center — Appointment Waitlist Setup & Guides",
+    template: "%s | Gaplets",
+  },
+  description:
+    "Setup guides for appointment waitlist: connect Square, configure notifications and rules, and go live in minutes.",
+  alternates: { canonical: "https://gaplets.com/docs" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    url: "https://gaplets.com/docs",
+    siteName: "Gaplets",
+    title: "Help Center — Appointment Waitlist Setup & Guides",
+    description:
+      "Connect Square, set rules and notifications, and launch your appointment waitlist fast.",
+    images: [{ url: "https://gaplets.com/og/docs.png", width: 1200, height: 630, alt: "Gaplets Docs" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Help Center — Appointment Waitlist Setup & Guides",
+    description:
+      "Everything to launch your appointment waitlist: integrations, notifications, rules.",
+    images: ["https://gaplets.com/og/docs.png"],
+  },
+  keywords: [
+    "appointment waitlist setup",
+    "appointment waitlist guides",
+    "Square Appointments waitlist",
+  ],
 };
 
 const PRICING_PATH = "/price" as const;
@@ -35,13 +62,13 @@ export default function DocsHubPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
-        eyebrow="Docs"
-        title="Help Center"
-        desc="Short guides to get you live in minutes."
-        href={PRICING_PATH}
-        cta="View pricing"
-        align="center"
-      />
+  eyebrow="Docs"
+  title="Help Center — Appointment Waitlist"
+  desc="Short guides to connect Square, configure rules & notifications, and go live."
+  href={PRICING_PATH}
+  cta="View pricing"
+  align="center"
+/>
       <DocsIndex primary={primary} guides={guides} quickStartHref={SQUARE_PATH} />
     </main>
   );

@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   keywords: [
     "gaplets pricing",
     "saas pricing",
+     "appointment waitlist pricing",
     "square appointments automation",
     "fill last‑minute cancellations",
   ],
@@ -41,6 +42,22 @@ export const metadata: Metadata = {
     images: [OG_IMAGE],
   },
 };
+const webpageLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Gaplets Pricing",
+    url: PAGE_URL,
+    description: "Pricing for Gaplets appointment waitlist & cancellation recovery.",
+  } as const;
+
+  const breadcrumbsLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Pricing", item: PAGE_URL },
+    ],
+  } as const;
 
 export default function PricingPage() {
   // JSON‑LD: OfferCatalog with three plans
@@ -75,6 +92,9 @@ export default function PricingPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
+      <Script id="pricing-webpage-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageLd) }} />
+    <Script id="pricing-breadcrumbs-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbsLd) }} />
+       <Script id="pricing-offercatalog-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(offerCatalogLd) }} />
       <SectionHeader
         eyebrow="Pricing"
         title="Choose a plan that fits"
