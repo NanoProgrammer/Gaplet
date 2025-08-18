@@ -5,7 +5,7 @@ import { NotificationsShowcase } from "@/components/features/NotificationsShowca
 
 const SITE_URL = "https://gaplets.com" as const;
 const PAGE_URL = `${SITE_URL}/features/notifications` as const;
-const OG_IMAGE = `${SITE_URL}/og/notifications.png` as const;
+
 
 export const metadata: Metadata = {
   title: {

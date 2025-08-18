@@ -6,7 +6,7 @@ import StepsSections from "@/components/3StepsSections";
 // SEO
 const SITE_URL = "https://gaplets.com" as const;
 const PAGE_URL = `${SITE_URL}/features/automation` as const;
-const OG_IMAGE = `${SITE_URL}/og/automation.png` as const; // asegúrate de tener esta imagen
+// asegúrate de tener esta imagen
 
 export const metadata: Metadata = {
   title: {

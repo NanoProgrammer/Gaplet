@@ -10,7 +10,7 @@ import { FeaturesGrid } from "@/components/features/FeaturesGrid";
 // ────────────────────────────────────────────────────────────────────────────────
 const SITE_URL = "https://gaplets.com" as const;
 const PAGE_URL = `${SITE_URL}/features` as const;
-const OG_IMAGE = `${SITE_URL}/og/features.png` as const;
+
 
 export const metadata: Metadata = {
   title: {
