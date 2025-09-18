@@ -11,14 +11,13 @@ export default function SetUpSection() {
       <div className="mx-4 md:mx-16">
         <p className="mx-auto max-w-2xl text-slate-700 text-sm sm:text-[15px] md:text-lg leading-relaxed text-center md:text-left">
           Connect your tools and choose who gets alerts. <strong>Gaplets</strong> works with&nbsp;
-          <strong>Square</strong> today and we're actively adding <strong>Google Calendar</strong> and&nbsp;
+          <strong>Square</strong> today and we&apos;re actively adding <strong>Google Calendar</strong> and&nbsp;
           <strong>Google Sheets</strong>. No new system to learn.
         </p>
       </div>
 
-      {/* Images container - responsive layout */}
+      {/* Mobile / Tablet: vertical stack */}
       <div className="block md:hidden px-4 mt-8">
-        {/* Mobile: vertical stack */}
         <div className="space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -32,6 +31,8 @@ export default function SetUpSection() {
               width={280}
               height={220}
               className="rounded-xl shadow-lg"
+              sizes="(max-width: 768px) 280px, 280px"
+              priority
             />
           </motion.div>
 
@@ -47,6 +48,7 @@ export default function SetUpSection() {
               width={280}
               height={200}
               className="rounded-xl shadow-lg"
+              sizes="(max-width: 768px) 280px, 280px"
             />
           </motion.div>
 
@@ -62,13 +64,15 @@ export default function SetUpSection() {
               width={260}
               height={160}
               className="rounded-xl shadow-lg"
+              sizes="(max-width: 768px) 260px, 260px"
             />
           </motion.div>
         </div>
       </div>
 
-      {/* Desktop: original animated and rotated images (unchanged) */}
+      {/* Desktop: tu layout original, con utilidades válidas */}
       <div className="hidden md:block relative max-w-2xl w-full h-[400px] left-[25%]">
+        {/* Square */}
         <motion.div
           initial={{ opacity: 0, y: 40, rotate: -10 }}
           whileInView={{ opacity: 1, y: 0, rotate: -8 }}
@@ -81,14 +85,16 @@ export default function SetUpSection() {
             width={320}
             height={260}
             className="rounded-xl"
+            sizes="(min-width: 768px) 320px, 320px"
           />
         </motion.div>
 
+        {/* Rules (bottom-50 → bottom-[50px]) */}
         <motion.div
           initial={{ opacity: 0, y: 40, rotate: 10 }}
           whileInView={{ opacity: 1, y: 0, rotate: 12 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="absolute bottom-50 right-5 z-20"
+          className="absolute bottom-[50px] right-5 z-20"
         >
           <Image
             src="/ui/rules.png"
@@ -96,27 +102,27 @@ export default function SetUpSection() {
             width={310}
             height={190}
             className="rounded-xl drop-shadow-lg w-56 h-40"
+            sizes="(min-width: 768px) 310px, 310px"
           />
         </motion.div>
 
+        {/* Dashboard (right-46 → right-[11.5rem], scale-120 → scale-[1.2]) */}
         <motion.div
           initial={{ opacity: 0, y: 40, rotate: -5 }}
           whileInView={{ opacity: 1, y: 0, rotate: -3 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="absolute top-[49%] right-46 z-40"
+          className="absolute top-[49%] right-[11.5rem] z-40"
         >
           <Image
             src="/ui/dashboard.png"
             alt="Dashboard"
             width={320}
             height={230}
-            className="rounded-xl drop-shadow-lg scale-120"
+            className="rounded-xl drop-shadow-lg scale-[1.2]"
+            sizes="(min-width: 768px) 320px, 320px"
           />
         </motion.div>
       </div>
-
-      {/* Bottom block: text only, no heading */}
-      
     </section>
   )
 }

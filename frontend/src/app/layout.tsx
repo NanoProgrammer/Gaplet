@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     siteName: "Gaplets",
     title: "Gaplets | Fill Last-Minute Appointments via Square",
     description:
-      "Leverage Square’s customer management: Gaplets auto-fills last-minute cancellations from your Square waitlist—zero manual work.",
+      "Leverage Square's customer management: Gaplets auto-fills last-minute cancellations from your Square waitlist—zero manual work.",
     url: "https://gaplets.com/",
     locale: "en_US",
     images: [{ url: "https://gaplets.com/og_gaplet.png", width: 1200, height: 630, alt: "Gaplets × Square – product preview" }],
