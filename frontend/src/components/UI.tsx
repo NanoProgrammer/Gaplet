@@ -7,17 +7,68 @@ import { motion } from 'framer-motion'
 export default function SetUpSection() {
   return (
     <section className="mb-16" id="SetUp">
-      {/* Text only (slightly larger) */}
-      <div className="mx-16">
-        <p className="mx-auto max-w-2xl text-slate-700 text-[15px] sm:text-base md:text-lg leading-relaxed text-center md:text-left">
+      {/* Text only (responsive) */}
+      <div className="mx-4 md:mx-16">
+        <p className="mx-auto max-w-2xl text-slate-700 text-sm sm:text-[15px] md:text-lg leading-relaxed text-center md:text-left">
           Connect your tools and choose who gets alerts. <strong>Gaplets</strong> works with&nbsp;
-          <strong>Square</strong> today and we’re actively adding <strong>Google Calendar</strong> and&nbsp;
+          <strong>Square</strong> today and we're actively adding <strong>Google Calendar</strong> and&nbsp;
           <strong>Google Sheets</strong>. No new system to learn.
         </p>
       </div>
 
-      {/* Animated and rotated images (unchanged layout/size/positions) */}
-      <div className="relative max-w-2xl w-full h-[400px] left-[25%]">
+      {/* Images container - responsive layout */}
+      <div className="block md:hidden px-4 mt-8">
+        {/* Mobile: vertical stack */}
+        <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex justify-center"
+          >
+            <Image
+              src="/ui/square.avif"
+              alt="Square OAuth"
+              width={280}
+              height={220}
+              className="rounded-xl shadow-lg"
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="flex justify-center"
+          >
+            <Image
+              src="/ui/dashboard.png"
+              alt="Dashboard"
+              width={280}
+              height={200}
+              className="rounded-xl shadow-lg"
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="flex justify-center"
+          >
+            <Image
+              src="/ui/rules.png"
+              alt="Dashboard Rules"
+              width={260}
+              height={160}
+              className="rounded-xl shadow-lg"
+            />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Desktop: original animated and rotated images (unchanged) */}
+      <div className="hidden md:block relative max-w-2xl w-full h-[400px] left-[25%]">
         <motion.div
           initial={{ opacity: 0, y: 40, rotate: -10 }}
           whileInView={{ opacity: 1, y: 0, rotate: -8 }}

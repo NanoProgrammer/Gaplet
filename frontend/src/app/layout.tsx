@@ -1,9 +1,9 @@
 // app/layout.tsx
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
@@ -24,19 +24,11 @@ export const metadata: Metadata = {
     "salon scheduling Square",
     "clinic scheduling Square",
   ],
-  alternates: {
-    canonical: "https://gaplets.com/",
-  },
+  alternates: { canonical: "https://gaplets.com/" },
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-snippet": -1,
-      "max-image-preview": "large",
-      "max-video-preview": -1,
-    },
+    googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large", "max-video-preview": -1 },
   },
   openGraph: {
     type: "website",
@@ -46,29 +38,18 @@ export const metadata: Metadata = {
       "Leverage Square’s customer management: Gaplets auto-fills last-minute cancellations from your Square waitlist—zero manual work.",
     url: "https://gaplets.com/",
     locale: "en_US",
-    images: [
-      {
-        url: "https://gaplets.com/og_gaplet.png",
-        width: 1200,
-        height: 630,
-        alt: "Gaplets × Square – product preview",
-      },
-    ],
+    images: [{ url: "https://gaplets.com/og_gaplet.png", width: 1200, height: 630, alt: "Gaplets × Square – product preview" }],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@your_handle",    // opcional
-    creator: "@your_handle", // opcional
+    site: "@your_handle",
+    creator: "@your_handle",
     title: "Gaplets | Square Integration for No-Show Recovery",
     description:
       "Plug Gaplets into Square to auto-notify clients when slots free up—stop losing revenue to no-shows.",
     images: ["https://gaplets.com/og_square_gaplet.png"],
   },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-    shortcut: "/favicon-32x32.png",
-  },
+  icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png", shortcut: "/favicon-32x32.png" },
   category: "Business & Productivity",
 };
 
@@ -80,8 +61,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="antialiased font-sans bg-white text-black">{children}
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body
+        className="antialiased font-sans bg-white text-black"
+        suppressHydrationWarning
+      >
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>

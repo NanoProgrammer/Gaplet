@@ -36,7 +36,7 @@ export default function Hero() {
         </div>
 
         {/* Diagram */}
-        <div className="flex flex-row items-center left-36 -top-66 lg:-top-12 lg:left-22 relative justify-center scale-75 lg:scale-95">
+        <div className="flex flex-row items-center left-22 sm:left-46 -top-72 lg:-top-12 lg:left-22 relative justify-center scale-55 md:scale-75 lg:scale-95">
           <div className="relative -top-5 left-40">
             <TV />
           </div>
