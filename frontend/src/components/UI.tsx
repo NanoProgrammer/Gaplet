@@ -94,7 +94,7 @@ export default function SetUpSection() {
           initial={{ opacity: 0, y: 40, rotate: 10 }}
           whileInView={{ opacity: 1, y: 0, rotate: 12 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="absolute bottom-[50px] right-5 z-20"
+          className="absolute top-[60px] right-5 z-20"
         >
           <Image
             src="/ui/rules.png"
@@ -111,7 +111,7 @@ export default function SetUpSection() {
           initial={{ opacity: 0, y: 40, rotate: -5 }}
           whileInView={{ opacity: 1, y: 0, rotate: -3 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="absolute top-[49%] right-[11.5rem] z-40"
+          className="absolute top-[45%] right-[11.5rem] z-40"
         >
           <Image
             src="/ui/dashboard.png"

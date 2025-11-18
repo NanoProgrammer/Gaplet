@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     "Square Appointments waitlist",
     "fill last-minute cancellations",
     "no-show recovery",
-    "auto-book cancellations",
+    "auto-book cancellations"
   ],
   openGraph: {
     title:
