@@ -141,7 +141,7 @@ export default function PricingClient() {
   }
 
   return (
-    <section id="Pricing" className="mx-auto mb-24 max-w-6xl rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-6 sm:p-8">
+    <section id="Pricing" className="mx-auto mb-24 max-w-4xl rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-6 sm:p-8">
       <header className="text-center">
         <h1 className="text-2xl font-semibold text-slate-900">Choose a plan</h1>
         <p className="mt-1 text-sm text-slate-600">7‑day free trial on any plan. Cancel anytime.</p>

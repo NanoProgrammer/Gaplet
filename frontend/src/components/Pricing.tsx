@@ -52,16 +52,16 @@ const PLANS: readonly Plan[] = [
 
 export default function Pricing() {
   return (
-    <section id="Pricing" className="mb-24 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-6 sm:p-8">
+    <section id="Pricing" className="mb-24 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-6 py-10 sm:px-10">
       <h2 className="text-center text-2xl font-semibold text-slate-900">Simple pricing</h2>
       <p className="mt-1 text-center text-sm text-slate-600">Try any plan free for 7 days. Cancel anytime.</p>
 
-      <div className="mx-auto mt-8 grid max-w-6xl gap-6 md:grid-cols-3">
+      <div className="mx-auto mt-10 grid max-w-7xl gap-8 md:grid-cols-3">
         {PLANS.map((p) => (
           <article
             key={p.name}
             className={[
-              "relative flex h-full flex-col rounded-2xl border p-6 shadow-sm",
+              "relative flex h-full flex-col rounded-2xl border p-7 shadow-sm",
               p.highlight ? "border-emerald-300 bg-white/90" : "border-slate-200 bg-white",
             ].join(" ")}
           >
@@ -106,7 +106,7 @@ export default function Pricing() {
       </div>
 
       {/* Included in every plan */}
-      <div className="mx-auto mt-8 max-w-3xl rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-700">
+      <div className="mx-auto mt-8 max-w-5xl rounded-xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-700">
         <span className="font-medium">All plans include:</span> Real‑time detection • Eligibility rules • Audit logs
       </div>
     </section>

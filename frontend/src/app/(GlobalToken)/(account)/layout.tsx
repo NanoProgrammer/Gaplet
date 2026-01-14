@@ -38,7 +38,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="absolute w-[350px] h-[350px] bg-[#c0ffe0] rounded-full blur-[90px] opacity-80 bottom-[-100px] left-1/4" />
 
       {/* Auth card */}
-      <div className="relative z-20 w-full max-w-lg">
+      <div className="relative z-20 w-full">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 font-mono tracking-tight">Welcome to Gaplets</h1>
           <p className="text-muted-foreground text-sm mt-1">Automate. Notify. Fill the gap.</p>
