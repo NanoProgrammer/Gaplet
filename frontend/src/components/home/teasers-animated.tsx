@@ -246,6 +246,7 @@ export function IntegrationsTeaser() {
     { t: "Square Appointments", badge: "Live", dim: false },
     { t: "Google Calendar", badge: "Coming soon", dim: true },
     { t: "Google Sheets", badge: "Coming soon", dim: true },
+    { t: "Fresha, Vagaro, Jane, Mindbody & 70+ more", badge: "Planned", dim: true },
   ];
   const sectionVariant: Variant = "white"; // ← consistent here
 
@@ -255,7 +256,7 @@ export function IntegrationsTeaser() {
         <SectionHeader
           eyebrow="Integrations"
           title="Connect your tools in minutes"
-          desc="Connect Gaplets’ appointment waitlist to Square Appointments (live). Google Calendar & Sheets coming soon."
+          desc="Connect Gaplets’ appointment waitlist to Square Appointments (live). Google Calendar & Sheets coming soon, with 70+ more tools across every industry on the roadmap."
 
           href="/integrations"
           cta="Explore integrations"
@@ -269,7 +270,7 @@ export function IntegrationsTeaser() {
                   <div className="text-lg font-semibold text-slate-900">{x.t}</div>
                   <span className={`rounded-full px-3 py-1 text-xs ring-1 ${x.dim ? "bg-slate-50 text-slate-600 ring-slate-200" : "bg-emerald-100/80 text-emerald-800 ring-emerald-200"}`}>{x.badge}</span>
                 </div>
-                <p className="text-sm text-slate-600">{x.dim ? "Planned support with OAuth + webhooks." : "Connect, map your services, and you’re ready."}</p>
+                <p className="text-sm text-slate-600">{x.dim ? (x.badge === "Planned" ? "Browse the full directory and vote for yours." : "Planned support with OAuth + webhooks.") : "Connect, map your services, and you’re ready."}</p>
               </Card>
             </motion.div>
           ))}
