@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as sgMail from '@sendgrid/mail';
 import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
+import { getGoogleAccessToken, insertGoogleEvent } from '../connectors/google';
+import { assertPublicHttpsUrl } from '../connectors/net-guard';
+import { callbackSecret } from '../connectors/callback-secret';
 const twilio = require('twilio');
+
+type AnyProvider = 'acuity' | 'square' | 'google' | 'ics' | 'webhook';
+const isGeneric = (p: string) => p === 'google' || p === 'ics' || p === 'webhook';
 
 interface Recipient {
   name: string;
@@ -16,7 +22,7 @@ interface Recipient {
 interface CampaignState {
   campaignId: string;
   userId: string;
-  provider: 'acuity' | 'square';
+  provider: AnyProvider;
   slotTime: Date;
   appointmentTypeId?: number | null;
   serviceVariationId?: string | null;
@@ -69,7 +75,7 @@ export class NotificationService {
     this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   }
 
-  async startCampaign(provider: 'acuity' | 'square', integration: any, payload: any, gapletSlotId?: string) {
+  async startCampaign(provider: AnyProvider, integration: any, payload: any, gapletSlotId?: string) {
     const userId: string = integration.userId;
   
     // Cargar usuario y preferencias
@@ -114,7 +120,13 @@ export class NotificationService {
     let locationId: string | null = null;
     let duration: number | null = null;
   
-    if (provider === 'acuity') {
+    let genericService: string | null = null;
+    if (isGeneric(provider)) {
+      slotTime = new Date(payload.generic.start);
+      duration = payload.generic.durationMinutes ?? null;
+      genericService = payload.generic.service ?? null;
+      canceledCustomerEmail = payload.generic.customerEmail ?? null;
+    } else if (provider === 'acuity') {
       slotTime = new Date(payload.datetime);
       appointmentTypeId = payload.appointmentTypeID ? Number(payload.appointmentTypeID) : null;
       canceledCustomerEmail = payload.email || null;
@@ -184,7 +196,16 @@ export class NotificationService {
     const clientServiceTypes: Map<string, Set<string | number>> = new Map();
   
     // … lógica de fetch de Acuity y Square para llenar clients, lastApptMap, nextApptMap, clientServiceTypes
-    if (provider === 'acuity') {
+    if (isGeneric(provider)) {
+      // Calendar/webhook connectors have no customer API: use the client list the business imported.
+      const rows = await this.prisma.client.findMany({ where: { userId, optedOut: false } });
+      for (const c of rows) {
+        clients.push({ name: c.name, email: c.email || undefined, phone: c.phone || undefined, customerId: c.id });
+        if (c.lastApptAt) lastApptMap.set(c.id, c.lastApptAt);
+        if (c.nextApptAt && c.nextApptAt > now) nextApptMap.set(c.id, c.nextApptAt);
+        if (c.services.length) clientServiceTypes.set(c.id, new Set(c.services.map((x) => x.toLowerCase())));
+      }
+    } else if (provider === 'acuity') {
       // 1) Obtener lista de clientes de Acuity
       const clientsRes = await fetch('https://acuityscheduling.com/api/v1/clients', {
         headers: { Authorization: `Bearer ${integration.accessToken}` },
@@ -316,7 +337,7 @@ export class NotificationService {
         || client.phone!;
   
       // Excluir al que canceló
-      if (provider === 'acuity'
+      if ((provider === 'acuity' || isGeneric(provider))
           && canceledCustomerEmail
           && client.email?.toLowerCase() === canceledCustomerEmail.toLowerCase()) {
         return false;
@@ -328,7 +349,13 @@ export class NotificationService {
       }
   
       // Filtrar por tipo de cita si corresponde
-      if (matchType) {
+      if (matchType && isGeneric(provider)) {
+        // Lenient: only exclude clients whose known services do not include the freed one.
+        const services = clientServiceTypes.get(idKey);
+        if (genericService && services && services.size && !services.has(genericService.toLowerCase())) {
+          return false;
+        }
+      } else if (matchType) {
         const services = clientServiceTypes.get(idKey) ?? new Set();
         const requiredId = provider === 'acuity'
           ? appointmentTypeId
@@ -442,7 +469,11 @@ export class NotificationService {
     let businessName = 'Your Business';      // valor por defecto
     let locationTimeZone = 'UTC';            // valor por defecto
   
-    if (provider === 'square') {
+    if (isGeneric(provider)) {
+      const cfg = (integration.config ?? {}) as any;
+      businessName = cfg.businessName || user.name || businessName;
+      locationTimeZone = cfg.timezone || locationTimeZone;
+    } else if (provider === 'square') {
       try {
         // Obtener nombre del negocio de Square
         const merchantsRes = await fetch('https://connect.squareup.com/v2/merchants', {
@@ -603,13 +634,16 @@ export class NotificationService {
 
   
   private async resolveTimeZone(
-  provider: 'square' | 'acuity',
+  provider: AnyProvider,
   accessToken: string,
-  locationId?: string
+  locationId?: string,
+  integ?: { config?: any } | null,
 ): Promise<string> {
   let tz = 'UTC';
   try {
-    if (provider === 'square' && locationId) {
+    if (isGeneric(provider)) {
+      tz = (integ?.config as any)?.timezone || tz;
+    } else if (provider === 'square' && locationId) {
       const res = await fetch(
         `https://connect.squareup.com/v2/locations/${locationId}`,
         {
@@ -675,9 +709,10 @@ async handleEmailReply(
   });
   if (!integ) return;
   const slotTimeZone = await this.resolveTimeZone(
-    campaign.provider as 'square' | 'acuity',
+    campaign.provider,
     integ.accessToken,
-    campaign.locationId
+    campaign.locationId,
+    integ,
   );
 
   // 5) Format appointment time
@@ -690,7 +725,10 @@ async handleEmailReply(
   // 6) Determine businessName
   let businessName = 'Your Business';
   try {
-    if (campaign.provider === 'square') {
+    if (isGeneric(campaign.provider)) {
+      const owner = await this.prisma.user.findUnique({ where: { id: campaign.userId } });
+      businessName = (integ.config as any)?.businessName || owner?.name || businessName;
+    } else if (campaign.provider === 'square') {
       const res = await fetch('https://connect.squareup.com/v2/merchants', {
         headers: { Authorization: `Bearer ${integ.accessToken}`, 'Square-Version': '2025-07-16' }
       });
@@ -921,6 +959,17 @@ async createAppointmentAndNotify(
     );
   }
 
+  if (isGeneric(campaign.provider)) {
+    const bookingId = await this.bookGeneric(campaign, winner, integration);
+    await this.recordReplacement(campaign, winner, slot.gapletSlotId, bookingId);
+    return;
+  }
+  if (campaign.provider === 'acuity') {
+    const bookingId = await this.bookAcuity(campaign, winner, integration);
+    await this.recordReplacement(campaign, winner, slot.gapletSlotId, bookingId);
+    return;
+  }
+
   // 2) Verificamos que tengamos service_variation_version
   const version = slot.serviceVariationVersion;
   if (!version) {
@@ -1007,6 +1056,113 @@ async createAppointmentAndNotify(
   });
 }
 
+
+/** Books via Acuity's API (used by the email-reply path; the SMS path already did this inline). */
+private async bookAcuity(campaign: CampaignState, winner: Recipient, integration: any): Promise<string> {
+  const [firstName, ...rest] = (winner.name || 'Client').split(' ');
+  const resp = await fetch('https://acuityscheduling.com/api/v1/appointments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${integration.accessToken}` },
+    body: JSON.stringify({
+      firstName,
+      lastName: rest.join(' ') || undefined,
+      email: winner.email || null,
+      phone: winner.phone,
+      datetime: campaign.slotTime,
+      appointmentTypeID: campaign.appointmentTypeId,
+    }),
+  });
+  const appt = await resp.json();
+  if (!appt.id) throw new Error(`Acuity booking failed ${JSON.stringify(appt)}`);
+  return String(appt.id);
+}
+
+/**
+ * "Booking" for connectors that have no write API (ICS, inbound webhook): the client is confirmed,
+ * the owner is emailed and the optional callback URL is called so Zapier/Make/custom code can write
+ * the booking into the real system. Google Calendar gets a real event created.
+ */
+private async bookGeneric(campaign: CampaignState, winner: Recipient, integration: any): Promise<string> {
+  const cfg = (integration.config ?? {}) as any;
+  const durationMin = campaign.duration || 60;
+  const end = new Date(campaign.slotTime.getTime() + durationMin * 60_000);
+  let bookingId = `manual-${campaign.gapletSlotId ?? campaign.campaignId}`;
+
+  if (campaign.provider === 'google') {
+    const token = await getGoogleAccessToken(this.prisma as any, integration);
+    bookingId = await insertGoogleEvent(token, integration.calendarId || 'primary', {
+      summary: `${winner.name || 'Client'} (booked via Gaplet)`,
+      start: campaign.slotTime,
+      end,
+      attendeeEmail: winner.email,
+      description: 'Slot refilled automatically by Gaplet.',
+    });
+  }
+
+  const owner = await this.prisma.user.findUnique({ where: { id: campaign.userId } });
+  const when = new Intl.DateTimeFormat('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: cfg.timezone || 'UTC',
+  }).format(campaign.slotTime);
+
+  if (owner?.email && process.env.SENDGRID_API_KEY) {
+    const extra = campaign.provider === 'google'
+      ? 'It was added to your Google Calendar.'
+      : 'Please add it to your booking system (this connector cannot write to it automatically).';
+    sgMail.send({
+      to: owner.email,
+      from: `no-reply@${process.env.SENDGRID_DOMAIN}`,
+      subject: `Gaplet filled your ${when} slot`,
+      text: `${winner.name || 'A client'} (${winner.email || winner.phone || 'no contact'}) claimed the ${when} slot.\n\n${extra}`,
+    }).catch((e) => console.error('Owner email failed:', e?.message));
+  }
+
+  if (cfg.callbackUrl) {
+    try {
+      await assertPublicHttpsUrl(cfg.callbackUrl);
+      const body = JSON.stringify({
+        event: 'slot.claimed',
+        slot_id: campaign.gapletSlotId,
+        start_at: campaign.slotTime.toISOString(),
+        duration_minutes: durationMin,
+        client: { name: winner.name, email: winner.email ?? null, phone: winner.phone ?? null },
+        booking_id: bookingId,
+      });
+      const sig = crypto.createHmac('sha256', callbackSecret(integration.id)).update(body).digest('hex');
+      const res = await fetch(cfg.callbackUrl, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'Content-Type': 'application/json', 'X-Gaplet-Signature': `sha256=${sig}` },
+        body,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) console.error(`Callback responded ${res.status}`);
+    } catch (e: any) {
+      console.error('Callback failed:', e?.message); // never fail the booking because the callback is down
+    }
+  }
+  return bookingId;
+}
+
+private async recordReplacement(campaign: CampaignState, winner: Recipient, gapletSlotId: string, bookingId: string) {
+  await this.prisma.openSlot.update({ where: { gapletSlotId }, data: { isTaken: true, takenAt: new Date() } });
+  await this.prisma.replacementLog.create({
+    data: {
+      userId: campaign.userId,
+      clientEmail: winner.email || '',
+      clientPhone: winner.phone ?? null,
+      clientName: winner.name ?? null,
+      appointmentTime: campaign.slotTime,
+      provider: campaign.provider,
+      providerBookingId: bookingId,
+      respondedAt: new Date(),
+    },
+  });
+  await this.prisma.user.update({
+    where: { id: campaign.userId },
+    data: { totalReplacements: { increment: 1 }, lastReplacementAt: new Date() },
+  });
+}
 
 async sendSlotAlreadyTakenEmail(
   to: string,
@@ -1188,9 +1344,10 @@ const firstName = rec.name.split(' ')[0];
   });
   const slotTimeZone = integForTZ
     ? await this.resolveTimeZone(
-        campaign.provider as 'square' | 'acuity',
+        campaign.provider,
         integForTZ.accessToken,
-        campaign.locationId
+        campaign.locationId,
+        integForTZ,
       )
     : 'UTC';
 
@@ -1250,7 +1407,11 @@ const firstName = rec.name.split(' ')[0];
   // 5) Perform booking and capture bookingId
   let bookingId = '';
   try {
-    if (campaign.provider === 'square') {
+    if (isGeneric(campaign.provider)) {
+      const integration = await this.prisma.connectedIntegration.findUnique({ where: { userId: campaign.userId } });
+      if (!integration) throw new Error('No integration');
+      bookingId = await this.bookGeneric(campaign, winner, integration);
+    } else if (campaign.provider === 'square') {
       const integration = await this.prisma.connectedIntegration.findUnique({
         where: { userId: campaign.userId, provider: 'square' }
       });

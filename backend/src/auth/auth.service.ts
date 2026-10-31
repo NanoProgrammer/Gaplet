@@ -249,9 +249,24 @@ async findOrCreateGoogleUser(profile: {
 /* ---------------------------------------------
    1) TOKEN EXCHANGE + SAVE — with Google added
 --------------------------------------------- */
+/** Short-lived signed state so a callback cannot attach tokens to an arbitrary user id. */
+signOAuthState(userId: string): string {
+  return this.jwt.sign({ sub: userId, purpose: 'oauth-state' }, { secret: this.config.get('JWT_ACCESS_SECRET'), expiresIn: '10m' });
+}
+
+async verifyOAuthState(state: string): Promise<string> {
+  try {
+    const p: any = await this.jwt.verifyAsync(state, { secret: this.config.get('JWT_ACCESS_SECRET') });
+    if (p?.purpose !== 'oauth-state' || !p.sub) throw new Error();
+    return p.sub;
+  } catch {
+    throw new BadRequestException('Invalid or expired OAuth state. Start the connection again.');
+  }
+}
+
 getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): string {
   const redirect = `${this.config.get('API_BASE_URL')}/auth/callback/${provider}`;
-  const state = userId;
+  const state = encodeURIComponent(this.signOAuthState(userId));
 
   switch (provider) {
     case 'acuity':
@@ -381,6 +396,13 @@ getAuthorizationUrl(provider: 'acuity' | 'square' | 'google', userId: string): s
       scope: tokenRes.scope,
       externalUserId,
       externalOrgId,
+      // a fresh OAuth connection starts from a clean sync state
+      config: {},
+      calendarId: null,
+      webhookId: null,
+      lastSyncAt: null,
+      lastError: null,
+      disconnectedAt: null,
     },
     create: {
       userId,

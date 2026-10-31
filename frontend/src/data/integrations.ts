@@ -49,11 +49,11 @@ export const INDUSTRIES: Record<IndustryKey, { label: string; blurb: string }> =
 export const INTEGRATIONS: readonly Integration[] = [
   // ── General ────────────────────────────────────────────────────────────────
   { key: "square", name: "Square Appointments", industry: "general", desc: "Webhook cancellation detection, customer targeting and auto-booking.", status: "live", provider: "square", img: "/squarefavicon.webp", href: "/integrations/square" },
-  { key: "google-calendar", name: "Google Calendar", industry: "general", desc: "Detect deleted events and invite clients to move up.", status: "soon", img: "/calendarlogo.webp" },
+  { key: "google-calendar", name: "Google Calendar", industry: "general", desc: "Detects deleted or moved events, messages your client list and books the replacement as a new event.", status: "live", provider: "google", img: "/calendarlogo.webp", href: "/signup?next=/dashboard/integrations" },
   { key: "google-sheets", name: "Google Sheets", industry: "general", desc: "Bring your own client list and let Gaplet run the waves.", status: "soon", img: "/google-sheets.webp" },
-  { key: "outlook", name: "Microsoft Outlook Calendar", industry: "general", desc: "Cancellation detection for Microsoft 365 calendars.", status: "planned" },
-  { key: "apple-calendar", name: "Apple Calendar (iCal/CalDAV)", industry: "general", desc: "Sync via CalDAV feeds.", status: "planned" },
-  { key: "calendly", name: "Calendly", industry: "general", desc: "Detect cancelled bookings and refill the slot.", status: "planned" },
+  { key: "outlook", name: "Microsoft Outlook Calendar", industry: "general", desc: "Works today via your published calendar link (ICS). Native sync is planned.", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "apple-calendar", name: "Apple Calendar (iCal/CalDAV)", industry: "general", desc: "Works today via a public iCloud calendar link (ICS).", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "calendly", name: "Calendly", industry: "general", desc: "Detect cancelled bookings and refill the slot. Native sync planned; use Zapier or Webhooks meanwhile.", status: "planned" },
   { key: "acuity", name: "Acuity Scheduling", industry: "general", desc: "OAuth + webhooks for cancelled appointments.", status: "soon" },
   { key: "setmore", name: "Setmore", industry: "general", desc: "Appointment cancellations and client list.", status: "planned" },
   { key: "simplybook", name: "SimplyBook.me", industry: "general", desc: "Cancellation webhooks and client targeting.", status: "planned" },
@@ -61,10 +61,10 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "squarespace", name: "Squarespace Scheduling", industry: "general", desc: "Acuity-powered scheduling for Squarespace sites.", status: "planned" },
   { key: "youcanbook", name: "YouCanBookMe", industry: "general", desc: "Booking-page cancellations.", status: "planned" },
   { key: "cal-com", name: "Cal.com", industry: "general", desc: "Open-source scheduling via webhooks.", status: "planned" },
-  { key: "zapier", name: "Zapier", industry: "general", desc: "Connect any tool that is not natively supported.", status: "planned" },
-  { key: "make", name: "Make (Integromat)", industry: "general", desc: "Automation scenarios to trigger Gaplet waves.", status: "planned" },
-  { key: "webhooks", name: "Custom Webhooks / API", industry: "general", desc: "Send cancellations from your own system.", status: "planned" },
-  { key: "csv", name: "CSV Import", industry: "general", desc: "Upload your client list in one click.", status: "planned" },
+  { key: "zapier", name: "Zapier", industry: "general", desc: "Use the “Webhooks by Zapier” action to send cancellations from any app Zapier supports.", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "make", name: "Make (Integromat)", industry: "general", desc: "Use the HTTP module in a scenario to send cancellations to Gaplets.", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "webhooks", name: "Custom Webhooks / API", industry: "general", desc: "Send cancellations from your own system with one authenticated POST; get a signed callback when a slot is claimed.", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "csv", name: "CSV Import", industry: "general", desc: "Upload your client list; used with calendar and webhook sources.", status: "live", href: "/signup?next=/dashboard/integrations" },
 
   // ── Beauty & Wellness ──────────────────────────────────────────────────────
   { key: "fresha", name: "Fresha", industry: "beauty", desc: "Salon & spa booking cancellations.", status: "planned" },

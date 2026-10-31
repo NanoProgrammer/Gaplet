@@ -8,6 +8,7 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { PaymentsModule } from './payments/payments.module';
 
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ConnectorsModule } from './connectors/connectors.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CheckoutModule,
     PaymentsModule,
     WebhooksModule,
+    ConnectorsModule,
   ],
   controllers: [],
   providers: [PrismaManagerService, JwtStrategy, JwtRefreshStrategy],

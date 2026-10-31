@@ -14,6 +14,7 @@ import {
 } from "@/data/integrations";
 
 const SUPPORT = "support@gaplets.com";
+const PAGE = 24;
 
 const requestHref = (name: string) =>
   `mailto:${SUPPORT}?subject=${encodeURIComponent(`Integration request: ${name}`)}&body=${encodeURIComponent(
@@ -74,6 +75,9 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
   const [q, setQ] = React.useState("");
   const [industry, setIndustry] = React.useState<IndustryKey | "all">("all");
   const [status, setStatus] = React.useState<IntegrationStatus | "all">("all");
+
+  const [limit, setLimit] = React.useState(PAGE);
+  React.useEffect(() => setLimit(PAGE), [q, industry, status]);
 
   const counts = React.useMemo(() => {
     const c: Record<string, number> = { all: INTEGRATIONS.length };
@@ -139,7 +143,7 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
 
       {filtered.length > 0 ? (
         <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((i) => (
+          {filtered.slice(0, limit).map((i) => (
             <Card key={i.key} item={i} ctaMode={mode} />
           ))}
         </ul>
@@ -153,8 +157,16 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
         </div>
       )}
 
+      {filtered.length > limit && (
+        <div className="mt-5 text-center">
+          <button type="button" onClick={() => setLimit((l) => l + PAGE)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Show more ({filtered.length - limit} remaining)
+          </button>
+        </div>
+      )}
+
       <p className="mt-8 text-xs text-slate-500">
-        “Live” works today. “Coming soon” is in development. “Planned” is on the roadmap and prioritised by how many customers ask for it. Product names are trademarks of their
+        “Live” works today. “Coming soon” is in development. “Planned” means no native sync yet: you can still connect it today if it publishes a calendar (ICS) link or can send webhooks directly or through Zapier / Make; native sync is prioritised by how many customers ask for it. Product names are trademarks of their
         respective owners; listing does not imply endorsement or partnership.
       </p>
     </div>

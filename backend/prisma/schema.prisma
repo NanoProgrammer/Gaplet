@@ -29,6 +29,7 @@ model User {
   preferences          UserPreference?  
   cancelationLogs  OpenSlot[]
   ReplacementLogs  ReplacementLog[]
+  clients          Client[]
   
 
   createdAt DateTime @default(now())
@@ -51,9 +52,35 @@ model ConnectedIntegration {
   webhookId       String?                            // ID del webhook suscrito
   calendarId      String?                            // ID del calendario seleccionado
   spreadsheetId   String?                            // ID del Google Sheet compartido
+  config          Json?                              // Ajustes por proveedor (ICS url, callback, snapshot, timezone...)
+  lastSyncAt      DateTime?                          // Último poll exitoso (google/ics)
+  lastError       String?                            // Último error de sincronización visible al usuario
 
   connectedAt     DateTime @default(now())
   disconnectedAt  DateTime?
+
+  @@index([provider])
+  @@index([externalUserId])
+}
+
+// Lista de clientes propia (CSV / Sheets) para proveedores sin API de clientes
+model Client {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  email       String?
+  phone       String?
+  services    String[] @default([])
+  lastApptAt  DateTime?
+  nextApptAt  DateTime?
+  optedOut    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, email])
+  @@unique([userId, phone])
+  @@index([userId])
 }
 
 

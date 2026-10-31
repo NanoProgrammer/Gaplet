@@ -95,28 +95,6 @@ export class WebhooksController {
     if (fromPhone && smsText) {
       // 1) Procesar la respuesta SMS (reordenamiento, validación de “I will take it”)
       await this.notificationService.handleSmsReply(fromPhone, smsText);
-
-      // 2) Si es afirmativa, actualizar métricas en user (se podría mover a handleSmsReply)
-      const text = smsText.toLowerCase();
-      if (text.includes('yes')) {
-        let integration = await this.prisma.connectedIntegration.findFirst({
-          where: { provider: 'square' },
-        });
-        if (!integration) {
-          integration = await this.prisma.connectedIntegration.findFirst({
-            where: { provider: 'acuity' },
-          });
-        }
-        if (integration) {
-          await this.prisma.user.update({
-            where: { id: integration.userId },
-            data: {
-              totalReplacements: { increment: 1 },
-              lastReplacementAt: new Date(),
-            },
-          });
-        }
-      }
     }
 
     // Twilio requiere respuesta XML vacía para confirmar recepción

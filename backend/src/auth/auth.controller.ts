@@ -145,11 +145,12 @@ async oauthCallback(
   @Res() res: Response,
 ) {
   try {
-    await this.authService.exchangeTokenAndSave(provider, code, state);
+    const userId = await this.authService.verifyOAuthState(state);
+    await this.authService.exchangeTokenAndSave(provider, code, userId);
 
-    // Solo para Acuity y Google
-    if (provider !== 'square') {
-      await this.authService.ensureWebhook(provider, state);
+    // Acuity uses a push webhook; Google Calendar is polled (no domain verification needed).
+    if (provider === 'acuity') {
+      await this.authService.ensureWebhook('acuity', userId);
     }
 
     return res.redirect(
