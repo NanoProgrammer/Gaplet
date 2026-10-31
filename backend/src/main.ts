@@ -46,7 +46,7 @@ async function bootstrap() {
       return next();
     }
     // Para el resto, usamos JSON parser y también guardamos rawBody
-    return bodyParser.json({ verify: rawBodySaver })(req, res, next);
+    return bodyParser.json({ limit: '5mb', verify: rawBodySaver })(req, res, next);
   });
 
   // CORS

@@ -19,15 +19,24 @@ export class UserService {
 
   // user.service.ts
 async getMe(userId: string) {
-  return this.prisma.user.findUnique({
+  const user = await this.prisma.user.findUnique({
     where: { id: userId },
     include: {
-      connectedIntegration: true,
+      // never expose OAuth tokens or the inbound-webhook secret hash to the browser
+      connectedIntegration: {
+        select: { id: true, provider: true, connectedAt: true, calendarId: true, lastSyncAt: true, lastError: true },
+      },
       preferences: true,
       ReplacementLogs: true,
-      cancelationLogs: true, 
+      cancelationLogs: true,
     },
   });
+  if (!user) return user;
+  const { password, googleRefreshToken, ...safe } = user as any;
+  return {
+    ...safe,
+    connectedProviders: user.connectedIntegration ? [user.connectedIntegration.provider] : [],
+  };
 }
 
 }

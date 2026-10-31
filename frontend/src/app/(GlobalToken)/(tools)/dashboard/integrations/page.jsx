@@ -253,6 +253,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import IntegrationsDirectory from '@/components/integrations/IntegrationsDirectory';
+import ConnectorsPanel from '@/components/integrations/ConnectorsPanel';
 import { Loader2, LinkIcon, PlugZap, CheckCircle, X } from 'lucide-react';
 
 const fetchWithAuth = async (url, options = {}) => {
@@ -415,6 +416,8 @@ export default function IntegrationsPage() {
             })}
           </div>
         </section>
+
+        <ConnectorsPanel onConnectGoogle={() => handleConnect('google')} />
 
         <section aria-labelledby="directory-title" className="space-y-4">
           <div>

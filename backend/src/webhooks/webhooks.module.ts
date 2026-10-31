@@ -6,5 +6,6 @@ import { NotificationService } from './webhook.service';
 @Module({
   controllers: [WebhooksController],
   providers: [PrismaManagerService, NotificationService],
+  exports: [NotificationService],
 })
 export class WebhooksModule {}
