@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { LazyMotion, domAnimation, m, type Variants } from "framer-motion";
-import { Stethoscope, Scissors, HeartPulse, Brush, Sparkles, PenTool, PawPrint, Dumbbell, Car } from "lucide-react";
+import { Stethoscope, Scissors, HeartPulse, Brush, Sparkles, PenTool, PawPrint, Dumbbell, Car, Wrench, GraduationCap, Briefcase, Eye, UtensilsCrossed, Home, Syringe } from "lucide-react";
 import Link from "next/link";
 
 export type UseCaseCard = {
@@ -10,10 +10,10 @@ export type UseCaseCard = {
   t: string;
   d: string;
   href: string;
-  icon?: "Stethoscope" | "Scissors" | "HeartPulse" | "Brush" | "Sparkles" | "PenTool" | "PawPrint" | "Dumbbell" | "Car";
+  icon?: "Stethoscope" | "Scissors" | "HeartPulse" | "Brush" | "Sparkles" | "PenTool" | "PawPrint" | "Dumbbell" | "Car" | "Wrench" | "GraduationCap" | "Briefcase" | "Eye" | "UtensilsCrossed" | "Home" | "Syringe";
 };
 
-const icons = { Stethoscope, Scissors, HeartPulse, Brush, Sparkles, PenTool, PawPrint, Dumbbell, Car } as const;
+const icons = { Stethoscope, Scissors, HeartPulse, Brush, Sparkles, PenTool, PawPrint, Dumbbell, Car, Wrench, GraduationCap, Briefcase, Eye, UtensilsCrossed, Home, Syringe } as const;
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const fadeUp: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { type: "tween", duration: 0.35, ease: EASE } } };

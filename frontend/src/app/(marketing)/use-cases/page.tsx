@@ -12,7 +12,7 @@ const PAGE_URL = `${SITE_URL}/use-cases` as const;
 const OG_IMAGE = `${SITE_URL}/og/use-cases.png` as const; // ensure asset exists
 
 export const metadata: Metadata = {
-  title: { default: "Use cases — Clinics, Barbers, Spas, Nails, Tattoo, Pets, Fitness & more", template: "%s | Gaplets" },
+  title: { default: "Use cases — Clinics, Salons, Spas, Vets, Fitness, Home services & more", template: "%s | Gaplets" },
   description:
     "From clinics to barbers, spas, nails, tattoo, pet grooming, fitness and more — if cancellations hurt, Gaplets helps refill those openings automatically.",
   alternates: { canonical: PAGE_URL },
@@ -41,13 +41,13 @@ export const metadata: Metadata = {
     type: "article",
     url: PAGE_URL,
     siteName: "Gaplets",
-    title: "Use cases — Clinics, Barbers, Spas, Nails, Tattoo, Pets, Fitness & more",
+    title: "Use cases — Clinics, Salons, Spas, Vets, Fitness, Home services & more",
     description: "See where Gaplets shines when last‑minute cancellations happen.",
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets Use Cases" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Use cases — Clinics, Barbers, Spas, Nails, Tattoo, Pets, Fitness & more",
+    title: "Use cases — Clinics, Salons, Spas, Vets, Fitness, Home services & more",
     description: "Popular appointment‑based businesses keep calendars full with Gaplets.",
     images: [OG_IMAGE],
   },
@@ -64,7 +64,24 @@ const CARDS: readonly UseCaseCard[] = [
   { k: "pets", t: "Pet grooming", d: "Alert nearby regulars and keep the table busy.", href: "/use-cases#pets", icon: "PawPrint" },
   { k: "fitness", t: "Fitness & Coaching", d: "Reschedule clients who want earlier times.", href: "/use-cases#fitness", icon: "Dumbbell" },
   { k: "auto", t: "Auto detailing & tint", d: "Fill bays fast when a job cancels.", href: "/use-cases#auto", icon: "Car" },
+  { k: "vets", t: "Veterinary clinics", d: "Refill exam and procedure slots from your waitlist.", href: "/use-cases#vets", icon: "Syringe" },
+  { k: "eyecare", t: "Optometry & Eye care", d: "Recover exam chairs with patients overdue for a visit.", href: "/use-cases#eyecare", icon: "Eye" },
+  { k: "repair", t: "Auto repair shops", d: "Backfill service bays when a drop-off cancels.", href: "/use-cases#repair", icon: "Wrench" },
+  { k: "home", t: "Home services", d: "Cleaners, HVAC and plumbers: refill crews' day fast.", href: "/use-cases#home", icon: "Home" },
+  { k: "education", t: "Tutors & lessons", d: "Music, language and tutoring slots filled from your list.", href: "/use-cases#education", icon: "GraduationCap" },
+  { k: "professional", t: "Consultants & Legal", d: "Keep billable hours booked when meetings fall through.", href: "/use-cases#professional", icon: "Briefcase" },
+  { k: "hospitality", t: "Tours & Experiences", d: "Resell cancelled seats on tours, classes and rentals.", href: "/use-cases#hospitality", icon: "UtensilsCrossed" },
 ] as const;
+
+const EXTRA_DETAILS: readonly { k: string; t: string; p: string; b: readonly string[] }[] = [
+  { k: "vets", t: "Veterinary clinics", p: "Fill cancelled exams, vaccinations and procedures from pets that are due.", b: ["Target by visit type and vet.", "Prioritise patients overdue for care.", "Stop alerts the moment the slot is booked."] },
+  { k: "eyecare", t: "Optometry & Eye care", p: "Exam chairs are expensive to leave empty; offer them to patients due for a checkup.", b: ["Match by exam type and doctor.", "Cap messages per wave.", "Track recovered revenue per week."] },
+  { k: "repair", t: "Auto repair shops", p: "A cancelled drop-off leaves a bay idle; offer it to waiting customers.", b: ["Filter by job length and bay type.", "First-come, first-served booking.", "Keep original bookings untouched."] },
+  { k: "home", t: "Home services", p: "Cleaners, HVAC and plumbing crews lose a full route stop when a visit cancels.", b: ["Target by service area and job type.", "Respect travel buffers between jobs.", "Queue retries when no one accepts at first."] },
+  { k: "education", t: "Tutors & lessons", p: "Music teachers, language tutors and coaches refill cancelled lessons quickly.", b: ["Notify students by instrument, subject or level.", "Honour package and session limits.", "Simple audit of who booked and when."] },
+  { k: "professional", t: "Consultants & Legal", p: "Keep billable hours booked when clients cancel at the last minute.", b: ["Offer openings to clients on your waitlist.", "Control which meeting types are eligible.", "Full log for reconciliation."] },
+  { k: "hospitality", t: "Tours & Experiences", p: "Cancelled seats on tours, classes and rentals are perishable inventory.", b: ["Alert guests who asked for that date.", "Set a short grace window to prevent double-fills.", "Track recovered revenue per experience."] },
+];
 
 export default function UseCasesPage() {
   // JSON‑LD: WebPage + Breadcrumbs + ItemList
@@ -202,6 +219,18 @@ export default function UseCasesPage() {
             <li>Track recovered revenue per service.</li>
           </ul>
         </section>
+      </div>
+
+      <div className="mt-6 grid gap-6">
+        {EXTRA_DETAILS.map((x) => (
+          <section key={x.k} id={x.k} aria-labelledby={`${x.k}-title`} className="scroll-mt-[70px] rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 id={`${x.k}-title`} className="text-base font-semibold text-slate-900">{x.t}</h2>
+            <p className="mt-2 text-sm text-slate-700 max-w-2xl">{x.p}</p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {x.b.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </section>
+        ))}
       </div>
 
       {/* Bottom CTA */}

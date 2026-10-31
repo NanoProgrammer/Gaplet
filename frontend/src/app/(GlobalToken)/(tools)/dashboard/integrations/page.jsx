@@ -248,28 +248,22 @@ prov.border} ${prov.bg} hover:shadow-lg hover:scale-[102%] transition`}
 
 'use client';
 
-// The Semi-manual integration is fully disabled in this version
-// Manual steps section has been commented out
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Loader2, LinkIcon, PlugZap, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import IntegrationsDirectory from '@/components/integrations/IntegrationsDirectory';
+import { Loader2, LinkIcon, PlugZap, CheckCircle, X } from 'lucide-react';
 
 const fetchWithAuth = async (url, options = {}) => {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  let accessToken = localStorage.getItem('accessToken');
+  const accessToken = localStorage.getItem('accessToken');
   const refreshToken = localStorage.getItem('refreshToken');
 
-  const doFetch = async (token) =>
+  const doFetch = (token) =>
     fetch(`${apiBase}${url}`, {
       ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
     });
 
   let res = await doFetch(accessToken);
@@ -286,24 +280,13 @@ const fetchWithAuth = async (url, options = {}) => {
   return res;
 };
 
-// Only Square integration is active; Semi-manual is disabled
+// Providers that can be connected today. Everything else lives in the directory below.
 const providers = [
   {
-    name: 'Square',
+    name: 'Square Appointments',
     img: '/squarefavicon.webp',
     key: 'square',
-    bg: 'bg-violet-100',
-    text: 'text-violet-800',
-    border: 'border-violet-300',
-  },
-  {
-    name: 'Semi-manual',
-    img: '/calendarlogo.webp',
-    key: 'google-semi',
-    bg: 'bg-white',
-    text: 'text-gray-400', // greyed out
-    border: 'border-gray-200',
-    disabled: true,
+    desc: 'Real-time cancellation detection via webhooks.',
   },
 ];
 
@@ -311,10 +294,10 @@ export default function IntegrationsPage() {
   const router = useRouter();
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const status = params.get('status');
     const provider = params.get('provider');
@@ -325,16 +308,17 @@ export default function IntegrationsPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const access = localStorage.getItem('accessToken');
-    if (!access) router.push('/signin');
+    if (!localStorage.getItem('accessToken')) {
+      router.replace('/signin');
+      return;
+    }
     (async () => {
       try {
         const res = await fetchWithAuth('/user/me');
         if (!res.ok) throw new Error();
         setUserInfo(await res.json());
       } catch {
-        router.push('/signin');
+        router.replace('/signin');
       } finally {
         setLoading(false);
       }
@@ -342,7 +326,7 @@ export default function IntegrationsPage() {
   }, [router]);
 
   const handleConnect = async (providerKey) => {
-    if (providers.find(p => p.key === providerKey)?.disabled) return;
+    setConnecting(providerKey);
     try {
       const res = await fetchWithAuth(`/auth/connect/${providerKey}`);
       if (!res.ok) throw new Error(await res.text());
@@ -351,85 +335,96 @@ export default function IntegrationsPage() {
     } catch (err) {
       console.error('Connection error', err);
       setNotification({ type: 'error', provider: providerKey });
+      setConnecting(null);
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center gap-2 text-gray-500">
-      <Loader2 className="animate-spin w-4 h-4" /> Loading integrations...
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-10 text-gray-500">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading integrations...
+      </div>
+    );
+  }
+
+  const connectedCount = providers.filter((p) => userInfo?.connectedProviders?.includes(p.key)).length;
 
   return (
-    <div className="min-h-screen px-6 py-10 bg-gradient-to-br from-gray-50 to-white">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white px-6 py-10">
+      <div className="mx-auto max-w-6xl space-y-8">
         {notification && (
-          <div className={`p-4 border rounded-lg text-sm font-medium ${
-            notification.type === 'success'
-              ? 'bg-green-100 text-green-800 border-green-300'
-              : 'bg-red-100 text-red-800 border-red-300'
-          }`}
+          <div
+            role="status"
+            className={`flex items-center justify-between rounded-lg border p-4 text-sm font-medium ${
+              notification.type === 'success'
+                ? 'border-green-300 bg-green-100 text-green-800'
+                : 'border-red-300 bg-red-100 text-red-800'
+            }`}
           >
-            {notification.type === 'success'
-              ? `✅ ${notification.provider} connected successfully!`
-              : `❌ Failed to connect ${notification.provider}.`}
+            <span>
+              {notification.type === 'success'
+                ? `✅ ${notification.provider} connected successfully!`
+                : `❌ Failed to connect ${notification.provider}.`}
+            </span>
+            <button onClick={() => setNotification(null)} aria-label="Dismiss" className="rounded p-1 hover:bg-black/5">
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
-        <h1 className="flex items-center gap-3 text-4xl font-extrabold text-gray-800">
-          <PlugZap className="w-8 h-8 text-green-500 animate-pulse" />
-          Integrations
-        </h1>
+        <header className="space-y-3">
+          <h1 className="flex items-center gap-3 text-4xl font-extrabold text-gray-800">
+            <PlugZap className="h-8 w-8 text-green-500" /> Integrations
+          </h1>
+          <p className="max-w-3xl text-lg text-gray-600">
+            When you cancel an appointment, Gaplet detects it and looks for a replacement. Connect your booking tool to enable
+            real-time cancellation detection{' '}
+            <span className="text-sm text-gray-500">(up to 3 days before the appointment).</span>
+          </p>
+        </header>
 
-        <p className="text-lg text-gray-600">
-          When you cancel an appointment, Gaplet will detect it and automatically look for a replacement.
-          <br />Connect your booking tools to enable real-time cancellation detection.
-          <br /><span className="text-sm text-gray-500">(Up to 3 days before the appointment.)</span>
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {providers.map((prov) => {
-            const connected = userInfo.connectedProviders?.includes(prov.key);
-            return (
-              <div
-                key={prov.key}
-                className={`p-6 bg-white border rounded-2xl shadow transition ${prov.border} ${prov.bg}`}
-              >
-                <div className="flex justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Image
-                      src={prov.img}
-                      alt={prov.name}
-                      width={24}
-                      height={24}
-                      className={prov.disabled ? 'filter grayscale' : ''}
-                    />
-                    <div>
-                      <h2 className={`text-xl font-semibold ${prov.disabled ? 'text-gray-400' : prov.text}`}>{prov.name}</h2>
-                      <p className="text-sm text-gray-500">
-                        {prov.disabled
-                          ? 'Coming soon...'
-                          : connected
-                          ? 'Connected'
-                          : 'Click connect to begin'}
-                      </p>
+        <section aria-labelledby="connected-title" className="space-y-4">
+          <h2 id="connected-title" className="text-lg font-semibold text-gray-800">
+            Available to connect <span className="text-sm font-normal text-gray-500">· {connectedCount} connected</span>
+          </h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {providers.map((prov) => {
+              const connected = userInfo?.connectedProviders?.includes(prov.key);
+              return (
+                <div key={prov.key} className="rounded-2xl border border-violet-300 bg-violet-50 p-6 shadow transition hover:shadow-lg">
+                  <div className="mb-4 flex justify-between">
+                    <div className="flex items-center gap-3">
+                      <Image src={prov.img} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-violet-800">{prov.name}</h3>
+                        <p className="text-sm text-gray-600">{connected ? 'Connected' : prov.desc}</p>
+                      </div>
                     </div>
+                    {connected && <CheckCircle className="h-5 w-5 text-green-600" aria-label="Connected" />}
                   </div>
-                  {connected && <CheckCircle className="w-5 h-5 text-green-600" />}
+                  <Button
+                    onClick={() => handleConnect(prov.key)}
+                    disabled={connecting === prov.key}
+                    className="flex w-full items-center justify-center gap-2 text-sm"
+                  >
+                    {connecting === prov.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
+                    {connected ? 'Reconnect' : 'Connect'}
+                  </Button>
                 </div>
+              );
+            })}
+          </div>
+        </section>
 
-                <Button
-                  onClick={() => handleConnect(prov.key)}
-                  disabled={prov.disabled}
-                  className={`w-full flex items-center justify-center gap-2 text-sm ${prov.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <LinkIcon className="w-4 h-4" />
-                  {connected ? 'Reconnect' : prov.disabled ? 'Coming Soon...' : 'Connect'}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+        <section aria-labelledby="directory-title" className="space-y-4">
+          <div>
+            <h2 id="directory-title" className="text-lg font-semibold text-gray-800">
+              More software by industry
+            </h2>
+            <p className="text-sm text-gray-500">Tell us which one you use — requests decide what we build next.</p>
+          </div>
+          <IntegrationsDirectory mode="dashboard" />
+        </section>
       </div>
     </div>
   );
