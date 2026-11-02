@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s | Gaplets",
   },
   description:
-    "Setup guides: connect Square, configure notifications and rules, and go live in minutes.",
+    "Setup guides: connect your booking tool, configure notifications and rules, and go live in minutes.",
   alternates: { canonical: "https://gaplets.com/docs" },
   robots: { index: true, follow: true },
   openGraph: {
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     siteName: "Gaplets",
     title: "Help Center — Setup & Guides",
     description:
-      "Connect Square, set rules and notifications, and start recovering cancellations fast.",
+      "Connect your booking tool, set rules and notifications, and start recovering cancellations fast.",
     images: [{ url: "https://gaplets.com/og/docs.png", width: 1200, height: 630, alt: "Gaplets Docs" }],
   },
   twitter: {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   keywords: [
     "cancellation recovery setup",
     "cancellation recovery guides",
-    "Square Appointments cancellations",
+    "booking software integration",
   ],
 };
 
@@ -64,7 +64,7 @@ export default function DocsHubPage() {
       <SectionHeader
   eyebrow="Docs"
   title="Help Center"
-  desc="Short guides to connect Square, configure rules & notifications, and go live."
+  desc="Short guides to connect your booking tool, configure rules & notifications, and go live."
   href={PRICING_PATH}
   cta="View pricing"
   align="center"

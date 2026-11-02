@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     "cancellation recovery",
     "move-up notifications",
     "fill last-minute cancellations",
-    "Square Appointments integration",
+    "booking software integration",
     "SMS email notifications",
     "eligibility rules",
     "auto booking",
@@ -61,7 +61,7 @@ const PRICING_PATH = "/price" as const;
 const CARDS = [
   { title: "Automation", desc: "Detect cancellations and auto-fill while you keep working.", href: "/features/automation", icon: "Zap" },
   { title: "Notifications", desc: "Reach eligible clients via SMS/Email at the same time.", href: "/features/notifications", icon: "BellRing" },
-  { title: "Square integration", desc: "OAuth + webhooks for instant detection.", href: "/integrations/square", icon: "Plug" },
+  { title: "Integrations", desc: "Square, Google Calendar, calendar links, webhooks and CSV.", href: "/integrations", icon: "Plug" },
   { title: "Privacy & security", desc: "Least-privilege scopes. Data encrypted in transit and at rest.", href: "/security", icon: "ShieldCheck" },
 ] as const;
 
@@ -170,7 +170,7 @@ export default function FeaturesPage() {
           Ready to recover lost revenue? {""}
           <Link href={PRICING_PATH} className="font-medium underline underline-offset-4">Pick a plan</Link>{" "}
           or {""}
-          <Link href="/integrations/square" className="font-medium underline underline-offset-4">Connect Square</Link>.
+          <Link href="/integrations" className="font-medium underline underline-offset-4">Browse integrations</Link>.
         </p>
       </div>
 

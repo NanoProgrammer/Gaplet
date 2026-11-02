@@ -32,7 +32,7 @@ export default function Hero() {
               <GlowButton variant="secondary">See live demo (30s)</GlowButton>
             </Link>
           </div>
-          <p className="mt-2 text-xs text-gray-500">No credit card. Works with Square Appointments.</p>
+          <p className="mt-2 text-xs text-gray-500">No credit card. Works with your booking software.</p>
         </div>
 
         {/* Diagram */}

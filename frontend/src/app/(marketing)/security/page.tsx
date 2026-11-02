@@ -52,7 +52,7 @@ const ITEMS = [
   { t: "Encryption", d: "TLS 1.2+ in transit and AES‑256 at rest. Secrets stored in a managed key service." },
   { t: "Least‑privilege access", d: "Role‑based permissions; production access is limited and auditable." },
   { t: "Backups", d: "Automated encrypted backups with periodic restore drills." },
-  { t: "OAuth scopes", d: "We only request the minimum Square scopes required to detect openings and book replacements." },
+  { t: "OAuth scopes", d: "We only request the minimum permissions each integration needs to detect openings and book replacements." },
   { t: "Data retention", d: "You control your data. We retain only what’s needed for operation and billing." },
   { t: "Logging & audit", d: "Key events are logged (openings, notifications, replacements) to aid reconciliation." },
   { t: "Reliability", d: "Queue‑based processing with retries and backoff; webhook failures surfaced for quick fixes." },

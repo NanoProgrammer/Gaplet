@@ -192,7 +192,7 @@ export function RevenueLossTeaser() {
 
 export function HowItWorksTeaser() {
   const steps = [
-    { t: "Cancel → Detect", d: "Delete the slot in your booking tool (Square Appointments, etc.). We detect it instantly." },
+    { t: "Cancel → Detect", d: "Cancel the booking in your booking tool or calendar. We detect it automatically." },
     { t: "Notify the right clients", d: "We ping eligible clients by SMS/Email at once. No spam — just fit." },
     { t: "Auto‑book the first reply", d: "Fair race. First to confirm gets the spot. Your calendar updates automatically." },
   ];
@@ -244,8 +244,8 @@ export function HowItWorksTeaser() {
 export function IntegrationsTeaser() {
   const items = [
     { t: "Square Appointments", badge: "Live", dim: false },
-    { t: "Google Calendar", badge: "Coming soon", dim: true },
-    { t: "Google Sheets", badge: "Coming soon", dim: true },
+    { t: "Google Calendar", badge: "Live", dim: false },
+    { t: "Any calendar link (ICS), webhook, Zapier or Make", badge: "Live", dim: false },
     { t: "Fresha, Vagaro, Jane, Mindbody & 70+ more", badge: "Planned", dim: true },
   ];
   const sectionVariant: Variant = "white"; // ← consistent here
@@ -256,7 +256,7 @@ export function IntegrationsTeaser() {
         <SectionHeader
           eyebrow="Integrations"
           title="Connect your tools in minutes"
-          desc="Connect Gaplets to Square Appointments (live). Google Calendar & Sheets coming soon, with 70+ more tools across every industry on the roadmap."
+          desc="Connect Gaplets to Square, Google Calendar, any calendar link or a webhook (Zapier, Make). 70+ more booking tools across every industry are on the roadmap."
 
           href="/integrations"
           cta="Explore integrations"
@@ -357,7 +357,7 @@ export function PricingTeaserGlow() {
 
 export function FAQTeaserStrip() {
   const faqs: [string, string][] = [
-    ["Do I need to change my booking system?", "No. We work with Square today. Calendar/Sheets coming soon."],
+    ["Do I need to change my booking system?", "No. Connect Square or Google Calendar, or link any calendar or send a webhook."],
     ["Do my clients need an app?", "No. They get SMS/Email and book via a link."],
     ["How fast are replacements?", "Usually within 1–2 hours when multi‑notify is enabled."],
   ];

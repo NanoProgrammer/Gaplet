@@ -35,7 +35,7 @@ export function DocsIndex({
   return (
     <div className="mt-8">
       <LazyMotion features={domAnimation} strict>
-        <Section id="primary" title="Start here" desc="Connect Square, review FAQ, and understand pricing.">
+        <Section id="primary" title="Start here" desc="Connect your booking tool, review FAQ, and understand pricing.">
           <MotionGrid cols="sm:grid-cols-3">
             {primary.map((item) => (
               <CardItem key={item.t} item={item} />
@@ -178,14 +178,14 @@ function QuickStart({ href }: { href: string }) {
             <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white/60 px-2 py-1 text-[11px] font-medium text-emerald-700">
               <Zap className="h-3.5 w-3.5" /> Live in minutes
             </div>
-            <h3 className="text-base font-semibold text-emerald-900">Connect Square → set rules → send a test</h3>
+            <h3 className="text-base font-semibold text-emerald-900">Connect your booking tool → set rules → send a test</h3>
             <p className="mt-1 text-sm text-emerald-800/90">
               Gaplets detects cancellations in real time, pings eligible clients, and the first to accept books the slot. Originals stay intact unless you choose to edit.
             </p>
           </div>
           <div className="flex gap-2">
             <Button asChild className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
-              <Link href={href} aria-label="Open Quick start: Square integration">Connect Square</Link>
+              <Link href={href} aria-label="Open Quick start: integrations">Connect your tool</Link>
             </Button>
             <Button asChild variant="outline" className="rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-100">
               <Link href="/docs/faq">Read the FAQ</Link>

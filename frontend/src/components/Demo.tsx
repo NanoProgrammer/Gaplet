@@ -260,7 +260,7 @@ function EmailThread({ step }: { step: number }) {
 function EventLog({ step, mode }: { step: number; mode: Mode }) {
   const items = React.useMemo(
     () => [
-      { id: "evt1", at: 1, icon: <Activity className="h-3.5 w-3.5 text-violet-600" />, text: "Cancellation detected (Square webhook)", meta: "2:35 PM • 60 min Massage w/ Jamie" },
+      { id: "evt1", at: 1, icon: <Activity className="h-3.5 w-3.5 text-violet-600" />, text: "Cancellation detected (booking system)", meta: "2:35 PM • 60 min Massage w/ Jamie" },
       { id: "evt2", at: 2, icon: <Send className="h-3.5 w-3.5 text-sky-600" />, text: "Wave 1 notified", meta: "Channels: SMS + Email • 12 eligible" },
       { id: "evt3", at: 4, icon: <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />, text: mode === "sms" ? "Reply received: YES" : "CTA clicked from Email", meta: "Ava P. • 2:37 PM" },
       { id: "evt4", at: 5, icon: <Bell className="h-3.5 w-3.5 text-emerald-600" />, text: "Confirmation sent", meta: "Others queued for closure notice" },

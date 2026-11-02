@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     "cancellation recovery",
     "fill last-minute cancellations",
     "cancellation recovery",
-    "Square Appointments cancellations",
+    "booking software integration",
     "sms email booking notifications",
     "auto booking",
   ],
@@ -118,7 +118,7 @@ export default function HowItWorksPage() {
           <h2 id="setup-title" className="text-base font-semibold text-slate-900">Setup checklist</h2>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-700">
             <li>
-              <span className="font-medium">Connect Square.</span> Authorize access so we can detect cancellations in real time. <a href="/integrations/square" className="underline underline-offset-4">Open Square integration</a>.
+              <span className="font-medium">Connect your booking tool.</span> Square or Google Calendar with one click, or use a calendar link or webhook for any other tool. <a href="/integrations" className="underline underline-offset-4">Choose your integration</a>.
             </li>
             <li>
               <span className="font-medium">Set eligibility rules.</span> Target only clients who can actually make it (same service type, inactive, no upcoming booking, provider/time filters). <a href="/features#rules" className="underline underline-offset-4">See rules</a>.
@@ -156,9 +156,9 @@ export default function HowItWorksPage() {
         {/* Next steps */}
         <section id="next-steps" aria-labelledby="next-title" className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
           <h2 id="next-title" className="text-base font-semibold text-slate-900">Next steps</h2>
-          <p className="mt-1 text-sm text-slate-600">Ready to go live? Connect Square or review pricing.</p>
+          <p className="mt-1 text-sm text-slate-600">Ready to go live? Connect your booking tool or review pricing.</p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <a href="/integrations/square" className="inline-flex items-center rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">Connect Square</a>
+            <a href="/integrations" className="inline-flex items-center rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">Connect your tool</a>
             <a href="/price" className="inline-flex items-center rounded-xl border px-3 py-2 text-sm font-medium hover:bg-slate-50">View pricing</a>
           </div>
         </section>

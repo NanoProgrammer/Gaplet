@@ -13,8 +13,8 @@ const PAGE_URL = `${SITE_URL}/integrations` as const;
 const OG_IMAGE = `${SITE_URL}/og/integrations.png` as const; // asegúrate de tener esta imagen
 
 export const metadata: Metadata = {
-  title: { default: "Integrations — Connect Square today. Calendar & Sheets next.", template: "%s | Gaplets" },
-  description: "Plug Gaplets into tools you already use. Square is live; Google Calendar and Google Sheets are coming next.",
+  title: { default: "Integrations — Connect your booking software, calendar or webhook", template: "%s | Gaplets" },
+  description: "Plug Gaplets into the tools you already use: Square, Google Calendar, any calendar link, or webhooks via Zapier and Make.",
   alternates: { canonical: PAGE_URL },
   robots: {
     index: true,
@@ -36,13 +36,13 @@ export const metadata: Metadata = {
     type: "website",
     url: PAGE_URL,
     siteName: "Gaplets",
-    title: "Integrations — Connect Square today. Calendar & Sheets next.",
-    description: "Square is live. Google Calendar and Google Sheets are next.",
+    title: "Integrations — Connect your booking software, calendar or webhook",
+    description: "Square, Google Calendar, calendar links and webhooks are live.",
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets Integrations" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Integrations — Connect Square today. Calendar & Sheets next.",
+    title: "Integrations — Connect your booking software, calendar or webhook",
     description: "Plug Gaplets into tools you already use.",
     images: [OG_IMAGE],
   },
@@ -55,7 +55,7 @@ export default function IntegrationsPage() {
     "@type": "WebPage",
     name: "Gaplets Integrations",
     url: PAGE_URL,
-    description: "Integrations with Square (live) and upcoming Google Calendar & Google Sheets.",
+    description: "Integrations with Square, Google Calendar, calendar links (ICS) and webhooks.",
   } as const;
 
   const breadcrumbsLd = {
@@ -82,9 +82,9 @@ export default function IntegrationsPage() {
       <SectionHeader
         eyebrow="Integrations"
         title="Plug into the tools you already use"
-        desc={`Browse ${INTEGRATIONS.length}+ booking tools across ${Object.keys(INDUSTRIES).length - 1} industries. Square is live; the rest are rolling out based on demand.`}
+        desc={`Browse ${INTEGRATIONS.length}+ booking tools across ${Object.keys(INDUSTRIES).length - 1} industries. Square, Google Calendar, calendar links and webhooks are live; native sync for the rest is prioritised by demand.`}
         href="/integrations/square"
-        cta="Connect Square"
+        cta="Get started"
         align="center"
       />
 

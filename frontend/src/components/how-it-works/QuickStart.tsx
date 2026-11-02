@@ -16,9 +16,9 @@ const STEPS = [
   {
     k: "connect",
     icon: Plug,
-    title: "Connect Square",
-    desc: "Authorize Square so we can detect cancellations instantly.",
-    cta: { href: "/integrations/square", label: "Connect Square" },
+    title: "Connect your booking tool",
+    desc: "Connect Square, Google Calendar, a calendar link or a webhook so we can detect cancellations.",
+    cta: { href: "/integrations", label: "Choose your tool" },
   },
   {
     k: "rules",

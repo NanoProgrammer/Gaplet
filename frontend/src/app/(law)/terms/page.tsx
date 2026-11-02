@@ -76,7 +76,7 @@ export default function TermsPage() {
           {
             title: "5. Third-Party Services",
             content:
-              "Gaplets integrates with services like Google Calendar, Jane, Square, and Twilio. We are not responsible for their availability or data policies. Your use of them is governed by their respective terms.",
+              "Gaplets integrates with services like Google Calendar, Square, and Twilio. We are not responsible for their availability or data policies. Your use of them is governed by their respective terms.",
           },
           {
             title: "6. Limitation of Liability",

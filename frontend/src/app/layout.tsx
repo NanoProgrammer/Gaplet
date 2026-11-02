@@ -11,18 +11,18 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 export const metadata: Metadata = {
   metadataBase: new URL("https://gaplets.com"),
   applicationName: "Gaplets",
-  title: "Gaplets | Square-Powered Last-Minute Appointment Filler",
+  title: "Gaplets | Cancellation Recovery & Client Reactivation",
   description:
-    "Detect last-minute cancellations in Square and instantly invite clients with a later booking — or past clients who stopped coming — to take the slot. Recover lost revenue and keep your calendar full.",
+    "Detect last-minute cancellations in your booking software and instantly invite clients with a later booking — or past clients who stopped coming — to take the slot. Recover lost revenue and keep your calendar full.",
   keywords: [
-    "Square integration",
-    "Square Appointments",
-    "Square cancellations",
+    "booking software integration",
+    "cancellation recovery",
+    "client reactivation",
     "fill last-minute cancellations",
     "appointment automation",
     "no-show recovery",
-    "salon scheduling Square",
-    "clinic scheduling Square",
+    "salon cancellations",
+    "clinic cancellations",
   ],
   alternates: { canonical: "https://gaplets.com/" },
   robots: {
@@ -33,21 +33,21 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Gaplets",
-    title: "Gaplets | Fill Last-Minute Appointments via Square",
+    title: "Gaplets | Fill Last-Minute Cancellations",
     description:
-      "Leverage Square's customer management: Gaplets auto-fills last-minute cancellations by inviting your existing clients—zero manual work.",
+      "Gaplets auto-fills last-minute cancellations by inviting your existing clients — works with your booking software, zero manual work.",
     url: "https://gaplets.com/",
     locale: "en_US",
-    images: [{ url: "https://gaplets.com/og_gaplet.png", width: 1200, height: 630, alt: "Gaplets × Square – product preview" }],
+    images: [{ url: "https://gaplets.com/og_gaplet.png", width: 1200, height: 630, alt: "Gaplets – product preview" }],
   },
   twitter: {
     card: "summary_large_image",
     site: "@your_handle",
     creator: "@your_handle",
-    title: "Gaplets | Square Integration for No-Show Recovery",
+    title: "Gaplets | Cancellation & No-Show Recovery",
     description:
-      "Plug Gaplets into Square to auto-notify clients when slots free up—stop losing revenue to no-shows.",
-    images: ["https://gaplets.com/og_square_gaplet.png"],
+      "Plug Gaplets into your booking tool to auto-notify clients when slots free up—stop losing revenue to cancellations.",
+    images: ["https://gaplets.com/og_gaplet.png"],
   },
   icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png", shortcut: "/favicon-32x32.png" },
   category: "Business & Productivity",

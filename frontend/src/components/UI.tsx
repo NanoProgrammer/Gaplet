@@ -11,8 +11,8 @@ export default function SetUpSection() {
       <div className="mx-4 md:mx-16">
         <p className="mx-auto max-w-2xl text-slate-700 text-sm sm:text-[15px] md:text-lg leading-relaxed text-center md:text-left">
           Connect your tools and choose who gets alerts. <strong>Gaplets</strong> works with&nbsp;
-          <strong>Square</strong> today and we&apos;re actively adding <strong>Google Calendar</strong> and&nbsp;
-          <strong>Google Sheets</strong>. No new system to learn.
+          <strong>Square</strong>, <strong>Google Calendar</strong>, any <strong>calendar link</strong> and&nbsp;
+          <strong>webhooks</strong> (Zapier, Make). No new system to learn.
         </p>
       </div>
 

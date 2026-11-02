@@ -235,7 +235,7 @@ export default function UseCasesPage() {
 
       {/* Bottom CTA */}
       <div className="mt-16 rounded-2xl border bg-white p-6 text-center shadow-sm">
-        <p className="text-sm text-slate-700">Ready to keep your calendar full? <Link href="/signup" className="font-medium underline underline-offset-4">Start free</Link> or <Link href="/integrations/square" className="font-medium underline underline-offset-4">connect Square</Link>.</p>
+        <p className="text-sm text-slate-700">Ready to keep your calendar full? <Link href="/signup" className="font-medium underline underline-offset-4">Start free</Link> or <Link href="/integrations" className="font-medium underline underline-offset-4">browse integrations</Link>.</p>
       </div>
 
       {/* JSON‑LD */}

@@ -10,11 +10,11 @@ const OG_IMAGE = `${SITE_URL}/og/faq.png` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "FAQ — Square setup, notifications, rules & billing",
+    default: "FAQ — Setup, notifications, rules & billing",
     template: "%s | Gaplets",
   },
   description:
-    "Answers: connect Square, configure who gets invited, send SMS/Email waves, and understand billing & taxes.",
+    "Answers: connect your booking tool, configure who gets invited, send SMS/Email waves, and understand billing & taxes.",
   alternates: { canonical: PAGE_URL },
   robots: {
     index: true,
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   keywords: [
     "cancellation recovery",
     "fill cancelled appointments",
-    "Square Appointments cancellations",
+    "booking software integration",
     "fill last-minute cancellations",
     "auto-book cancellations",
   ],
@@ -41,16 +41,16 @@ export const metadata: Metadata = {
     type: "article",
     url: PAGE_URL,
     siteName: "Gaplets",
-    title: "FAQ — Square setup, notifications, rules & billing",
+    title: "FAQ — Setup, notifications, rules & billing",
     description:
-      "Connect Square, set eligibility rules, send SMS/Email waves, and handle billing & taxes.",
+      "Connect your booking tool, set eligibility rules, send SMS/Email waves, and handle billing & taxes.",
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets FAQ" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FAQ — Square setup, notifications, rules & billing",
+    title: "FAQ — Setup, notifications, rules & billing",
     description:
-      "How to set up Gaplets with Square: rules, notifications, and billing.",
+      "How to set up Gaplets: rules, notifications, and billing.",
     images: [OG_IMAGE],
   },
 };
@@ -77,18 +77,18 @@ const gettingStarted: QAItem[] = [
       "It auto-fills last-minute cancellations by notifying eligible clients via email/SMS. The first to accept books the slot. Original appointments remain unless edited.",
   },
   {
-    q: "How do I connect Square?",
+    q: "How do I connect my booking software?",
     a: (
       <>
         Go to{" "}
-        <Link href="/integrations/square" className="underline underline-offset-4">
-          Integrations → Square
+        <Link href="/integrations" className="underline underline-offset-4">
+          Integrations
         </Link>{" "}
-        and authorize. We subscribe to Square webhooks so openings are captured instantly.
+        and choose Square or Google Calendar (authorize with OAuth), paste a calendar link (ICS) from any tool that publishes one, or send cancellations with a webhook from Zapier, Make or your own system.
       </>
     ),
     plain:
-      "Open Integrations → Square, authorize your account, and we subscribe to webhooks to capture openings instantly.",
+      "Open Integrations and choose Square or Google Calendar (OAuth), paste a calendar link (ICS), or send cancellations with a webhook from Zapier, Make or your own system.",
   },
   {
     q: "Who gets notified?",
@@ -241,7 +241,7 @@ export default function FAQPage() {
   name: "FAQ",
   url: PAGE_URL,
   description:
-    "FAQ: Square setup, eligibility rules, notifications, and billing.",
+    "FAQ: setup, eligibility rules, notifications, and billing.",
 } as const;
 
 
@@ -252,7 +252,7 @@ export default function FAQPage() {
       <SectionHeader
   eyebrow="Docs"
   title="FAQ"
-  desc="Short answers to get set up, from Square connection to notifications and billing."
+  desc="Short answers to get set up, from connecting your tool to notifications and billing."
   href={PRICING_PATH}
   cta="View pricing"
   align="center"
@@ -315,10 +315,10 @@ export default function FAQPage() {
           </Link>{" "}
           or{" "}
           <Link
-            href="/integrations/square"
+            href="/integrations"
             className="font-medium underline underline-offset-4"
           >
-            Integrations → Square
+            Integrations
           </Link>
           .
         </p>

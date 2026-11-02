@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "fill cancelled appointments",
     "fill last-minute cancellations",
     "auto booking",
-    "Square Appointments webhooks",
+    "booking system webhooks",
     "SMS email notifications",
   ],
   openGraph: {

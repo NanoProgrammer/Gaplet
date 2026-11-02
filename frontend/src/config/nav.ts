@@ -12,7 +12,6 @@ export const NAV = {
   more: [
     { href: "/how-it-works", label: "How it works" },
     { href: "/testimonials", label: "Testimonials" },
-    { href: "/integrations/square", label: "Square" },
     { href: "/security", label: "Security & compliance" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
