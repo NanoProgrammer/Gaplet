@@ -9,11 +9,11 @@ const PAGE_URL = `${SITE_URL}/features/notifications` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
+    default: "Notifications — SMS + Email invitations to the right clients",
     template: "%s | Gaplets",
   },
   description:
-    "Multi-channel notifications for your appointment waitlist: SMS + Email sent simultaneously to eligible clients. Waves stop on first booking.",
+    "Multi-channel invitations for cancelled slots: SMS + Email to clients with a later booking or who haven’t visited in a while. Waves stop on first booking.",
   alternates: { canonical: "https://gaplets.com/features/notifications" },
   robots: {
     index: true,
@@ -30,24 +30,24 @@ export const metadata: Metadata = {
     },
   },
   keywords: [
-    "appointment waitlist notifications",
+    "cancellation notifications",
     "sms notifications",
     "email notifications",
-    "waitlist automation",
+    "move-up notifications",
     "fill last-minute cancellations",
   ],
   openGraph: {
     type: "article",
     url: "https://gaplets.com/features/notifications",
     siteName: "Gaplets",
-    title: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
+    title: "Notifications — SMS + Email invitations to the right clients",
     description:
       "Reach the right clients instantly. One tap to confirm; automatic stop on first booking.",
     images: [{ url: "https://gaplets.com/og/notifications.png", width: 1200, height: 630, alt: "Notifications" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Appointment Waitlist Notifications — SMS + Email waves to eligible clients",
+    title: "Notifications — SMS + Email invitations to the right clients",
     description:
       "Simultaneous SMS + Email to eligible clients. Smart throttling and caps.",
     images: ["https://gaplets.com/og/notifications.png"],
@@ -79,7 +79,7 @@ export default function NotificationsPage() {
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
      <SectionHeader
   eyebrow="Notifications"
-  title="Appointment waitlist — right people, right away"
+  title="Right clients, right away"
   desc="Simultaneous SMS + Email to clients who can actually make it. First to confirm gets the spot."
   href="/features"
   cta="Back to features"

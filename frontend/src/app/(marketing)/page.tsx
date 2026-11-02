@@ -16,24 +16,24 @@ import {
 export const metadata: Metadata = {
   metadataBase: new URL("https://gaplets.com"),
   title:
-    "Appointment Waitlist Software for Square | Auto‑Fill Last‑Minute Cancellations – Gaplet",
+    "Cancellation Recovery & Client Reactivation for Square | Gaplet",
   description:
-    "Appointment waitlist automation for Square Appointments. Detect cancellations, notify eligible clients by SMS/Email, and auto‑book the first to confirm — no call‑down list.",
+    "Cancellation recovery for Square Appointments. When a booking cancels, invite clients with a later appointment to move up and win back past clients who stopped coming — by SMS/Email. The first to confirm gets the slot. No call‑down list.",
   alternates: { canonical: "https://gaplets.com/" },
   robots: { index: true, follow: true },
   keywords: [
-    "appointment waitlist",
-    "appointment waitlist software",
-    "appointment waitlist automation",
-    "appointment waitlist app",
-    "Square Appointments waitlist",
+    "cancellation recovery",
+    "cancellation recovery software",
+    "fill cancelled appointments",
+    "client reactivation",
+    "Square Appointments cancellations",
     "fill last-minute cancellations",
     "no-show recovery",
     "auto-book cancellations"
   ],
   openGraph: {
     title:
-      "Appointment Waitlist Software for Square | Auto‑Fill Last‑Minute Cancellations – Gaplet",
+      "Cancellation Recovery & Client Reactivation for Square | Gaplet",
     description:
       "Detect. Notify. Auto‑book. Recover lost revenue from last‑minute cancellations on Square.",
     url: "https://gaplets.com/",
@@ -44,14 +44,14 @@ export const metadata: Metadata = {
         url: "/og.jpg",
         width: 1200,
         height: 630,
-        alt: "Appointment waitlist software — Gaplet",
+        alt: "Cancellation recovery software — Gaplet",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title:
-      "Appointment Waitlist Automation for Square – Gaplet",
+      "Cancellation Recovery for Square – Gaplet",
     description:
       "Fill last‑minute cancellations automatically on Square. First to reply gets booked.",
     images: ["/og.jpg"],
@@ -68,7 +68,7 @@ export default function HomePage() {
     operatingSystem: "Web",
     url: "https://gaplets.com/",
     description:
-      "Appointment waitlist automation for Square Appointments to fill last‑minute cancellations and auto‑book the first to confirm.",
+      "Cancellation recovery for Square Appointments: invite clients with a later booking to move up, reactivate past clients, and book the first to confirm.",
     offers: { "@type": "Offer", price: "49.00", priceCurrency: "USD" },
   } as const;
 

@@ -27,10 +27,10 @@ export const metadata: Metadata = {
   keywords: [
     "square appointments integration",
     "google calendar integration",
-    "square appointments waitlist",
+    "square appointments cancellations",
     "google sheets integration",
     "fill last-minute cancellations",
-    "waitlist automation",
+    "move-up notifications",
   ],
   openGraph: {
     type: "website",

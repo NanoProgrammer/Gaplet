@@ -149,7 +149,7 @@ export function RevenueLossTeaser() {
         <SectionHeader
           eyebrow="The silent leak"
           title="Cancellations quietly drain your month"
-          desc="Cancel the slot and our appointment waitlist app handles detection, notifications, and auto-booking — end-to-end."
+          desc="When a booking cancels, Gaplets detects it, invites the right clients to take the slot, and books the first to confirm — end-to-end."
 
           href="/use-cases"
           cta="See real use cases"
@@ -256,7 +256,7 @@ export function IntegrationsTeaser() {
         <SectionHeader
           eyebrow="Integrations"
           title="Connect your tools in minutes"
-          desc="Connect Gaplets’ appointment waitlist to Square Appointments (live). Google Calendar & Sheets coming soon, with 70+ more tools across every industry on the roadmap."
+          desc="Connect Gaplets to Square Appointments (live). Google Calendar & Sheets coming soon, with 70+ more tools across every industry on the roadmap."
 
           href="/integrations"
           cta="Explore integrations"
@@ -295,7 +295,7 @@ export function BenefitsMarquee() {
 
   return (
     <section className="relative mx-auto max-w-7xl px-0 py-16 overflow-x-clip">
-      <SectionHeader eyebrow="Benefits" title="Built to claw back lost revenue" desc="Includes appointment waitlist automation. Start free for 7 days. Cancel anytime."
+      <SectionHeader eyebrow="Benefits" title="Built to claw back lost revenue" desc="Fills cancellations and reactivates past clients. Start free for 7 days. Cancel anytime."
  href="/features" cta="Explore features" align="center" />
 
       <div className="relative mt-8 overflow-x-clip">

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
    keywords: [
     "gaplets testimonials",
     "gaplets reviews",
-    "appointment waitlist reviews",
+    "cancellation recovery reviews",
     "fill cancellations case studies",
  ],
   alternates: { canonical: PAGE_URL },

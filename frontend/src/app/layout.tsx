@@ -13,11 +13,11 @@ export const metadata: Metadata = {
   applicationName: "Gaplets",
   title: "Gaplets | Square-Powered Last-Minute Appointment Filler",
   description:
-    "Detect last-minute cancellations in Square and instantly notify waitlisted customers. Recover lost revenue and keep your calendar full—right from your Square dashboard.",
+    "Detect last-minute cancellations in Square and instantly invite clients with a later booking — or past clients who stopped coming — to take the slot. Recover lost revenue and keep your calendar full.",
   keywords: [
     "Square integration",
     "Square Appointments",
-    "Square waitlist",
+    "Square cancellations",
     "fill last-minute cancellations",
     "appointment automation",
     "no-show recovery",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     siteName: "Gaplets",
     title: "Gaplets | Fill Last-Minute Appointments via Square",
     description:
-      "Leverage Square's customer management: Gaplets auto-fills last-minute cancellations from your Square waitlist—zero manual work.",
+      "Leverage Square's customer management: Gaplets auto-fills last-minute cancellations by inviting your existing clients—zero manual work.",
     url: "https://gaplets.com/",
     locale: "en_US",
     images: [{ url: "https://gaplets.com/og_gaplet.png", width: 1200, height: 630, alt: "Gaplets × Square – product preview" }],

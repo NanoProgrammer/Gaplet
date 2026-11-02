@@ -10,7 +10,7 @@ const PAGE_URL = `${SITE_URL}/integrations/square` as const;
 const OG_IMAGE = `${SITE_URL}/og/integrations-square.png` as const; // asegúrate de tener esta imagen
 
 export const metadata: Metadata = {
-  title: { default: "Square Integration — Waitlist & cancellation recovery for Square Appointments",
+  title: { default: "Square Integration — Cancellation recovery & client reactivation for Square Appointments",
      template: "%s | Gaplets"
    },
   description: "Use your Square customers & appointments to auto‑fill last‑minute gaps. Connect, set rules, and go live in minutes.",
@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   },
   keywords: [
     "Square Appointments integration",
-    "Square Appointments waitlist",
+    "Square Appointments cancellations",
     "fill last-minute cancellations",
-    "waitlist automation",
+    "move-up notifications",
     "sms email notifications",
     "auto booking"
   ],
@@ -60,7 +60,7 @@ const softwareAppLd = {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     url: PAGE_URL,
-    description: "Appointment waitlist & cancellation recovery integrated with Square Appointments.",
+    description: "Cancellation recovery & client reactivation integrated with Square Appointments.",
     offers: {
       "@type": "Offer",
       price: 0,

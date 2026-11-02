@@ -14,11 +14,11 @@ const PAGE_URL = `${SITE_URL}/features` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
+    default: "Features — Cancellation Recovery, Client Reactivation, Rules, Analytics",
     template: "%s | Gaplets",
   },
   description:
-    "Automate last‑minute cancellation recovery with an appointment waitlist: detect openings, notify eligible clients via SMS/Email, auto‑book, and track recovered revenue.",
+    "Automate last‑minute cancellation recovery: detect openings, invite clients to move up or come back, auto‑book the first to confirm, and track recovered revenue.",
   alternates: { canonical: "https://gaplets.com/features" },
   robots: {
     index: true,
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     "max-video-preview": -1,
   },
   keywords: [
-    "appointment waitlist",
-    "waitlist automation",
+    "cancellation recovery",
+    "move-up notifications",
     "fill last-minute cancellations",
     "Square Appointments integration",
     "SMS email notifications",
@@ -41,14 +41,14 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://gaplets.com/features",
     siteName: "Gaplets",
-    title: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
+    title: "Features — Cancellation Recovery, Client Reactivation, Rules, Analytics",
     description:
       "Detect cancellations, notify the right clients, auto‑book, and measure results.",
     images: [{ url: "https://gaplets.com/og/features.png", width: 1200, height: 630, alt: "Gaplets Features" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Appointment Waitlist Features — Automation, Notifications, Rules, Analytics",
+    title: "Features — Cancellation Recovery, Client Reactivation, Rules, Analytics",
     description:
       "Automate cancellation recovery: detect, notify, auto‑book, and track ROI.",
     images: ["https://gaplets.com/og/features.png"],
@@ -105,7 +105,7 @@ export default function FeaturesPage() {
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
   eyebrow="Product"
-  title="Appointment Waitlist — All the building blocks"
+  title="Cancellation Recovery — All the building blocks"
   desc="From detection to auto‑booking — simple, fast, and reliable."
   href={PRICING_PATH}
   cta="View pricing"

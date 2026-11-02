@@ -14,7 +14,7 @@ export const blogPosts = [
       <p>A last-minute gap is an unfilled appointment slot caused by a late cancellation or no-show. These gaps represent a loss of potential revenue, disrupted schedules, and wasted preparation.</p>
 
       <h2>How Gaplets Solves It</h2>
-      <p>Gaplets is designed to detect these empty slots instantly. It then looks at your waitlist or upcoming clients and sends automated SMS or email invitations to fill the spot. No manual work, no extra tools.</p>
+      <p>Gaplets is designed to detect these empty slots instantly. It then looks at clients who already have a later appointment, and at past clients who haven’t visited in a while, and sends automated SMS or email invitations to fill the spot. No manual work, no extra tools.</p>
       <ul>
         <li>⚡ Detect appointment gaps instantly</li>
         <li>📱 Notify eligible clients via SMS or email</li>
@@ -26,7 +26,7 @@ export const blogPosts = [
       <p>In industries where your time equals money, filling even one missed appointment a week can significantly boost monthly income. Gaplets provides peace of mind and operational resilience.</p>
 
       <h2>Example Use Case</h2>
-      <p>Imagine you’re a physiotherapist with a 2pm cancellation. Gaplets finds a client from your waitlist who wanted a same-day visit, sends them an invite, and books the appointment without you lifting a finger. That’s smart automation.</p>
+      <p>Imagine you’re a physiotherapist with a 2pm cancellation. Gaplets finds a client whose next visit is days away, invites them to take the 2pm slot, and books it for the first one to confirm — without you lifting a finger. That’s smart automation.</p>
 
       <h2>Start Today</h2>
       <p>If you're tired of wasted slots and lost revenue, it’s time to automate the gap. Gaplets is built to fit into your existing workflow and deliver results from day one.</p>

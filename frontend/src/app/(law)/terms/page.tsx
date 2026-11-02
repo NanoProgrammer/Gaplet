@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "appointment platform agreement",
     "calendar automation terms",
     "SaaS user agreement",
-    "smart waitlist platform",
+    "cancellation recovery platform",
   ],
   alternates: {
     canonical: "https://gaplets.com/terms",

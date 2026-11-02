@@ -33,10 +33,10 @@ export const metadata: Metadata = {
     },
   },
   keywords: [
-    "appointment waitlist",
+    "cancellation recovery",
     "fill last-minute cancellations",
     "cancellation recovery",
-    "Square Appointments waitlist",
+    "Square Appointments cancellations",
     "sms email booking notifications",
     "auto booking",
   ],

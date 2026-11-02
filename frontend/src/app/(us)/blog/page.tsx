@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Gaplets Blog | Tips on Scheduling, Automation, and Revenue Recovery',
   description:
-    'Read insights and strategies on filling last-minute cancellations, smart waitlist management, and improving your appointment scheduling with Gaplets.',
+    'Read insights and strategies on filling last-minute cancellations, smart client re-engagement, and improving your appointment scheduling with Gaplets.',
   openGraph: {
     title: 'Gaplets Blog | Tips on Scheduling and Revenue Recovery',
     description:

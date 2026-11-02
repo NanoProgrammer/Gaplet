@@ -10,11 +10,11 @@ const OG_IMAGE = `${SITE_URL}/og/faq.png` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
+    default: "FAQ — Square setup, notifications, rules & billing",
     template: "%s | Gaplets",
   },
   description:
-    "Answers for appointment waitlist: connect Square, configure eligibility, send SMS/Email waves, and understand billing & taxes.",
+    "Answers: connect Square, configure who gets invited, send SMS/Email waves, and understand billing & taxes.",
   alternates: { canonical: PAGE_URL },
   robots: {
     index: true,
@@ -31,9 +31,9 @@ export const metadata: Metadata = {
     },
   },
   keywords: [
-    "appointment waitlist",
-    "appointment waitlist automation",
-    "Square Appointments waitlist",
+    "cancellation recovery",
+    "fill cancelled appointments",
+    "Square Appointments cancellations",
     "fill last-minute cancellations",
     "auto-book cancellations",
   ],
@@ -41,16 +41,16 @@ export const metadata: Metadata = {
     type: "article",
     url: PAGE_URL,
     siteName: "Gaplets",
-    title: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
+    title: "FAQ — Square setup, notifications, rules & billing",
     description:
       "Connect Square, set eligibility rules, send SMS/Email waves, and handle billing & taxes.",
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "Gaplets FAQ" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Appointment Waitlist FAQ — Square setup, notifications, rules & billing",
+    title: "FAQ — Square setup, notifications, rules & billing",
     description:
-      "How to set up an appointment waitlist with Square: rules, notifications, and billing.",
+      "How to set up Gaplets with Square: rules, notifications, and billing.",
     images: [OG_IMAGE],
   },
 };
@@ -238,10 +238,10 @@ export default function FAQPage() {
   const webpageLd = {
   "@context": "https://schema.org",
   "@type": "WebPage",
-  name: "Appointment Waitlist — FAQ",
+  name: "FAQ",
   url: PAGE_URL,
   description:
-    "FAQ about appointment waitlist: Square setup, eligibility rules, notifications, and billing.",
+    "FAQ: Square setup, eligibility rules, notifications, and billing.",
 } as const;
 
 
@@ -251,8 +251,8 @@ export default function FAQPage() {
       <Script id="faq-webpage-jsonld" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageLd) }} />
       <SectionHeader
   eyebrow="Docs"
-  title="Appointment Waitlist — FAQ"
-  desc="Short answers to set up your appointment waitlist, from Square connection to notifications and billing."
+  title="FAQ"
+  desc="Short answers to get set up, from Square connection to notifications and billing."
   href={PRICING_PATH}
   cta="View pricing"
   align="center"

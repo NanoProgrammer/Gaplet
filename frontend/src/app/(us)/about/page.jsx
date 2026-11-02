@@ -37,7 +37,7 @@ export default function AboutPage() {
           Gaplets is built using <strong>Next.js</strong> for fast, server-rendered performance, styled with <strong>Tailwind CSS v4</strong> and UI components from <strong>shadcn/ui</strong>. It uses modern JavaScript libraries like <strong>Framer Motion</strong> for subtle animations and <strong>React</strong> for a modular, scalable frontend architecture.
         </p>
         <p>
-          On the backend, it connects to third-party APIs such as <strong>Google Calendar</strong>, <strong>Jane</strong>, <strong>Square</strong>, and <strong>Twilio</strong> to automate real-time waitlist management and appointment recovery.
+          On the backend, it connects to third-party APIs such as <strong>Google Calendar</strong>, <strong>Jane</strong>, <strong>Square</strong>, and <strong>Twilio</strong> to automate real-time cancellation recovery and client reactivation.
         </p>
         <p>
           Every decision — from performance to design to UX — was made intentionally. This project is entirely self-built and deployed via <strong>Netlify</strong>, designed to be both useful and elegant.

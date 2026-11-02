@@ -10,11 +10,11 @@ const PAGE_URL = `${SITE_URL}/features/automation` as const;
 
 export const metadata: Metadata = {
   title: {
-    default: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
+    default: "Cancellation Recovery — Detect, invite & fill openings",
     template: "%s | Gaplets",
   },
   description:
-    "Replace cancellations in three steps with appointment waitlist automation: detect the opening, notify eligible clients via SMS/Email, and auto‑book the first response.",
+    "Recover cancellations in three steps: detect the opening, invite clients with a later booking (or past clients who stopped coming) via SMS/Email, and book the first response.",
   alternates: { canonical: "https://gaplets.com/features/automation" },
   robots: {
     index: true,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "max-video-preview": -1,
   },
   keywords: [
-    "appointment waitlist automation",
+    "fill cancelled appointments",
     "fill last-minute cancellations",
     "auto booking",
     "Square Appointments webhooks",
@@ -34,14 +34,14 @@ export const metadata: Metadata = {
     type: "article",
     url: "https://gaplets.com/features/automation",
     siteName: "Gaplets",
-    title: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
+    title: "Cancellation Recovery — Detect, invite & fill openings",
     description:
       "Detect cancellations, notify the right clients, auto‑book the first response, and keep originals intact.",
     images: [{ url: "https://gaplets.com/og/automation.png", width: 1200, height: 630, alt: "Automation" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Appointment Waitlist Automation — Detect, notify & auto‑book openings",
+    title: "Cancellation Recovery — Detect, invite & fill openings",
     description:
       "Replace cancellations in three steps with automation.",
     images: ["https://gaplets.com/og/automation.png"],
@@ -89,7 +89,7 @@ export default function AutomationPage() {
     <main className="mx-auto max-w-6xl px-6 py-16 overflow-x-clip">
       <SectionHeader
   eyebrow="Automation"
-  title="Appointment waitlist — set it once"
+  title="Cancellation recovery — set it once"
   desc="Cancel the slot in your tool — Gaplets detects it and fills it."
   href="/sign in"
   cta="Get set up"

@@ -18,10 +18,10 @@ export default function Hero() {
         {/* Copy + CTAs */}
         <div className="text-center max-w-xl lg:mr-40">
           <h1 className="text-[36px] sm:text-4xl font-bold mb-6">
-            Appointment waitlist automation — auto‑fill last‑minute cancellations
+            Fill cancellations by moving clients up — and win back the ones who stopped coming
           </h1>
           <p className="text-md text-gray-600 mb-6">
-            Gaplets detects openings on Square Appointments, messages eligible clients via SMS/Email, and auto‑books the first to confirm — turning empty slots into revenue.
+            When a booking is cancelled, Gaplets invites clients who already have a later appointment to move up, and reaches past clients who haven’t visited in a while — by SMS/Email. The first to confirm gets the slot, turning empty time into revenue.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">

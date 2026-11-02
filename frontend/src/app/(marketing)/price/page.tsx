@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   keywords: [
     "gaplets pricing",
     "saas pricing",
-     "appointment waitlist pricing",
+     "cancellation recovery pricing",
     "square appointments automation",
     "fill last‑minute cancellations",
   ],
@@ -47,7 +47,7 @@ const webpageLd = {
     "@type": "WebPage",
     name: "Gaplets Pricing",
     url: PAGE_URL,
-    description: "Pricing for Gaplets appointment waitlist & cancellation recovery.",
+    description: "Pricing for Gaplets cancellation recovery & client reactivation.",
   } as const;
 
   const breadcrumbsLd = {
