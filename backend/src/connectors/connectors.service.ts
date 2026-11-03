@@ -11,7 +11,7 @@ import { assertPublicHttpsUrl, safeFetchText } from './net-guard';
 import { ADAPTER_KEYS, GenericProvider, isAdapterKey, isGenericProvider } from './providers/keys';
 import { ADAPTERS, getAdapter, isConfigured } from './providers/registry';
 import { adapterCtx } from './providers/runtime';
-import { Credentials } from './providers/types';
+import { Credentials, ParsedCancellation, ProviderAdapter } from './providers/types';
 import { JwtService } from '@nestjs/jwt';
 
 export { GENERIC_PROVIDERS, GenericProvider, isGenericProvider } from './providers/keys';
@@ -143,6 +143,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
   async disconnect(userId: string) {
     const integ = await this.prisma.connectedIntegration.findUnique({ where: { userId } });
     if (!integ) return { ok: true };
+    await this.dropNativeWebhook(integ);
     if (integ.provider === 'google' && integ.accessToken) {
       fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(integ.refreshToken ?? integ.accessToken)}`, { method: 'POST', signal: AbortSignal.timeout(5000) }).catch(() => undefined);
     }
@@ -289,7 +290,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
 
   listProviders() {
     return Object.values(ADAPTERS).map((a) => ({
-      key: a.key, name: a.name, maturity: a.maturity, bookingSupported: a.bookingSupported,
+      key: a.key, name: a.name, maturity: a.maturity, bookingSupported: a.bookingSupported, delivery: a.webhook ? 'webhook' : 'polling',
       auth: a.auth.type, fields: a.auth.type === 'apikey' ? a.auth.fields : [], available: isConfigured(a),
     }));
   }
@@ -326,8 +327,51 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
     let creds: Credentials;
     try { creds = await a.auth.validate(values ?? {}); }
     catch (e: any) { throw new BadRequestException(e.message); }
+    if (a.webhook) return this.connectWithWebhook(userId, a, creds);
     await this.saveCredentials(userId, provider as GenericProvider, creds);
     return { ok: true };
+  }
+
+  /** Vendors without a list endpoint: subscribe to their cancellation webhook, authenticated by a secret URL token. */
+  private async connectWithWebhook(userId: string, a: ProviderAdapter, creds: Credentials) {
+    const base = (process.env.API_BASE_URL ?? '').replace(/\/$/, '');
+    if (!/^https:\/\//.test(base)) throw new BadRequestException('API_BASE_URL must be a public https URL to receive webhooks');
+    const previous = await this.prisma.connectedIntegration.findUnique({ where: { userId } });
+    if (previous) await this.dropNativeWebhook(previous);
+    const token = `gp_${crypto.randomBytes(24).toString('hex')}`;
+    const hookUrl = `${base}/hooks/native/${a.key}/${token}`;
+    const extra = creds.extra ?? {};
+    let reg: { webhookId: string; extra?: Record<string, string> };
+    try { reg = await a.webhook!.register({ accessToken: creds.accessToken, extra }, hookUrl); }
+    catch (e: any) { throw new BadRequestException(`Could not register the ${a.name} webhook: ${e.message}`); }
+    await this.save(userId, a.key as GenericProvider, { config: { extra: { ...extra, ...(reg.extra ?? {}) } }, accessToken: creds.accessToken, externalUserId: sha256(token) });
+    await this.prisma.connectedIntegration.update({ where: { userId }, data: { webhookId: reg.webhookId } });
+    return { ok: true };
+  }
+
+  /** Best effort: never blocks a disconnect. */
+  private async dropNativeWebhook(integ: any) {
+    const a = getAdapter(integ.provider);
+    if (!a?.webhook?.unregister || !integ.webhookId) return;
+    try { await a.webhook.unregister({ accessToken: integ.accessToken, extra: this.cfg(integ).extra ?? {} }, integ.webhookId); }
+    catch (e: any) { this.log.warn(`could not remove ${a.name} webhook: ${e.message}`); }
+  }
+
+  /** Public endpoint for vendors that push events. The secret token in the URL is the credential. */
+  async handleNativeWebhook(provider: string, token: string, body: any) {
+    const a = getAdapter(provider);
+    if (!a?.webhook) throw new NotFoundException();
+    const integ = await this.prisma.connectedIntegration.findFirst({ where: { provider, externalUserId: sha256(token || '') } });
+    if (!integ) throw new UnauthorizedException('Invalid token');
+    this.rateLimit(integ.id);
+    let parsed: ParsedCancellation | null;
+    try { parsed = a.webhook.parse(body); }
+    catch (e: any) {
+      await this.prisma.connectedIntegration.update({ where: { id: integ.id }, data: { lastError: `Unexpected ${a.name} webhook payload: ${String(e.message).slice(0, 200)}` } }).catch(() => undefined);
+      throw new BadRequestException('Unexpected payload');
+    }
+    if (!parsed) return { received: true, ignored: true };
+    return { received: true, ...(await this.ingest(integ, parsed)) };
   }
 
   private async saveCredentials(userId: string, provider: GenericProvider, c: Credentials) {
@@ -367,7 +411,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
       const integs = await this.prisma.connectedIntegration.findMany({
         where: { provider: { in: ['google', 'ics', ...ADAPTER_KEYS] }, user: { role: { not: 'USER' } } },
       });
-      for (const integ of integs) await this.pollOne(integ).catch((e) => this.log.error(`poll ${integ.id}: ${e.message}`));
+      for (const integ of integs.filter((i) => !isAdapterKey(i.provider) || !!getAdapter(i.provider)?.listAppointments)) await this.pollOne(integ).catch((e) => this.log.error(`poll ${integ.id}: ${e.message}`));
     } finally { this.polling = false; }
   }
 
@@ -381,6 +425,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
         events = await this.fetchIcsEvents(config.icsUrl, now);
       } else if (isAdapterKey(integ.provider)) {
         const adapter = getAdapter(integ.provider)!;
+        if (!adapter.listAppointments) throw new Error(`${adapter.name} delivers cancellations by webhook; there is nothing to poll`);
         const ctx = await adapterCtx(this.prisma, integ, adapter, config.snapshot);
         events = await adapter.listAppointments(ctx, now, new Date(now.getTime() + LOOKAHEAD_MS));
         await this.maybeSyncClients(integ, adapter, ctx, config, now);

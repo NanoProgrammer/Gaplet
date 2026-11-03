@@ -58,6 +58,10 @@ export class OAuthCallbackController {
 export class InboundHooksController {
   constructor(private readonly svc: ConnectorsService) {}
 
+  @Post('native/:provider/:token')
+  @HttpCode(200)
+  native(@Param('provider') provider: string, @Param('token') token: string, @Body() body: any) { return this.svc.handleNativeWebhook(provider, token, body); }
+
   @Post('inbound/:token')
   @HttpCode(200)
   inbound(@Param('token') token: string, @Body() body: any) { return this.svc.handleInbound(token, body); }

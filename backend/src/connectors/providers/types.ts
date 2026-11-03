@@ -9,6 +9,18 @@ export type Credentials = {
   extra?: Record<string, string>;
 };
 
+/** A cancellation extracted from a vendor webhook. */
+export type ParsedCancellation = { externalId?: string; start: Date; durationMinutes: number; service?: string; customerEmail?: string };
+
+/** For vendors that push events instead of offering a list endpoint. */
+export type WebhookCapability = {
+  /** subscribes to cancellation events; hookUrl contains our secret token */
+  register(creds: { accessToken: string; extra: Record<string, string> }, hookUrl: string): Promise<{ webhookId: string; extra?: Record<string, string> }>;
+  unregister?(creds: { accessToken: string; extra: Record<string, string> }, webhookId: string): Promise<void>;
+  /** null = an event we ignore; THROWS when a cancellation arrives with an unexpected shape */
+  parse(body: any): ParsedCancellation | null;
+};
+
 export type ProviderField = { name: string; label: string; secret?: boolean; placeholder?: string };
 
 export type Ctx = {
@@ -50,7 +62,9 @@ export interface ProviderAdapter {
   /** true only when book() creates the appointment in the vendor system */
   bookingSupported: boolean;
   /** timed, non-cancelled appointments in [from, to] */
-  listAppointments(ctx: Ctx, from: Date, to: Date): Promise<CalEvent[]>;
+  /** absent for webhook-only vendors (see `webhook`) */
+  listAppointments?(ctx: Ctx, from: Date, to: Date): Promise<CalEvent[]>;
+  webhook?: WebhookCapability;
   /** IANA zone for vendors that return local times; falls back to the integration's configured timezone */
   needsTimezone?: boolean;
   listClients?(ctx: Ctx): Promise<ParsedClient[]>;

@@ -59,7 +59,9 @@ run('native providers (real database)', () => {
 
   it('lists providers and flags OAuth ones that are not configured', () => {
     const list = svc.listProviders();
-    expect(list.map((p) => p.key).sort()).toEqual(['calcom', 'calendly', 'cliniko', 'clio', 'jobber', 'microsoft', 'opendental', 'zoho']);
+    expect(list.map((p) => p.key).sort()).toEqual(['calcom', 'calendly', 'cliniko', 'clio', 'jobber', 'microsoft', 'opendental', 'pabau', 'pushpress', 'shopmonkey', 'wodify', 'workiz', 'zoho']);
+    expect(list.find((p) => p.key === 'pushpress')).toMatchObject({ delivery: 'webhook', maturity: 'unverified', available: false });
+    expect(list.find((p) => p.key === 'wodify')).toMatchObject({ delivery: 'polling' });
     // unverified providers stay off even if credentials exist, until explicitly enabled
     expect(list.find((p) => p.key === 'jobber')).toMatchObject({ maturity: 'unverified', available: false });
     expect(() => svc.startOAuth(userId, 'jobber')).toThrow(/not configured/);

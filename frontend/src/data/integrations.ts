@@ -84,7 +84,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "massagebook", name: "MassageBook", industry: "beauty", desc: "Massage therapists scheduling.", status: "planned" },
   { key: "pocketsuite", name: "PocketSuite", industry: "beauty", desc: "Mobile and independent service pros.", status: "planned" },
   { key: "aesthetic-record", name: "Aesthetic Record", industry: "beauty", desc: "Aesthetics and med-spa practices.", status: "planned" },
-  { key: "pabau", name: "Pabau", industry: "beauty", desc: "Clinics, med-spas and aesthetics.", status: "planned" },
+  { key: "pabau", name: "Pabau", industry: "beauty", desc: "Built from the official docs, pending verification with a real clinic. Not available yet.", status: "soon" },
 
   // ── Health & Clinics ───────────────────────────────────────────────────────
   { key: "jane", name: "Jane App", industry: "health", desc: "Physio, chiro, massage and allied health.", status: "planned", img: "/janeApp.avif" },
@@ -103,8 +103,8 @@ export const INTEGRATIONS: readonly Integration[] = [
   // ── Fitness ────────────────────────────────────────────────────────────────
   { key: "mindbody", name: "Mindbody", industry: "fitness", desc: "Studios, gyms and wellness brands.", status: "planned", img: "/mindbody.avif" },
   { key: "glofox", name: "Glofox", industry: "fitness", desc: "Boutique fitness studios.", status: "planned" },
-  { key: "wodify", name: "Wodify", industry: "fitness", desc: "CrossFit and functional fitness.", status: "planned" },
-  { key: "pushpress", name: "PushPress", industry: "fitness", desc: "Gym management and billing.", status: "planned" },
+  { key: "wodify", name: "Wodify", industry: "fitness", desc: "Built from the official docs, pending verification with a real gym. Not available yet.", status: "soon" },
+  { key: "pushpress", name: "PushPress", industry: "fitness", desc: "Receives cancellations by webhook. Built from the official SDK, pending verification with a real gym. Not available yet.", status: "soon" },
   { key: "trainerize", name: "Trainerize", industry: "fitness", desc: "Personal trainers and coaches.", status: "planned" },
   { key: "teamup", name: "TeamUp", industry: "fitness", desc: "Classes and memberships.", status: "planned" },
   { key: "zenplanner", name: "Zen Planner", industry: "fitness", desc: "Martial arts and fitness studios.", status: "planned" },
@@ -119,7 +119,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "covetrus", name: "Covetrus Pulse", industry: "pets", desc: "Veterinary practice management.", status: "planned" },
 
   // ── Auto ───────────────────────────────────────────────────────────────────
-  { key: "shopmonkey", name: "Shopmonkey", industry: "auto", desc: "Auto repair shop scheduling.", status: "planned" },
+  { key: "shopmonkey", name: "Shopmonkey", industry: "auto", desc: "Built from the official docs, pending verification with a real shop. Not available yet.", status: "soon" },
   { key: "tekmetric", name: "Tekmetric", industry: "auto", desc: "Repair shop management.", status: "planned" },
   { key: "shop-ware", name: "Shop-Ware", industry: "auto", desc: "Shop workflow and appointments.", status: "planned" },
 
@@ -127,7 +127,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "jobber", name: "Jobber", industry: "home", desc: "Implemented from memory, pending verification with a real account. Not available yet.", status: "soon" },
   { key: "housecall", name: "Housecall Pro", industry: "home", desc: "Plumbing, HVAC, cleaning.", status: "planned" },
   { key: "servicetitan", name: "ServiceTitan", industry: "home", desc: "Enterprise home services.", status: "planned" },
-  { key: "workiz", name: "Workiz", industry: "home", desc: "Field service scheduling.", status: "planned" },
+  { key: "workiz", name: "Workiz", industry: "home", desc: "Built from the official docs, pending verification with a real account. Not available yet.", status: "soon" },
   { key: "booking-koala", name: "Booking Koala", industry: "home", desc: "Cleaning company bookings.", status: "planned" },
   { key: "zenmaid", name: "ZenMaid", industry: "home", desc: "Maid and cleaning services.", status: "planned" },
 

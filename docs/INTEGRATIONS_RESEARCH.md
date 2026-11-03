@@ -51,7 +51,21 @@ Jobber, Open Dental y Zoho Bookings se escribieron **de memoria**, sin documenta
 | Open Dental | clave del consultorio + clave de desarrollador de Gaplets | cabecera `ODFHIR`, campos de `/appointments`, estados, `Email` del paciente, duración por `Pattern`, zona horaria |
 | Zoho Bookings | OAuth | URLs y scopes, `api_domain`, formato de fecha, forma de la respuesta de `fetchappointment`, estados |
 
-**No implementadas (5 del grupo A):** Wodify, PushPress, Pabau, Shopmonkey y Workiz. Ni siquiera conozco la ruta del endpoint de citas; escribirlas sería inventar. Para hacerlas hace falta la página de documentación de "listar citas" de cada una.
+### Wodify, PushPress, Pabau, Shopmonkey y Workiz (documentación aportada por el dueño; apagadas por defecto)
+
+Hechas a partir de la documentación oficial que leyó el dueño en el navegador. Ninguna se ha ejecutado contra una cuenta real, así que siguen `unverified`. Cada supuesto está marcado `UNVERIFIED:` en el encabezado de su archivo.
+
+| Programa | Cómo detecta | Lo que hay que comprobar con una cuenta real |
+|---|---|---|
+| Wodify | consulta `appointments/bookings/clients/search` | que `utc_appointment_start_datetime` sea filtrable; valores de `booking_status`; **no hay email de cliente**, así que quien canceló no se excluye de las invitaciones |
+| PushPress | **webhook** (no existe endpoint de listar citas) | forma del payload, **verificación de firma pendiente** (solo autentica el token secreto de la URL), duración (se asume 60 min), unidad de `startTimestamp`, sin email de cliente |
+| Pabau | consulta `GET /appointments` (la clave va en la ruta) | que excluya las canceladas, valores de `appointment_status`, horas locales (exige zona horaria) |
+| Shopmonkey | `POST /appointment/search` (revisa siempre `success`) | cómo se marca una cancelación (borrado o `cancellationNote`), formato de fecha, forma de `customer.emails`, ids de citas recurrentes |
+| Workiz | `GET /job/all/` con `only_open=false` (la clave va en la ruta) | **si devuelve trabajos futuros** (`start_date` solo filtra hacia atrás: si no los devuelve, esta integración no verá nada), forma de `data`, zona horaria del trabajo |
+
+Ninguna reserva en el sistema del cliente: el dueño recibe un email y un callback firmado para anotarla.
+
+
 
 El resto de los grupos A y B **no se implementó**: sin la documentación oficial tendría que inventar los endpoints.
 

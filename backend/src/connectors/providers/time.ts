@@ -34,3 +34,28 @@ export function parseZoho(str: string, tz: string): Date {
   if (!m || mo < 0) throw new Error(`Unrecognised date "${str}"`);
   return localToUtc(+m[3], mo + 1, +m[1], +m[4], +m[5], +(m[6] ?? 0), tz);
 }
+
+const HAS_ZONE = /(Z|[zZ]|[+-]\d\d:?\d\d)$/;
+/** ISO without milliseconds ("2026-11-03T00:00:00Z"). */
+export const isoNoMs = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+export const hasZone = (s: string) => HAS_ZONE.test(s.trim());
+/** For fields documented as UTC: tolerates a missing "Z". */
+export function parseUtcLoose(s: string): Date {
+  const d = new Date(hasZone(s) ? s.trim() : `${s.trim().replace(' ', 'T')}Z`);
+  if (isNaN(d.getTime())) throw new Error(`Unrecognised date "${s}"`);
+  return d;
+}
+/** Date with an explicit offset is used as is; a naive one is interpreted in `tz`, which is then required. */
+export function parseMaybeLocal(s: string, tz?: string): Date {
+  if (hasZone(s)) {
+    const d = new Date(s.trim().replace(' ', 'T'));
+    if (isNaN(d.getTime())) throw new Error(`Unrecognised date "${s}"`);
+    return d;
+  }
+  if (!tz) throw new Error('The vendor returned a date without a time zone. Set your time zone in Business settings first.');
+  return parseLocal(s, tz);
+}
+export function validZone(tz?: string): tz is string {
+  if (!tz) return false;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; }
+}
