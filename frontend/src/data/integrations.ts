@@ -93,7 +93,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "healthie", name: "Healthie", industry: "health", desc: "Dietitians and wellness practitioners.", status: "planned" },
   { key: "tebra", name: "Tebra (Kareo)", industry: "health", desc: "Independent medical practices.", status: "planned" },
   { key: "dentrix", name: "Dentrix Ascend", industry: "health", desc: "Dental practice schedules.", status: "planned" },
-  { key: "open-dental", name: "Open Dental", industry: "health", desc: "Dental appointment book.", status: "planned" },
+  { key: "open-dental", name: "Open Dental", industry: "health", desc: "Implemented from memory, pending verification with a real office. Not available yet.", status: "soon" },
   { key: "eaglesoft", name: "Eaglesoft", industry: "health", desc: "Dental practice management.", status: "planned" },
   { key: "nextech", name: "Nextech", industry: "health", desc: "Dermatology and plastic surgery.", status: "planned" },
   { key: "practice-better", name: "Practice Better", industry: "health", desc: "Nutrition and wellness coaching.", status: "planned" },
@@ -124,7 +124,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "shop-ware", name: "Shop-Ware", industry: "auto", desc: "Shop workflow and appointments.", status: "planned" },
 
   // ── Home services ──────────────────────────────────────────────────────────
-  { key: "jobber", name: "Jobber", industry: "home", desc: "Field service and home services.", status: "planned" },
+  { key: "jobber", name: "Jobber", industry: "home", desc: "Implemented from memory, pending verification with a real account. Not available yet.", status: "soon" },
   { key: "housecall", name: "Housecall Pro", industry: "home", desc: "Plumbing, HVAC, cleaning.", status: "planned" },
   { key: "servicetitan", name: "ServiceTitan", industry: "home", desc: "Enterprise home services.", status: "planned" },
   { key: "workiz", name: "Workiz", industry: "home", desc: "Field service scheduling.", status: "planned" },
@@ -141,7 +141,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "honeybook", name: "HoneyBook", industry: "professional", desc: "Creative and consulting businesses.", status: "planned" },
   { key: "dubsado", name: "Dubsado", industry: "professional", desc: "Client management for freelancers.", status: "planned" },
   { key: "hubspot-meetings", name: "HubSpot Meetings", industry: "professional", desc: "Sales and consulting meetings.", status: "planned" },
-  { key: "zoho-bookings", name: "Zoho Bookings", industry: "professional", desc: "Zoho ecosystem scheduling.", status: "planned" },
+  { key: "zoho-bookings", name: "Zoho Bookings", industry: "professional", desc: "Implemented from memory, pending verification with a real account. Not available yet.", status: "soon" },
   { key: "microsoft-bookings", name: "Microsoft Bookings", industry: "professional", desc: "Microsoft 365 booking pages.", status: "planned" },
 
   // ── Hospitality ────────────────────────────────────────────────────────────

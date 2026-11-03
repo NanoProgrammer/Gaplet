@@ -1,6 +1,6 @@
 import { CalEvent } from '../calendar-diff';
 import { ParsedClient, normalizePhone } from '../csv';
-import { requestJson } from './http';
+import { listOf, requestJson } from './http';
 import { ProviderAdapter } from './types';
 
 const UA = 'Gaplets (support@gaplets.com)';
@@ -15,7 +15,7 @@ async function allPages(url: string, key: string, listKey: string, maxPages: num
   let next: string | undefined = url;
   for (let p = 0; next && p < maxPages; p++) {
     const j: any = await requestJson(next, { headers: headers(key) }, 'Cliniko');
-    items.push(...(j[listKey] ?? []));
+    items.push(...listOf(j, listKey, 'Cliniko'));
     next = j.links?.next;
   }
   return items;

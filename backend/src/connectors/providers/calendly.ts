@@ -1,5 +1,5 @@
 import { CalEvent } from '../calendar-diff';
-import { bearer, env, form, requestJson } from './http';
+import { bearer, env, form, listOf, requestJson } from './http';
 import { Credentials, ProviderAdapter } from './types';
 
 const API = 'https://api.calendly.com';
@@ -40,7 +40,7 @@ export const calendly: ProviderAdapter = {
     let url: string | undefined = `${API}/scheduled_events?${new URLSearchParams({ user: userUri, status: 'active', min_start_time: from.toISOString(), max_start_time: to.toISOString(), count: '100' })}`;
     for (let page = 0; url && page < 20; page++) {
       const j: any = await requestJson(url, { headers: bearer(ctx.accessToken) }, 'Calendly');
-      for (const e of j.collection ?? []) {
+      for (const e of listOf(j, 'collection', 'Calendly')) {
         const id = lastSegment(e.uri);
         let email = known.get(id);
         if (email === undefined) {

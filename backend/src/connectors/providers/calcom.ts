@@ -1,5 +1,5 @@
 import { CalEvent } from '../calendar-diff';
-import { bearer, requestJson } from './http';
+import { bearer, listOf, requestJson } from './http';
 import { ProviderAdapter } from './types';
 
 const API = 'https://api.cal.com/v2';
@@ -25,7 +25,7 @@ export const calcom: ProviderAdapter = {
     for (let skip = 0, page = 0; page < 20; page++) {
       const qs = new URLSearchParams({ status: 'upcoming', afterStart: from.toISOString(), beforeEnd: to.toISOString(), take: '100', skip: String(skip) });
       const j: any = await requestJson(`${API}/bookings?${qs}`, { headers: H(ctx.accessToken) }, 'Cal.com');
-      const rows: any[] = j.data ?? [];
+      const rows: any[] = listOf(j, 'data', 'Cal.com');
       for (const b of rows) {
         if (b.status && b.status !== 'accepted') continue;
         out.push({ id: String(b.uid ?? b.id), start: new Date(b.start), end: new Date(b.end), summary: b.title, email: b.attendees?.[0]?.email?.toLowerCase() });

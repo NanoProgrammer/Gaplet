@@ -17,5 +17,5 @@ export async function adapterCtx(db: Db, integ: Row, adapter: ProviderAdapter, p
       data: { accessToken: c.accessToken, refreshToken: c.refreshToken ?? integ.refreshToken, expiresAt: c.expiresAt ?? null },
     });
   }
-  return { accessToken, extra, previous };
+  return { accessToken, extra, previous, timezone: integ.config?.timezone };
 }

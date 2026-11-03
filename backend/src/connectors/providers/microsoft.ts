@@ -1,5 +1,5 @@
 import { CalEvent } from '../calendar-diff';
-import { bearer, env, form, requestJson } from './http';
+import { bearer, env, form, listOf, requestJson } from './http';
 import { Credentials, ProviderAdapter } from './types';
 
 const tenant = () => env('MICROSOFT_TENANT', 'common');
@@ -38,7 +38,7 @@ export const microsoft: ProviderAdapter = {
     })}`;
     for (let page = 0; url && page < 20; page++) {
       const j: any = await requestJson(url, { headers: { ...bearer(ctx.accessToken), Prefer: 'outlook.timezone="UTC"' } }, 'Microsoft Graph');
-      for (const e of j.value ?? []) {
+      for (const e of listOf(j, 'value', 'Microsoft Graph')) {
         if (e.isCancelled || e.isAllDay || !e.start?.dateTime || !e.end?.dateTime) continue;
         const guest = (e.attendees ?? []).find((a: any) => a?.emailAddress?.address);
         out.push({ id: String(e.id), start: utc(e.start.dateTime), end: utc(e.end.dateTime), summary: e.subject, email: guest?.emailAddress?.address?.toLowerCase() });

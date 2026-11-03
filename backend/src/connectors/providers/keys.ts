@@ -1,5 +1,5 @@
 /** Providers handled by the generic engine (polling + imported/synced client list). */
-export const ADAPTER_KEYS = ['microsoft', 'calendly', 'cliniko', 'clio', 'calcom'] as const;
+export const ADAPTER_KEYS = ['microsoft', 'calendly', 'cliniko', 'clio', 'calcom', 'jobber', 'opendental', 'zoho'] as const;
 export type AdapterKey = (typeof ADAPTER_KEYS)[number];
 
 export const GENERIC_PROVIDERS = ['google', 'ics', 'webhook', ...ADAPTER_KEYS] as const;

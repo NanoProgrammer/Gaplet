@@ -322,6 +322,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
   async connectApiKey(userId: string, provider: string, values: Record<string, string>) {
     const a = getAdapter(provider);
     if (!a || a.auth.type !== 'apikey') throw new BadRequestException('Unsupported provider');
+    if (!isConfigured(a)) throw new BadRequestException(`${a.name} is not enabled on this server`);
     let creds: Credentials;
     try { creds = await a.auth.validate(values ?? {}); }
     catch (e: any) { throw new BadRequestException(e.message); }

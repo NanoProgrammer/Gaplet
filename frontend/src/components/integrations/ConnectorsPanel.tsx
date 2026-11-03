@@ -15,7 +15,7 @@ type Status = {
 };
 
 type Provider = { key: string; name: string; maturity: string; bookingSupported: boolean; auth: "oauth2" | "apikey"; fields: { name: string; label: string; secret?: boolean; placeholder?: string }[]; available: boolean };
-const LABEL: Record<string, string> = { square: "Square", acuity: "Acuity", google: "Google Calendar", ics: "Calendar link (ICS)", webhook: "Webhook / Zapier / Make", microsoft: "Microsoft Outlook", calendly: "Calendly", cliniko: "Cliniko", clio: "Clio", calcom: "Cal.com" };
+const LABEL: Record<string, string> = { square: "Square", acuity: "Acuity", google: "Google Calendar", ics: "Calendar link (ICS)", webhook: "Webhook / Zapier / Make", microsoft: "Microsoft Outlook", calendly: "Calendly", cliniko: "Cliniko", clio: "Clio", calcom: "Cal.com", jobber: "Jobber", opendental: "Open Dental", zoho: "Zoho Bookings" };
 const field = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
 const btn = "inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50";
 const ghost = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50";
@@ -154,7 +154,7 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {providers.map((p) => (
                     <div key={p.key} className="rounded-xl border border-slate-200 p-4">
-                      <p className="font-medium text-slate-900">{p.name}</p>
+                      <p className="font-medium text-slate-900">{p.name}{p.maturity === "unverified" && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">Unverified</span>}</p>
                       <p className="mt-1 text-xs text-slate-500">{p.bookingSupported ? "Detects cancellations and books the replacement." : "Detects cancellations and messages your clients. The new booking is emailed to you (and sent to your callback URL) to enter in the vendor system."}</p>
                       {!p.available ? (
                         <p className="mt-2 text-xs text-amber-700">Not enabled on this server yet.</p>

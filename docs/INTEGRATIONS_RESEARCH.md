@@ -41,6 +41,18 @@ Implementadas como **Beta**: construidas desde los resúmenes de documentación 
 
 La detección usa **consulta periódica y comparación**, no webhooks, a propósito: los nombres exactos de los eventos de webhook no pude confirmarlos y esta vía no depende de ellos.
 
+### Implementadas sin verificar (apagadas por defecto)
+
+Jobber, Open Dental y Zoho Bookings se escribieron **de memoria**, sin documentación ni cuenta. Solo se ofrecen con `ENABLE_UNVERIFIED_PROVIDERS=true`. Cada supuesto está marcado `UNVERIFIED:` en su archivo (`backend/src/connectors/providers/`) como lista de comprobación. Si un supuesto es falso, el efecto es un error visible al conectar o sincronizar, nunca avisos falsos a clientes: una respuesta con forma inesperada se trata como error, no como "sin citas".
+
+| Programa | Auth | Qué hay que comprobar con una cuenta real |
+|---|---|---|
+| Jobber | OAuth | URLs de OAuth, versión de GraphQL aceptada, consulta `visits` y su filtro, valores de `visitStatus` |
+| Open Dental | clave del consultorio + clave de desarrollador de Gaplets | cabecera `ODFHIR`, campos de `/appointments`, estados, `Email` del paciente, duración por `Pattern`, zona horaria |
+| Zoho Bookings | OAuth | URLs y scopes, `api_domain`, formato de fecha, forma de la respuesta de `fetchappointment`, estados |
+
+**No implementadas (5 del grupo A):** Wodify, PushPress, Pabau, Shopmonkey y Workiz. Ni siquiera conozco la ruta del endpoint de citas; escribirlas sería inventar. Para hacerlas hace falta la página de documentación de "listar citas" de cada una.
+
 El resto de los grupos A y B **no se implementó**: sin la documentación oficial tendría que inventar los endpoints.
 
 ## Veredicto por programa

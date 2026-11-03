@@ -59,7 +59,10 @@ run('native providers (real database)', () => {
 
   it('lists providers and flags OAuth ones that are not configured', () => {
     const list = svc.listProviders();
-    expect(list.map((p) => p.key).sort()).toEqual(['calcom', 'calendly', 'cliniko', 'clio', 'microsoft']);
+    expect(list.map((p) => p.key).sort()).toEqual(['calcom', 'calendly', 'cliniko', 'clio', 'jobber', 'microsoft', 'opendental', 'zoho']);
+    // unverified providers stay off even if credentials exist, until explicitly enabled
+    expect(list.find((p) => p.key === 'jobber')).toMatchObject({ maturity: 'unverified', available: false });
+    expect(() => svc.startOAuth(userId, 'jobber')).toThrow(/not configured/);
     expect(list.find((p) => p.key === 'microsoft')).toMatchObject({ available: true, auth: 'oauth2', maturity: 'beta' });
     expect(list.find((p) => p.key === 'calendly')!.available).toBe(false); // no CALENDLY_* in this test
     expect(list.find((p) => p.key === 'cliniko')).toMatchObject({ available: true, auth: 'apikey' });
@@ -148,6 +151,24 @@ run('native providers (real database)', () => {
     expect(JSON.parse(create.init.body).attendees[0].emailAddress.address).toBe('ana@c.test');
     expect((await raw.replacementLog.findFirstOrThrow({ where: { userId } })).providerBookingId).toBe('outlook-created-1');
     expect((await raw.openSlot.findUniqueOrThrow({ where: { id: slot.id } })).isTaken).toBe(true);
+  });
+
+  it('a malformed vendor response never creates false cancellations or messages anyone', async () => {
+    await prisma.connectedIntegration.create({ data: { userId, provider: 'microsoft', accessToken: 'AT', refreshToken: 'RT', expiresAt: new Date(Date.now() + 3600e3), config: {} } });
+    await svc.importClients(userId, 'name,email\nAna,ana@c.test\n');
+    const ev = (id: string, h: number) => ({ id, subject: 'x', start: { dateTime: iso(h).replace('Z', '') }, end: { dateTime: iso(h + 1).replace('Z', '') }, attendees: [] });
+    on(/calendarView/, () => ({ value: [ev('a', 5), ev('b', 6), ev('c', 7)] }));
+    const get = () => prisma.connectedIntegration.findUniqueOrThrow({ where: { userId } });
+    await svc.pollOne(await get()); // baseline of 3 appointments
+    on(/calendarView/, () => ({ message: 'Service is being upgraded' })); // HTTP 200, wrong shape
+    await expect(svc.pollOne(await get())).rejects.toThrow(/unexpected response/);
+    expect(await raw.openSlot.count({ where: { userId } })).toBe(0);
+    expect((await get()).lastError).toMatch(/unexpected response/);
+    await sleep(60);
+    expect(sendMock).not.toHaveBeenCalled();
+    // and the snapshot survives, so the next good poll still sees the 3 appointments
+    on(/calendarView/, () => ({ value: [ev('a', 5), ev('b', 6), ev('c', 7)] }));
+    expect(await svc.pollOne(await get())).toMatchObject({ freed: 0 });
   });
 
   it('refreshes an expired Microsoft token during polling and persists it encrypted', async () => {

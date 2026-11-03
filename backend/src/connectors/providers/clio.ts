@@ -1,5 +1,5 @@
 import { CalEvent } from '../calendar-diff';
-import { bearer, env, form, requestJson } from './http';
+import { bearer, env, form, listOf, requestJson } from './http';
 import { Credentials, ProviderAdapter } from './types';
 
 // Clio has regional hosts (e.g. https://eu.app.clio.com); default is the US host.
@@ -31,7 +31,7 @@ export const clio: ProviderAdapter = {
     })}`;
     for (let page = 0; url && page < 20; page++) {
       const j: any = await requestJson(url, { headers: bearer(ctx.accessToken) }, 'Clio');
-      for (const e of j.data ?? []) {
+      for (const e of listOf(j, 'data', 'Clio')) {
         if (e.all_day || !e.start_at || !e.end_at) continue;
         out.push({ id: String(e.id), start: new Date(e.start_at), end: new Date(e.end_at), summary: e.summary, email: e.attendees?.find((a: any) => a?.email)?.email?.toLowerCase() });
       }
