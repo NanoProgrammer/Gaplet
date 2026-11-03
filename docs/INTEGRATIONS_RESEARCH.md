@@ -25,6 +25,24 @@ Fecha: 2026-11-02. Alcance: los ~75 programas del directorio (`frontend/src/data
 | **API key por cliente** | Cada negocio genera su clave en su cuenta | Se pega en el dashboard de Gaplets (hay que cifrarla en la base de datos) |
 | **Acuerdo de partner** | Gaplets solicita acceso al proveedor | `.env` tras la aprobación, a veces con contrato y coste |
 
+## Estado de implementación (actualizado)
+
+Implementadas como **Beta**: construidas desde los resúmenes de documentación y probadas con respuestas simuladas, **no verificadas con cuentas reales**.
+
+| Programa | Auth | Detección | Clientes | Reserva en el sistema del cliente |
+|---|---|---|---|---|
+| Microsoft Outlook (Graph) | OAuth | consulta de `calendarView` cada ~2 min | importación CSV | **sí** (`POST /me/events`) |
+| Calendly | OAuth | `scheduled_events` activos | CSV | no (endpoint no confirmado) |
+| Cliniko | API key del cliente | `individual_appointments` | **sincroniza pacientes** | no (faltan ids de profesional/tipo) |
+| Clio | OAuth | `calendar_entries` | CSV | no |
+| Cal.com | API key del cliente | `bookings` | CSV | no |
+
+"Sin reserva" significa que, cuando un cliente acepta, se le confirma, se avisa al dueño por email y se llama al callback firmado para que la reserva se registre en el sistema real. No se le rechaza al cliente.
+
+La detección usa **consulta periódica y comparación**, no webhooks, a propósito: los nombres exactos de los eventos de webhook no pude confirmarlos y esta vía no depende de ellos.
+
+El resto de los grupos A y B **no se implementó**: sin la documentación oficial tendría que inventar los endpoints.
+
 ## Veredicto por programa
 
 Leyenda de veredicto: **A** = construir ya, acceso razonable. **B** = construible, requiere trámite o plan de pago del cliente. **C** = no hay API abierta; solo ICS / webhook / Zapier.

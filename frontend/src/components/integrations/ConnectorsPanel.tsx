@@ -14,7 +14,8 @@ type Status = {
   settings?: { businessName: string | null; timezone: string | null; callbackUrl: string | null; icsUrl: string | null };
 };
 
-const LABEL: Record<string, string> = { square: "Square", acuity: "Acuity", google: "Google Calendar", ics: "Calendar link (ICS)", webhook: "Webhook / Zapier / Make" };
+type Provider = { key: string; name: string; maturity: string; bookingSupported: boolean; auth: "oauth2" | "apikey"; fields: { name: string; label: string; secret?: boolean; placeholder?: string }[]; available: boolean };
+const LABEL: Record<string, string> = { square: "Square", acuity: "Acuity", google: "Google Calendar", ics: "Calendar link (ICS)", webhook: "Webhook / Zapier / Make", microsoft: "Microsoft Outlook", calendly: "Calendly", cliniko: "Cliniko", clio: "Clio", calcom: "Cal.com" };
 const field = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
 const btn = "inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50";
 const ghost = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50";
@@ -28,6 +29,9 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
   const [webhook, setWebhook] = React.useState<{ url: string; token: string } | null>(null);
   const [copied, setCopied] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({ icsUrl: "", businessName: "", timezone: browserTz, callbackUrl: "" });
+  const [providers, setProviders] = React.useState<Provider[]>([]);
+  const [keyFor, setKeyFor] = React.useState<string | null>(null);
+  const [keyValues, setKeyValues] = React.useState<Record<string, string>>({});
 
   const load = React.useCallback(async () => {
     try {
@@ -45,6 +49,7 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
     }
   }, []);
   React.useEffect(() => { void load(); }, [load]);
+  React.useEffect(() => { apiJson<Provider[]>("/connectors/providers").then(setProviders).catch(() => setProviders([])); }, []);
 
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key); setMsg(null);
@@ -67,8 +72,20 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
     });
   };
 
+  const connectNative = (p: Provider) =>
+    run(`native-${p.key}`, async () => {
+      if (p.auth === "oauth2") {
+        const { redirectUrl } = await apiJson<{ redirectUrl: string }>(`/connectors/oauth/${p.key}/start`);
+        window.location.href = redirectUrl;
+        return;
+      }
+      await apiJson(`/connectors/apikey/${p.key}`, { method: "POST", body: JSON.stringify({ values: keyValues }) });
+      setKeyFor(null); setKeyValues({});
+      return `${p.name} connected.`;
+    });
+
   const active = status?.provider;
-  const generic = active === "google" || active === "ics" || active === "webhook";
+  const generic = !!active && !["square", "acuity"].includes(active);
 
   return (
     <section aria-labelledby="connectors-title" className="space-y-5">
@@ -91,7 +108,7 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
               <div>
                 <p className="font-semibold text-emerald-900">Active source: {LABEL[active] ?? active}</p>
-                {(active === "google" || active === "ics") && (
+                {active !== "webhook" && active !== "square" && active !== "acuity" && (
                   <p className="text-emerald-800">{status.lastSyncAt ? `Last checked ${new Date(status.lastSyncAt).toLocaleString()}` : "Waiting for first check (every ~2 min)"}</p>
                 )}
                 {status.lastError && <p className="mt-1 flex items-start gap-1 text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{status.lastError}</p>}
@@ -129,6 +146,38 @@ export default function ConnectorsPanel({ onConnectGoogle }: { onConnectGoogle: 
                 return `Connected. Found ${r.eventsFound} upcoming events.`;
               })}>{busy === "ics" && <Loader2 className="h-4 w-4 animate-spin" />} Connect link</button>
             </div>
+
+            {providers.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+                <h3 className="font-semibold text-slate-900">Native integrations <span className="ml-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-200">Beta</span></h3>
+                <p className="mt-1 text-sm text-slate-600">Built from public API documentation and tested with simulated responses, but not yet verified with real vendor accounts. If something fails, use a calendar link or webhook instead.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {providers.map((p) => (
+                    <div key={p.key} className="rounded-xl border border-slate-200 p-4">
+                      <p className="font-medium text-slate-900">{p.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">{p.bookingSupported ? "Detects cancellations and books the replacement." : "Detects cancellations and messages your clients. The new booking is emailed to you (and sent to your callback URL) to enter in the vendor system."}</p>
+                      {!p.available ? (
+                        <p className="mt-2 text-xs text-amber-700">Not enabled on this server yet.</p>
+                      ) : keyFor === p.key ? (
+                        <div className="mt-2 space-y-2">
+                          {p.fields.map((f) => (
+                            <input key={f.name} type={f.secret ? "password" : "text"} autoComplete="off" className={field} placeholder={f.placeholder ?? f.label} aria-label={f.label} value={keyValues[f.name] ?? ""} onChange={(e) => setKeyValues({ ...keyValues, [f.name]: e.target.value })} />
+                          ))}
+                          <div className="flex gap-2">
+                            <button className={btn} disabled={busy === `native-${p.key}`} onClick={() => void connectNative(p)}>{busy === `native-${p.key}` && <Loader2 className="h-4 w-4 animate-spin" />} Connect</button>
+                            <button className={ghost} onClick={() => { setKeyFor(null); setKeyValues({}); }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button className={`${btn} mt-2`} disabled={busy === `native-${p.key}`} onClick={() => (p.auth === "apikey" ? setKeyFor(p.key) : void connectNative(p))}>
+                          {active === p.key ? "Reconnect" : "Connect"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
               <h3 className="flex items-center gap-2 font-semibold text-slate-900"><Webhook className="h-5 w-5 text-emerald-600" /> Webhook / Zapier / Make</h3>

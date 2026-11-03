@@ -2,10 +2,11 @@
 // Single source of truth for the integrations directory (marketing + dashboard).
 // Status is deliberately honest:
 //   live    → works end-to-end today
+//   beta    → built and unit-tested, not yet verified with real vendor credentials
 //   soon    → in active development
 //   planned → on the roadmap, prioritised by customer requests
 
-export type IntegrationStatus = "live" | "soon" | "planned";
+export type IntegrationStatus = "live" | "beta" | "soon" | "planned";
 
 export type IndustryKey =
   | "beauty"
@@ -51,16 +52,16 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "square", name: "Square Appointments", industry: "general", desc: "Webhook cancellation detection, customer targeting and auto-booking.", status: "live", provider: "square", img: "/squarefavicon.webp", href: "/integrations/square" },
   { key: "google-calendar", name: "Google Calendar", industry: "general", desc: "Detects deleted or moved events, messages your client list and books the replacement as a new event.", status: "live", provider: "google", img: "/calendarlogo.webp", href: "/signup?next=/dashboard/integrations" },
   { key: "google-sheets", name: "Google Sheets", industry: "general", desc: "Bring your own client list and let Gaplet run the waves.", status: "soon", img: "/google-sheets.webp" },
-  { key: "outlook", name: "Microsoft Outlook Calendar", industry: "general", desc: "Works today via your published calendar link (ICS). Native sync is planned.", status: "live", href: "/signup?next=/dashboard/integrations" },
+  { key: "outlook", name: "Microsoft Outlook Calendar", industry: "general", desc: "Native sync (beta) with OAuth, or use your published calendar link (ICS).", status: "live", href: "/signup?next=/dashboard/integrations" },
   { key: "apple-calendar", name: "Apple Calendar (iCal/CalDAV)", industry: "general", desc: "Works today via a public iCloud calendar link (ICS).", status: "live", href: "/signup?next=/dashboard/integrations" },
-  { key: "calendly", name: "Calendly", industry: "general", desc: "Detect cancelled bookings and refill the slot. Native sync planned; use Zapier or Webhooks meanwhile.", status: "planned" },
+  { key: "calendly", name: "Calendly", industry: "general", desc: "Detects cancelled bookings and messages your clients. Cannot write the new booking back yet.", status: "beta", provider: "calendly", href: "/signup?next=/dashboard/integrations" },
   { key: "acuity", name: "Acuity Scheduling", industry: "general", desc: "OAuth + webhooks for cancelled appointments.", status: "soon" },
   { key: "setmore", name: "Setmore", industry: "general", desc: "Appointment cancellations and client list.", status: "planned" },
   { key: "simplybook", name: "SimplyBook.me", industry: "general", desc: "Cancellation webhooks and client targeting.", status: "planned" },
   { key: "square-booking", name: "Square Online Booking", industry: "general", desc: "Booking-site cancellations through Square.", status: "planned" },
   { key: "squarespace", name: "Squarespace Scheduling", industry: "general", desc: "Acuity-powered scheduling for Squarespace sites.", status: "planned" },
   { key: "youcanbook", name: "YouCanBookMe", industry: "general", desc: "Booking-page cancellations.", status: "planned" },
-  { key: "cal-com", name: "Cal.com", industry: "general", desc: "Open-source scheduling via webhooks.", status: "planned" },
+  { key: "cal-com", name: "Cal.com", industry: "general", desc: "Detects cancelled bookings with your API key. Cannot write the new booking back yet.", status: "beta", provider: "calcom", href: "/signup?next=/dashboard/integrations" },
   { key: "zapier", name: "Zapier", industry: "general", desc: "Use the “Webhooks by Zapier” action to send cancellations from any app Zapier supports.", status: "live", href: "/signup?next=/dashboard/integrations" },
   { key: "make", name: "Make (Integromat)", industry: "general", desc: "Use the HTTP module in a scenario to send cancellations to Gaplets.", status: "live", href: "/signup?next=/dashboard/integrations" },
   { key: "webhooks", name: "Custom Webhooks / API", industry: "general", desc: "Send cancellations from your own system with one authenticated POST; get a signed callback when a slot is claimed.", status: "live", href: "/signup?next=/dashboard/integrations" },
@@ -88,7 +89,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   // ── Health & Clinics ───────────────────────────────────────────────────────
   { key: "jane", name: "Jane App", industry: "health", desc: "Physio, chiro, massage and allied health.", status: "planned", img: "/janeApp.avif" },
   { key: "simplepractice", name: "SimplePractice", industry: "health", desc: "Therapists and mental health practices.", status: "planned" },
-  { key: "cliniko", name: "Cliniko", industry: "health", desc: "Allied health practice management.", status: "planned" },
+  { key: "cliniko", name: "Cliniko", industry: "health", desc: "Detects cancelled appointments and syncs patients with your API key. Cannot write the new booking back yet.", status: "beta", provider: "cliniko", href: "/signup?next=/dashboard/integrations" },
   { key: "healthie", name: "Healthie", industry: "health", desc: "Dietitians and wellness practitioners.", status: "planned" },
   { key: "tebra", name: "Tebra (Kareo)", industry: "health", desc: "Independent medical practices.", status: "planned" },
   { key: "dentrix", name: "Dentrix Ascend", industry: "health", desc: "Dental practice schedules.", status: "planned" },
@@ -136,7 +137,7 @@ export const INTEGRATIONS: readonly Integration[] = [
   { key: "tutorbird", name: "TutorBird", industry: "education", desc: "Private tutors and lesson schedules.", status: "planned" },
 
   // ── Professional services ──────────────────────────────────────────────────
-  { key: "clio", name: "Clio", industry: "professional", desc: "Law practice appointments.", status: "planned" },
+  { key: "clio", name: "Clio", industry: "professional", desc: "Detects cancelled calendar entries via OAuth. Cannot write the new booking back yet.", status: "beta", provider: "clio", href: "/signup?next=/dashboard/integrations" },
   { key: "honeybook", name: "HoneyBook", industry: "professional", desc: "Creative and consulting businesses.", status: "planned" },
   { key: "dubsado", name: "Dubsado", industry: "professional", desc: "Client management for freelancers.", status: "planned" },
   { key: "hubspot-meetings", name: "HubSpot Meetings", industry: "professional", desc: "Sales and consulting meetings.", status: "planned" },
@@ -154,6 +155,7 @@ export const INTEGRATIONS: readonly Integration[] = [
 
 export const STATUS_META: Record<IntegrationStatus, { label: string; cls: string }> = {
   live: { label: "Live", cls: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
+  beta: { label: "Beta", cls: "bg-sky-50 text-sky-800 ring-sky-200" },
   soon: { label: "Coming soon", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
   planned: { label: "Planned", cls: "bg-slate-50 text-slate-600 ring-slate-200" },
 };

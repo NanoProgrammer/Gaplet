@@ -8,10 +8,13 @@ import { getGoogleAccessToken, listGoogleEvents } from './google';
 import { parseIcs } from './ics';
 import { callbackSecret } from './callback-secret';
 import { assertPublicHttpsUrl, safeFetchText } from './net-guard';
+import { ADAPTER_KEYS, GenericProvider, isAdapterKey, isGenericProvider } from './providers/keys';
+import { ADAPTERS, getAdapter, isConfigured } from './providers/registry';
+import { adapterCtx } from './providers/runtime';
+import { Credentials } from './providers/types';
+import { JwtService } from '@nestjs/jwt';
 
-export const GENERIC_PROVIDERS = ['google', 'ics', 'webhook'] as const;
-export type GenericProvider = (typeof GENERIC_PROVIDERS)[number];
-export const isGenericProvider = (p: string): p is GenericProvider => (GENERIC_PROVIDERS as readonly string[]).includes(p);
+export { GENERIC_PROVIDERS, GenericProvider, isGenericProvider } from './providers/keys';
 
 const LOOKAHEAD_MS = 4 * 24 * 60 * 60 * 1000;
 /** If one poll frees more slots than this, assume a feed glitch / bulk edit and do not message anyone. */
@@ -23,6 +26,9 @@ export type ConnectorConfig = {
   callbackUrl?: string;
   icsUrl?: string;
   snapshot?: SnapshotEvent[];
+  /** provider-specific values (API shard, user URI…) */
+  extra?: Record<string, string>;
+  clientsSyncedAt?: string;
 };
 
 export type InboundCancellation = {
@@ -49,6 +55,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaManagerService,
     private readonly notifications: NotificationService,
+    private readonly jwt: JwtService,
   ) {}
 
   onModuleInit() {
@@ -79,12 +86,12 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
-  private async save(userId: string, provider: GenericProvider, data: { config: ConnectorConfig; externalUserId?: string | null; accessToken?: string }) {
+  private async save(userId: string, provider: GenericProvider, data: { config: ConnectorConfig; externalUserId?: string | null; accessToken?: string; refreshToken?: string | null; expiresAt?: Date | null }) {
     const base = {
       provider,
       accessToken: data.accessToken ?? '',
-      refreshToken: null,
-      expiresAt: null,
+      refreshToken: data.refreshToken ?? null,
+      expiresAt: data.expiresAt ?? null,
       scope: null,
       externalUserId: data.externalUserId ?? null,
       externalOrgId: null,
@@ -278,6 +285,72 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
     return { duplicate: false, slotId: gapletSlotId };
   }
 
+  // ───────────────────────────── native providers ─────────────────────────────
+
+  listProviders() {
+    return Object.values(ADAPTERS).map((a) => ({
+      key: a.key, name: a.name, maturity: a.maturity, bookingSupported: a.bookingSupported,
+      auth: a.auth.type, fields: a.auth.type === 'apikey' ? a.auth.fields : [], available: isConfigured(a),
+    }));
+  }
+
+  private oauthRedirect(provider: string) {
+    return `${(process.env.API_BASE_URL ?? '').replace(/\/$/, '')}/connectors/oauth/${provider}/callback`;
+  }
+
+  startOAuth(userId: string, provider: string) {
+    const a = getAdapter(provider);
+    if (!a || a.auth.type !== 'oauth2') throw new BadRequestException('Unsupported provider');
+    if (!isConfigured(a)) throw new BadRequestException(`${a.name} is not configured on this server`);
+    const state = this.jwt.sign({ sub: userId, purpose: 'oauth-state', provider }, { secret: process.env.JWT_ACCESS_SECRET, expiresIn: '10m' });
+    return { redirectUrl: a.auth.authorizeUrl(this.oauthRedirect(provider), state) };
+  }
+
+  async finishOAuth(provider: string, code: string, state: string) {
+    const a = getAdapter(provider);
+    if (!a || a.auth.type !== 'oauth2') throw new BadRequestException('Unsupported provider');
+    let userId: string;
+    try {
+      const p: any = await this.jwt.verifyAsync(state, { secret: process.env.JWT_ACCESS_SECRET });
+      if (p.purpose !== 'oauth-state' || p.provider !== provider || !p.sub) throw new Error();
+      userId = p.sub;
+    } catch { throw new BadRequestException('Invalid or expired state. Start the connection again.'); }
+    const creds = await a.auth.exchange(code, this.oauthRedirect(provider));
+    await this.saveCredentials(userId, provider as GenericProvider, creds);
+  }
+
+  async connectApiKey(userId: string, provider: string, values: Record<string, string>) {
+    const a = getAdapter(provider);
+    if (!a || a.auth.type !== 'apikey') throw new BadRequestException('Unsupported provider');
+    let creds: Credentials;
+    try { creds = await a.auth.validate(values ?? {}); }
+    catch (e: any) { throw new BadRequestException(e.message); }
+    await this.saveCredentials(userId, provider as GenericProvider, creds);
+    return { ok: true };
+  }
+
+  private async saveCredentials(userId: string, provider: GenericProvider, c: Credentials) {
+    await this.save(userId, provider, { config: { extra: c.extra ?? {} }, accessToken: c.accessToken, refreshToken: c.refreshToken ?? null, expiresAt: c.expiresAt ?? null });
+  }
+
+  /** Mirrors the vendor's client list into our Client table at most every 6 hours. */
+  private async maybeSyncClients(integ: any, adapter: any, ctx: any, config: ConnectorConfig, now: Date) {
+    if (!adapter.listClients) return;
+    if (config.clientsSyncedAt && now.getTime() - new Date(config.clientsSyncedAt).getTime() < 6 * 3600_000) return;
+    const clients = await adapter.listClients(ctx);
+    for (const c of clients) {
+      const where = { userId: integ.userId, OR: [...(c.email ? [{ email: c.email }] : []), ...(c.phone ? [{ phone: c.phone }] : [])] };
+      const existing = await this.prisma.client.findFirst({ where });
+      const data = { name: c.name, services: c.services, lastApptAt: c.lastApptAt ?? null, nextApptAt: c.nextApptAt ?? null };
+      try {
+        if (existing) await this.prisma.client.update({ where: { id: existing.id }, data: { ...data, email: c.email ?? existing.email, phone: c.phone ?? existing.phone } });
+        else await this.prisma.client.create({ data: { userId: integ.userId, email: c.email ?? null, phone: c.phone ?? null, ...data } });
+      } catch { /* unique clash on a secondary key: keep the existing record */ }
+    }
+    await this.prisma.connectedIntegration.update({ where: { id: integ.id }, data: { config: { ...config, clientsSyncedAt: now.toISOString() } as any } });
+    integ.config = { ...config, clientsSyncedAt: now.toISOString() };
+  }
+
   // ───────────────────────────────── polling ─────────────────────────────────
 
   private async fetchIcsEvents(url: string, now: Date): Promise<CalEvent[]> {
@@ -291,7 +364,7 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
     this.polling = true;
     try {
       const integs = await this.prisma.connectedIntegration.findMany({
-        where: { provider: { in: ['google', 'ics'] }, user: { role: { not: 'USER' } } },
+        where: { provider: { in: ['google', 'ics', ...ADAPTER_KEYS] }, user: { role: { not: 'USER' } } },
       });
       for (const integ of integs) await this.pollOne(integ).catch((e) => this.log.error(`poll ${integ.id}: ${e.message}`));
     } finally { this.polling = false; }
@@ -299,12 +372,18 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
 
   /** Fetches the current events, diffs against the stored snapshot and ingests freed slots. */
   async pollOne(integ: any, now = new Date()): Promise<{ baseline?: boolean; freed: number; suppressed?: boolean }> {
-    const config = this.cfg(integ);
+    let config = this.cfg(integ);
     try {
       let events: CalEvent[];
       if (integ.provider === 'ics') {
         if (!config.icsUrl) throw new Error('Missing ICS URL');
         events = await this.fetchIcsEvents(config.icsUrl, now);
+      } else if (isAdapterKey(integ.provider)) {
+        const adapter = getAdapter(integ.provider)!;
+        const ctx = await adapterCtx(this.prisma, integ, adapter, config.snapshot);
+        events = await adapter.listAppointments(ctx, now, new Date(now.getTime() + LOOKAHEAD_MS));
+        await this.maybeSyncClients(integ, adapter, ctx, config, now);
+        config = this.cfg(integ); // pick up clientsSyncedAt so the snapshot write below does not discard it
       } else {
         const token = await getGoogleAccessToken(this.prisma, integ);
         events = await listGoogleEvents(token, integ.calendarId || 'primary', now, new Date(now.getTime() + LOOKAHEAD_MS));

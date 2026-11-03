@@ -5,10 +5,13 @@ import { PrismaManagerService } from '../prisma-manager/prisma-manager.service';
 import { getGoogleAccessToken, insertGoogleEvent } from '../connectors/google';
 import { assertPublicHttpsUrl } from '../connectors/net-guard';
 import { callbackSecret } from '../connectors/callback-secret';
+import { GenericProvider, isGenericProvider } from '../connectors/providers/keys';
+import { getAdapter } from '../connectors/providers/registry';
+import { adapterCtx } from '../connectors/providers/runtime';
 const twilio = require('twilio');
 
-type AnyProvider = 'acuity' | 'square' | 'google' | 'ics' | 'webhook';
-const isGeneric = (p: string) => p === 'google' || p === 'ics' || p === 'webhook';
+type AnyProvider = 'acuity' | 'square' | GenericProvider;
+const isGeneric = isGenericProvider;
 
 interface Recipient {
   name: string;
@@ -1088,7 +1091,12 @@ private async bookGeneric(campaign: CampaignState, winner: Recipient, integratio
   const end = new Date(campaign.slotTime.getTime() + durationMin * 60_000);
   let bookingId = `manual-${campaign.gapletSlotId ?? campaign.campaignId}`;
 
-  if (campaign.provider === 'google') {
+  const adapter = getAdapter(campaign.provider);
+  if (adapter?.bookingSupported && adapter.book) {
+    // Real booking in the vendor system. A failure propagates: the client is told the slot is gone.
+    const ctx = await adapterCtx(this.prisma as any, integration, adapter);
+    bookingId = await adapter.book(ctx, { start: campaign.slotTime, end, service: undefined }, { name: winner.name, email: winner.email, phone: winner.phone });
+  } else if (campaign.provider === 'google') {
     const token = await getGoogleAccessToken(this.prisma as any, integration);
     bookingId = await insertGoogleEvent(token, integration.calendarId || 'primary', {
       summary: `${winner.name || 'Client'} (booked via Gaplet)`,
@@ -1106,8 +1114,8 @@ private async bookGeneric(campaign: CampaignState, winner: Recipient, integratio
   }).format(campaign.slotTime);
 
   if (owner?.email && process.env.SENDGRID_API_KEY) {
-    const extra = campaign.provider === 'google'
-      ? 'It was added to your Google Calendar.'
+    const extra = campaign.provider === 'google' || (adapter?.bookingSupported && adapter.book)
+      ? 'It was added to your calendar automatically.'
       : 'Please add it to your booking system (this connector cannot write to it automatically).';
     sgMail.send({
       to: owner.email,

@@ -4,6 +4,7 @@
  * Skipped when DATABASE_URL is not set.
  */
 import * as crypto from 'crypto';
+import { JwtService } from '@nestjs/jwt';
 
 const sendMock = jest.fn().mockResolvedValue([{}]);
 jest.mock('@sendgrid/mail', () => ({ setApiKey: jest.fn(), send: (...a: any[]) => sendMock(...a) }));
@@ -49,7 +50,7 @@ run('connectors (real database)', () => {
     process.env.API_BASE_URL = 'https://api.gaplets.test';
     await prisma.$connect();
     notifications = new NotificationService(prisma);
-    svc = new ConnectorsService(prisma, notifications);
+    svc = new ConnectorsService(prisma, notifications, new JwtService({}));
   });
   afterAll(async () => { await prisma.$disconnect(); });
 

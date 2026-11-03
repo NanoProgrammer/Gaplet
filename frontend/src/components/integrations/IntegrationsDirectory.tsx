@@ -93,7 +93,7 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
         (status === "all" || i.status === status) &&
         (!term || `${i.name} ${i.desc} ${INDUSTRIES[i.industry].label}`.toLowerCase().includes(term)),
     ).sort((a, b) => {
-      const rank = { live: 0, soon: 1, planned: 2 } as const;
+      const rank = { live: 0, beta: 1, soon: 2, planned: 3 } as const;
       return rank[a.status] - rank[b.status] || a.name.localeCompare(b.name);
     });
   }, [q, industry, status]);
@@ -118,7 +118,7 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
           />
         </label>
         <div className="flex gap-2" role="group" aria-label="Filter by status">
-          {(["all", "live", "soon", "planned"] as const).map((s) => (
+          {(["all", "live", "beta", "soon", "planned"] as const).map((s) => (
             <button key={s} type="button" onClick={() => setStatus(s)} aria-pressed={status === s} className={chip(status === s)}>
               {s === "all" ? "All status" : STATUS_META[s].label}
             </button>
@@ -166,7 +166,7 @@ export default function IntegrationsDirectory({ mode = "marketing" }: { mode?: "
       )}
 
       <p className="mt-8 text-xs text-slate-500">
-        “Live” works today. “Coming soon” is in development. “Planned” means no native sync yet: you can still connect it today if it publishes a calendar (ICS) link or can send webhooks directly or through Zapier / Make; native sync is prioritised by how many customers ask for it. Product names are trademarks of their
+        “Live” works today. “Beta” is built and tested but not yet verified with real vendor accounts: expect rough edges. “Coming soon” is in development. “Planned” means no native sync yet: you can still connect it today if it publishes a calendar (ICS) link or can send webhooks directly or through Zapier / Make; native sync is prioritised by how many customers ask for it. Product names are trademarks of their
         respective owners; listing does not imply endorsement or partnership.
       </p>
     </div>
